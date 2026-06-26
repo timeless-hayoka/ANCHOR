@@ -55,6 +55,42 @@
         "failed": 1,
         "timed_out": 1
       }
+    },
+    {
+      "id": "dvd-phase1-local-2026-06-26T23-14-42Z",
+      "target": "damn-vulnerable-defi",
+      "title": "Damn Vulnerable DeFi Phase 1 scaffold run with expectations",
+      "status": "scaffold",
+      "level": "Phase 1",
+      "commit": "57a31b8",
+      "branch": "main",
+      "executed_at": "2026-06-26T23:14:42.889092+00:00",
+      "environment": {
+        "forge_version": "1.7.1",
+        "os": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+        "per_challenge_timeout_sec": 45
+      },
+      "record": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T23-14-42Z/README.md",
+      "artifact_json": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T23-14-42Z/benchmark.json",
+      "expectations": "benchmarks/damn-vulnerable-defi/challenge_expectations.json",
+      "confidence_ladder": {
+        "methodology": "high",
+        "environment": "high",
+        "detection": "partial",
+        "reproduction": "partial",
+        "comparative_data": "partial"
+      },
+      "verified": true,
+      "confidence": "scaffold",
+      "results_summary": {
+        "passed": 1,
+        "failed": 1,
+        "timed_out": 1,
+        "aligned": 1,
+        "environment_sensitive": 1,
+        "investigate": 1,
+        "diverged": 0
+      }
     }
   ]
 }

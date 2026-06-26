@@ -1,0 +1,9 @@
+$ forge test --match-path test/wallet-mining/WalletMining.t.sol -vvv
+
+STDOUT
+No files changed, compilation skipped
+
+
+STDERR
+
+Timed out after 45s

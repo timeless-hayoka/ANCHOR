@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "target": "damn-vulnerable-defi",
+  "challenge_set": [
+    {
+      "challenge": "shards",
+      "test_path": "test/shards/Shards.t.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "Local challenge path should complete without RPC on a healthy setup."
+    },
+    {
+      "challenge": "wallet-mining",
+      "test_path": "test/wallet-mining/WalletMining.t.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass_or_timeout_needs_investigation",
+      "notes": "Known local challenge path, but timeout behavior must be measured and tracked explicitly."
+    },
+    {
+      "challenge": "withdrawal",
+      "test_path": "test/withdrawal/Withdrawal.t.sol",
+      "requires_rpc": true,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "environment_dependent",
+      "notes": "Fork-dependent path. Failure without RPC is informative, not necessarily a benchmark regression."
+    }
+  ]
+}

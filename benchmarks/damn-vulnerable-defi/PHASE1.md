@@ -46,3 +46,14 @@ python3 benchmarks/damn-vulnerable-defi/run_phase1_benchmark.py
 ## Next step to reach a stronger Phase 1
 
 Add challenge expectation labels and ANCHOR detector outputs so the benchmark can publish automated detection metrics instead of only execution outcomes.
+
+## Comparison schema
+
+The scaffold now reads `challenge_expectations.json` and records, per challenge:
+
+- expected ground truth
+- expected Phase 1 outcome
+- structured ANCHOR output fields
+- comparison state between expectation and observation
+
+That gives future runs a stable history format instead of one-off prose.
