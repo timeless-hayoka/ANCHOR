@@ -58,6 +58,7 @@ Benchmarks exist so other researchers can evaluate ANCHOR by method, not by pitc
 - [benchmarks/ethernaut/README.md](benchmarks/ethernaut/README.md)
 - [benchmarks/openzeppelin/README.md](benchmarks/openzeppelin/README.md)
 - [benchmarks/custom/README.md](benchmarks/custom/README.md)
+- `benchmarks/index.json` - machine-readable benchmark manifest
 
 Each benchmark records:
 
@@ -71,6 +72,12 @@ Each benchmark records:
 - false negatives
 - lessons learned
 - evidence artifacts
+
+
+## Public demo
+
+- [demo/index.html](demo/index.html) - static preview page for researchers, reviewers, and collaborators
+- GitHub Pages deployment is defined in `.github/workflows/pages.yml`
 
 ## What lives here
 

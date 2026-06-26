@@ -1,0 +1,23 @@
+{
+  "benchmarks": [
+    {
+      "id": "dvd-phase0-2026-06-26",
+      "target": "damn-vulnerable-defi",
+      "title": "Damn Vulnerable DeFi Phase 0 baseline",
+      "status": "baseline",
+      "level": "Phase 0",
+      "commit": "a2e03c5",
+      "branch": "main",
+      "record": "benchmarks/damn-vulnerable-defi/2026-06-26-phase0-baseline.md",
+      "confidence_ladder": {
+        "methodology": "high",
+        "environment": "high",
+        "detection": "partial",
+        "reproduction": "partial",
+        "comparative_data": "not_yet"
+      },
+      "verified": true,
+      "confidence": "baseline"
+    }
+  ]
+}
