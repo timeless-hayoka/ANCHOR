@@ -1,0 +1,15 @@
+$ forge test --match-path test/shards/Shards.t.sol -vvv
+
+STDOUT
+No files changed, compilation skipped
+
+Ran 2 tests for test/shards/Shards.t.sol:ShardsChallenge
+[PASS] test_assertInitialState() (gas: 80589)
+[PASS] test_shards() (gas: 720140)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 7.60ms (1.13ms CPU time)
+
+Ran 1 test suite in 15.56ms (7.60ms CPU time): 2 tests passed, 0 failed, 0 skipped (2 total tests)
+
+
+STDERR
+

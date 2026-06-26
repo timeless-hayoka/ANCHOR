@@ -1,0 +1,51 @@
+{
+  "benchmark_id": "dvd-phase1-local",
+  "level": "Phase 1 scaffold",
+  "executed_at": "2026-06-26T18:59:25.689358+00:00",
+  "anchor": {
+    "commit": "8bfff40c421872a5de80d92090a609ba247f908a",
+    "branch": "main"
+  },
+  "target": {
+    "repo": "/home/crexs/damn-vulnerable-defi",
+    "commit": "1fceebd31fe097eb00d8b44ad50e5fd62a3606b0",
+    "branch": "trinity-dvdf-unstoppable-validation"
+  },
+  "environment": {
+    "os": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+    "forge_version": "forge Version: 1.7.1\nCommit SHA: 4072e48705af9d93e3c0f6e29e93b5e9a40caed8\nBuild Timestamp: 2026-05-08T07:50:55.527285345Z (1778226655)\nBuild Profile: dist",
+    "per_challenge_timeout_sec": 45
+  },
+  "results": [
+    {
+      "challenge": "shards",
+      "test_path": "test/shards/Shards.t.sol",
+      "command": "forge test --match-path test/shards/Shards.t.sol -vvv",
+      "returncode": 0,
+      "status": "PASSED",
+      "duration_sec": 0.286,
+      "timed_out": false,
+      "log_path": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T18-59-25Z/shards.log"
+    },
+    {
+      "challenge": "wallet-mining",
+      "test_path": "test/wallet-mining/WalletMining.t.sol",
+      "command": "forge test --match-path test/wallet-mining/WalletMining.t.sol -vvv",
+      "returncode": 124,
+      "status": "TIMED_OUT",
+      "duration_sec": 45.045,
+      "timed_out": true,
+      "log_path": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T18-59-25Z/wallet-mining.log"
+    },
+    {
+      "challenge": "withdrawal",
+      "test_path": "test/withdrawal/Withdrawal.t.sol",
+      "command": "forge test --match-path test/withdrawal/Withdrawal.t.sol -vvv",
+      "returncode": 1,
+      "status": "FAILED",
+      "duration_sec": 0.205,
+      "timed_out": false,
+      "log_path": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T18-59-25Z/withdrawal.log"
+    }
+  ]
+}

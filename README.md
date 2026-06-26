@@ -6,6 +6,18 @@ AI says there may be a bug. ANCHOR asks for evidence.
 
 ANCHOR is a local-first proof gate for authorized smart-contract security research. It turns raw tool output into a reproducible case, refuses to promote claims without proof, and preserves the trail from signal to signed evidence.
 
+## Start here
+
+If you are new to ANCHOR, use this order:
+
+1. [demo/index.html](demo/index.html) - see the product and proof gate quickly
+2. [docs/METHODOLOGY.md](docs/METHODOLOGY.md) - understand the hunt workflow
+3. [docs/PROOF_GATE.md](docs/PROOF_GATE.md) - understand what counts as a finding
+4. [benchmarks/README.md](benchmarks/README.md) - inspect published benchmark artifacts
+5. [targets/enzyme-blue.md](targets/enzyme-blue.md) - see the current real-world target note
+
+If you want the short public-facing wording for profiles and outreach, use [docs/PROFILE_COPY.md](docs/PROFILE_COPY.md).
+
 ## Core idea
 
 A plausible claim is not a finding.

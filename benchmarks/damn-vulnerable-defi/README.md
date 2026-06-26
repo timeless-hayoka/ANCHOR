@@ -52,4 +52,4 @@ Store run notes, registry outputs, and signed evidence references here as the be
 ## Benchmark records
 
 - [2026-06-26 Phase 0 baseline](2026-06-26-phase0-baseline.md)
-
+- [2026-06-26 Phase 1 scaffold run](runs/2026-06-26T18-59-25Z/README.md)

@@ -8,6 +8,12 @@
       "level": "Phase 0",
       "commit": "a2e03c5",
       "branch": "main",
+      "executed_at": "2026-06-26",
+      "environment": {
+        "forge_version": "1.7.1",
+        "os": "Linux Mint 22.1",
+        "execution_model": "static proof-gate preview"
+      },
       "record": "benchmarks/damn-vulnerable-defi/2026-06-26-phase0-baseline.md",
       "confidence_ladder": {
         "methodology": "high",
@@ -18,6 +24,37 @@
       },
       "verified": true,
       "confidence": "baseline"
+    },
+    {
+      "id": "dvd-phase1-local-2026-06-26T18-59-25Z",
+      "target": "damn-vulnerable-defi",
+      "title": "Damn Vulnerable DeFi Phase 1 scaffold run",
+      "status": "scaffold",
+      "level": "Phase 1",
+      "commit": "8bfff40",
+      "branch": "main",
+      "executed_at": "2026-06-26T18:59:25.689358+00:00",
+      "environment": {
+        "forge_version": "1.7.1",
+        "os": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+        "per_challenge_timeout_sec": 45
+      },
+      "record": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T18-59-25Z/README.md",
+      "artifact_json": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T18-59-25Z/benchmark.json",
+      "confidence_ladder": {
+        "methodology": "high",
+        "environment": "high",
+        "detection": "partial",
+        "reproduction": "partial",
+        "comparative_data": "not_yet"
+      },
+      "verified": true,
+      "confidence": "scaffold",
+      "results_summary": {
+        "passed": 1,
+        "failed": 1,
+        "timed_out": 1
+      }
     }
   ]
 }
