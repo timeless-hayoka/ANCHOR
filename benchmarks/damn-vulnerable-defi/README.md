@@ -48,3 +48,8 @@ Use this benchmark to tune proof-gate discipline, not just detector coverage.
 ## Evidence artifacts
 
 Store run notes, registry outputs, and signed evidence references here as the benchmark matures.
+
+## Benchmark records
+
+- [2026-06-26 Phase 0 baseline](2026-06-26-phase0-baseline.md)
+
