@@ -4,15 +4,20 @@ Proof-gated smart-contract hunting for authorized security research.
 
 AI says there may be a bug. ANCHOR asks for evidence.
 
-ANCHOR is the flagship because it is the clearest story and the most finished artifact: a local-first proof gate for authorized smart-contract security research. It turns raw tool output into a reproducible case, refuses to promote claims without proof, and preserves the trail from signal to signed evidence.
+ANCHOR is a local-first proof gate for authorized smart-contract security research. It turns raw tool output into a reproducible case, refuses to promote claims without proof, and preserves the trail from signal to signed evidence.
 
-## The gate
+## Core idea
+
+A plausible claim is not a finding.
 
 A claim only moves forward when the evidence holds.
 
-- `seeded false claim` -> rejected with `REJECTED - INSUFFICIENT EVIDENCE`
-- `FIXTURE CORPUS - REAL TOOL EXECUTION` -> reproducible specimen run
-- `Phase 2` -> one public, already-disclosed vulnerability reproduced in an authorized lab or local fork
+- `signal` -> a scanner, heuristic, or human notices something worth checking
+- `hypothesis` -> the possible bug is stated precisely enough to falsify
+- `repro_attempted` -> the claim is tested on real code in an authorized environment
+- `reproduced_real` -> the impact is demonstrated with a complete proof of concept
+- `council_accepted` -> the result survives review and is ready to communicate
+- `report_ready` -> the evidence bundle, narrative, and reproduction steps are archived
 
 The point is simple:
 
@@ -21,6 +26,51 @@ The point is simple:
 - Bad claim fails the gate.
 - Real claim reproduces.
 - The proof is signed and preserved.
+
+## Methodology
+
+Methodology is a first-class concept in ANCHOR.
+
+The operating sequence is:
+
+1. Scope confirmation
+2. Hypothesis creation
+3. Evidence collection
+4. Reproduction
+5. Council review
+6. Report generation
+7. Archive
+
+Read the method documents here:
+
+- [docs/METHODOLOGY.md](docs/METHODOLOGY.md)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/PROOF_GATE.md](docs/PROOF_GATE.md)
+- [docs/EVIDENCE_LIFECYCLE.md](docs/EVIDENCE_LIFECYCLE.md)
+- [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)
+
+## Benchmarks
+
+Benchmarks exist so other researchers can evaluate ANCHOR by method, not by pitch.
+
+- [benchmarks/README.md](benchmarks/README.md)
+- [benchmarks/damn-vulnerable-defi/README.md](benchmarks/damn-vulnerable-defi/README.md)
+- [benchmarks/ethernaut/README.md](benchmarks/ethernaut/README.md)
+- [benchmarks/openzeppelin/README.md](benchmarks/openzeppelin/README.md)
+- [benchmarks/custom/README.md](benchmarks/custom/README.md)
+
+Each benchmark records:
+
+- target
+- scope
+- methodology
+- tooling
+- detection results
+- reproduction results
+- false positives
+- false negatives
+- lessons learned
+- evidence artifacts
 
 ## What lives here
 
@@ -60,4 +110,4 @@ Open the console, set the server URL to `http://127.0.0.1:8000`, and connect the
 - Target: `UnpermissionedActionsWrapper`
 - Hunt note: [targets/enzyme-blue.md](targets/enzyme-blue.md)
 
-That is the first real-world reproduction target because it has the clearest authorization boundary and the most likely reviewer-friendly PoC path.
+That is the first real-world reproduction target because it has a clear authorization boundary and a reviewer-friendly proof-of-concept path.
