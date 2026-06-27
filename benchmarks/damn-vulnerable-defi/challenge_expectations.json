@@ -5,6 +5,7 @@
     {
       "challenge": "shards",
       "test_path": "test/shards/Shards.t.sol",
+      "slither_target": "src/shards/ShardsNFTMarketplace.sol",
       "requires_rpc": false,
       "expected_ground_truth": "known_solve_path_exists",
       "expected_phase1_outcome": "pass",
@@ -13,6 +14,7 @@
     {
       "challenge": "wallet-mining",
       "test_path": "test/wallet-mining/WalletMining.t.sol",
+      "slither_target": "src/wallet-mining/WalletDeployer.sol",
       "requires_rpc": false,
       "expected_ground_truth": "known_solve_path_exists",
       "expected_phase1_outcome": "pass_or_timeout_needs_investigation",
@@ -21,6 +23,7 @@
     {
       "challenge": "withdrawal",
       "test_path": "test/withdrawal/Withdrawal.t.sol",
+      "slither_target": "src/withdrawal/TokenBridge.sol",
       "requires_rpc": true,
       "expected_ground_truth": "known_solve_path_exists",
       "expected_phase1_outcome": "environment_dependent",

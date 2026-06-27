@@ -23,7 +23,7 @@ The initial scaffold targets the three challenge paths already exposed by the AN
 ## Run command
 
 ```bash
-python3 benchmarks/damn-vulnerable-defi/run_phase1_benchmark.py
+./anchor benchmark dvd phase1
 ```
 
 Optional overrides:
@@ -31,7 +31,7 @@ Optional overrides:
 ```bash
 ANCHOR_DVD_ROOT=/path/to/damn-vulnerable-defi \
 ANCHOR_BENCHMARK_LABEL=dvd-phase1-local \
-python3 benchmarks/damn-vulnerable-defi/run_phase1_benchmark.py
+./anchor benchmark dvd phase1
 ```
 
 ## What the scaffold records
@@ -57,3 +57,12 @@ The scaffold now reads `challenge_expectations.json` and records, per challenge:
 - comparison state between expectation and observation
 
 That gives future runs a stable history format instead of one-off prose.
+
+
+## Benchmark history
+
+```bash
+anchor benchmark history --limit 5
+```
+
+This prints the latest published benchmark runs with pass/fail/timeout counts, detector signal count, and scoped medium/high target-relevant detector findings.

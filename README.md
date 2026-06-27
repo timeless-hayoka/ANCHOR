@@ -106,11 +106,22 @@ Each benchmark records:
 ## Install and run
 
 ```bash
-pip install -r requirements.txt
+./anchor env init
+./.venv/bin/pip install -r requirements.txt
 uvicorn anchor_server:app --host 127.0.0.1 --port 8000
 ```
 
 On first start the server creates `anchor_signing_key.pem` with owner-only permissions and reuses it later so evidence signatures stay stable.
+
+## Benchmark command
+
+The repo now ships with a single local entrypoint that prefers `./.venv/bin/python` when it exists and otherwise falls back to `python3`.
+
+```bash
+./anchor benchmark dvd phase1
+```
+
+That command runs the current Damn Vulnerable DeFi Phase 1 scaffold, writes a fresh benchmark artifact under `benchmarks/damn-vulnerable-defi/runs/`, and updates `benchmarks/index.json` so the latest summary shows up in the demo surfaces.
 
 ## Connect the console
 
@@ -130,3 +141,12 @@ Open the console, set the server URL to `http://127.0.0.1:8000`, and connect the
 - Hunt note: [targets/enzyme-blue.md](targets/enzyme-blue.md)
 
 That is the first real-world reproduction target because it has a clear authorization boundary and a reviewer-friendly proof-of-concept path.
+
+
+## Benchmark history
+
+```bash
+anchor benchmark history --limit 5
+```
+
+This prints the latest published benchmark runs with pass/fail/timeout counts, detector signal count, and scoped medium/high target-relevant detector findings.

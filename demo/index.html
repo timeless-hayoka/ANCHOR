@@ -287,8 +287,8 @@
         </div>
         <div class="metric">
           <div class="k">Current benchmark maturity</div>
-          <div class="v">Phase 0</div>
-          <div class="d">The public benchmark story has published artifacts and an honest baseline record.</div>
+          <div class="v" id="benchmarkLevel">Phase 0</div>
+          <div class="d" id="benchmarkMaturityNote">The public benchmark story has published artifacts and an honest baseline record.</div>
         </div>
         <div class="metric">
           <div class="k">Trust boundary</div>
@@ -315,11 +315,11 @@
         </div>
       </div>
       <div class="ladder">
-        <div class="step done"><div class="s">Methodology</div><div class="n">High</div></div>
-        <div class="step done"><div class="s">Environment</div><div class="n">High</div></div>
-        <div class="step partial"><div class="s">Detection</div><div class="n">Partial</div></div>
-        <div class="step partial"><div class="s">Reproduction</div><div class="n">Partial</div></div>
-        <div class="step todo"><div class="s">Comparative data</div><div class="n">Not yet</div></div>
+        <div class="step done" id="confidenceMethodologyStep"><div class="s">Methodology</div><div class="n" id="confidenceMethodology">High</div></div>
+        <div class="step done" id="confidenceEnvironmentStep"><div class="s">Environment</div><div class="n" id="confidenceEnvironment">High</div></div>
+        <div class="step partial" id="confidenceDetectionStep"><div class="s">Detection</div><div class="n" id="confidenceDetection">Partial</div></div>
+        <div class="step partial" id="confidenceReproductionStep"><div class="s">Reproduction</div><div class="n" id="confidenceReproduction">Partial</div></div>
+        <div class="step todo" id="confidenceComparativeStep"><div class="s">Comparative data</div><div class="n" id="confidenceComparative">Not yet</div></div>
       </div>
     </section>
 
@@ -334,13 +334,13 @@
             </tr>
           </thead>
           <tbody>
-            <tr><td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--muted);">Benchmark ID</td><td style="padding: 12px; border-bottom: 1px solid var(--line);">dvd-phase0-2026-06-26</td></tr>
-            <tr><td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--muted);">Level</td><td style="padding: 12px; border-bottom: 1px solid var(--line);">Phase 0 baseline</td></tr>
-            <tr><td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--muted);">ANCHOR commit</td><td style="padding: 12px; border-bottom: 1px solid var(--line);"><code>a2e03c5</code></td></tr>
-            <tr><td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--muted);">Branch</td><td style="padding: 12px; border-bottom: 1px solid var(--line);"><code>main</code></td></tr>
-            <tr><td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--muted);">Forge version</td><td style="padding: 12px; border-bottom: 1px solid var(--line);"><code>1.7.1</code></td></tr>
-            <tr><td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--muted);">Operating model</td><td style="padding: 12px; border-bottom: 1px solid var(--line);">Local-first, static proof-gate preview</td></tr>
-            <tr><td style="padding: 12px; color: var(--muted);">Evidence status</td><td style="padding: 12px;">Published artifact with machine-readable manifest</td></tr>
+            <tr><td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--muted);">Benchmark ID</td><td id="metaBenchmarkId" style="padding: 12px; border-bottom: 1px solid var(--line);">dvd-phase0-2026-06-26</td></tr>
+            <tr><td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--muted);">Level</td><td id="metaBenchmarkLevel" style="padding: 12px; border-bottom: 1px solid var(--line);">Phase 0 baseline</td></tr>
+            <tr><td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--muted);">ANCHOR commit</td><td id="metaCommit" style="padding: 12px; border-bottom: 1px solid var(--line);"><code>a2e03c5</code></td></tr>
+            <tr><td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--muted);">Branch</td><td id="metaBranch" style="padding: 12px; border-bottom: 1px solid var(--line);"><code>main</code></td></tr>
+            <tr><td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--muted);">Forge version</td><td id="metaForge" style="padding: 12px; border-bottom: 1px solid var(--line);"><code>1.7.1</code></td></tr>
+            <tr><td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--muted);">Operating model</td><td id="metaExecutionModel" style="padding: 12px; border-bottom: 1px solid var(--line);">Local-first, static proof-gate preview</td></tr>
+            <tr><td style="padding: 12px; color: var(--muted);">Evidence status</td><td id="metaEvidenceStatus" style="padding: 12px;">Published artifact with machine-readable manifest</td></tr>
           </tbody>
         </table>
       </div>
@@ -358,7 +358,7 @@
       <div class="grid">
         <div class="card">
           <h3>Current artifact</h3>
-          <p><strong style="color: var(--text);">Damn Vulnerable DeFi Phase 0 baseline</strong><br>This is the first published benchmark record: a scoped, auditable baseline that states exactly what ANCHOR proves today and what it does not claim yet.</p>
+          <p id="artifactSpotlight"><strong style="color: var(--text);">Damn Vulnerable DeFi Phase 0 baseline</strong><br>This is the first published benchmark record: a scoped, auditable baseline that states exactly what ANCHOR proves today and what it does not claim yet.</p>
         </div>
         <div class="card">
           <h3>Why it matters</h3>
@@ -431,6 +431,60 @@
         frame.src = tab.dataset.src;
       });
     });
+
+    function titleCase(value) {
+      return String(value || '').replace(/_/g, ' ').replace(/\w/g, (m) => m.toUpperCase());
+    }
+
+    function setConfidence(name, value) {
+      const text = titleCase(value || 'not_yet');
+      const valueNode = document.getElementById(`confidence${name}`);
+      const stepNode = document.getElementById(`confidence${name}Step`);
+      if (!valueNode || !stepNode) return;
+      valueNode.textContent = text;
+      stepNode.className = 'step ' + (value === 'high' ? 'done' : (value === 'partial' ? 'partial' : 'todo'));
+    }
+
+    async function loadLatestBenchmark() {
+      try {
+        const res = await fetch('../benchmarks/index.json');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const benchmarks = Array.isArray(data.benchmarks) ? data.benchmarks : [];
+        if (!benchmarks.length) return;
+        const latest = benchmarks.slice().sort((a, b) => String(a.executed_at || '').localeCompare(String(b.executed_at || ''))).at(-1);
+        const summary = latest.results_summary || {};
+        document.getElementById('benchmarkLevel').textContent = latest.level || 'Unknown';
+        document.getElementById('benchmarkMaturityNote').textContent = [
+          latest.title || 'Latest benchmark artifact',
+          summary.passed != null ? `${summary.passed} passed` : null,
+          summary.failed != null ? `${summary.failed} failed` : null,
+          summary.timed_out != null ? `${summary.timed_out} timed out` : null,
+        ].filter(Boolean).join(' · ');
+        document.getElementById('metaBenchmarkId').textContent = latest.id || 'unknown';
+        document.getElementById('metaBenchmarkLevel').textContent = [latest.level || 'Unknown', latest.status || 'unknown'].join(' · ');
+        document.getElementById('metaCommit').innerHTML = `<code>${latest.commit || 'unknown'}</code>`;
+        document.getElementById('metaBranch').innerHTML = `<code>${latest.branch || 'unknown'}</code>`;
+        document.getElementById('metaForge').innerHTML = `<code>${latest.environment?.forge_version || 'unknown'}</code>`;
+        document.getElementById('metaExecutionModel').textContent = latest.environment?.os || 'Local-first benchmark run';
+        document.getElementById('metaEvidenceStatus').textContent = [
+          latest.record ? 'Published artifact' : 'Artifact pending',
+          summary.detector_signals != null ? `${summary.detector_signals} detector-signal challenges` : null,
+          latest.artifact_json ? 'Machine-readable manifest entry' : null,
+        ].filter(Boolean).join(' · ');
+        const ladder = latest.confidence_ladder || {};
+        setConfidence('Methodology', ladder.methodology);
+        setConfidence('Environment', ladder.environment);
+        setConfidence('Detection', ladder.detection);
+        setConfidence('Reproduction', ladder.reproduction);
+        setConfidence('Comparative', ladder.comparative_data);
+        document.getElementById('artifactSpotlight').innerHTML = `<strong style="color: var(--text);">${latest.title || latest.id || 'Latest benchmark'}</strong><br>Latest recorded run: ${latest.executed_at || 'unknown time'}. Summary: ${summary.passed ?? 0} passed, ${summary.failed ?? 0} failed, ${summary.timed_out ?? 0} timed out.`;
+      } catch (_) {
+        // Static fallback is already rendered in markup.
+      }
+    }
+
+    loadLatestBenchmark();
   </script>
 </body>
 </html>

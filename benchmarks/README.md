@@ -71,3 +71,12 @@ Every benchmark should converge on the same structure:
 ## Manifest
 
 The machine-readable registry is stored in `benchmarks/index.json`.
+
+
+## Benchmark history
+
+```bash
+anchor benchmark history --limit 5
+```
+
+This prints the latest published benchmark runs with pass/fail/timeout counts, detector signal count, and scoped medium/high target-relevant detector findings.

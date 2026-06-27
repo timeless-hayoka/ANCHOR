@@ -904,6 +904,36 @@ async function updateObserver() {
   }
 }
 
+async function fetchLatestBenchmarkEntry() {
+  const candidates = ['../../benchmarks/index.json', '../benchmarks/index.json', '/benchmarks/index.json'];
+  for (const candidate of candidates) {
+    try {
+      const res = await fetch(candidate);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const benchmarks = Array.isArray(data.benchmarks) ? data.benchmarks : [];
+      if (!benchmarks.length) continue;
+      return benchmarks.slice().sort((a, b) => String(a.executed_at || '').localeCompare(String(b.executed_at || ''))).at(-1);
+    } catch (_) {
+      // try the next path
+    }
+  }
+  return null;
+}
+
+function formatBenchmarkSummary(entry) {
+  if (!entry) return 'Evidence metrics are unavailable right now.';
+  const summary = entry.results_summary || {};
+  return [
+    `Latest benchmark: ${entry.id || 'unknown'}`,
+    entry.level ? `Level: ${entry.level}` : null,
+    summary.passed != null ? `${summary.passed} passed` : null,
+    summary.failed != null ? `${summary.failed} failed` : null,
+    summary.timed_out != null ? `${summary.timed_out} timed out` : null,
+    summary.detector_signals != null ? `${summary.detector_signals} detector signals` : null,
+  ].filter(Boolean).join(' · ');
+}
+
 async function loadMetrics() {
   setPanelNotice(evidenceStatus, 'loading', 'Loading evidence metrics…');
   try {
@@ -928,8 +958,15 @@ async function loadMetrics() {
     evidenceAccepted.textContent = '—';
     evidenceRejected.textContent = '—';
     evidenceRate.textContent = '—';
-    evidenceSummary.textContent = 'Evidence metrics are unavailable right now.';
-    setPanelNotice(evidenceStatus, 'error', `Evidence metrics unavailable: ${e.message || 'unknown error'}`);
+    const latestBenchmark = await fetchLatestBenchmarkEntry();
+    evidenceSummary.textContent = formatBenchmarkSummary(latestBenchmark);
+    setPanelNotice(
+      evidenceStatus,
+      latestBenchmark ? 'optional' : 'error',
+      latestBenchmark
+        ? 'Live evidence metrics unavailable; showing the latest published benchmark summary instead.'
+        : `Evidence metrics unavailable: ${e.message || 'unknown error'}`
+    );
   }
 }
 

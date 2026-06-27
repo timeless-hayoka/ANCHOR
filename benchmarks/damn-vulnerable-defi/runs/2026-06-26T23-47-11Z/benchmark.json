@@ -1,0 +1,182 @@
+{
+  "schema_version": "1.2",
+  "benchmark_id": "dvd-phase1-local",
+  "level": "Phase 1 scaffold",
+  "executed_at": "2026-06-26T23:47:11.352547+00:00",
+  "anchor": {
+    "commit": "fff5e75e20be169513c7115a52ca6e7da059b74d",
+    "branch": "main"
+  },
+  "target": {
+    "repo": "/home/crexs/damn-vulnerable-defi",
+    "commit": "1fceebd31fe097eb00d8b44ad50e5fd62a3606b0",
+    "branch": "trinity-dvdf-unstoppable-validation"
+  },
+  "environment": {
+    "os": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+    "forge_version": "forge Version: 1.7.1\nCommit SHA: 4072e48705af9d93e3c0f6e29e93b5e9a40caed8\nBuild Timestamp: 2026-05-08T07:50:55.527285345Z (1778226655)\nBuild Profile: dist",
+    "per_challenge_timeout_sec": 90,
+    "detector_tooling": {
+      "slither": "/home/crexs/.local/bin/slither",
+      "mythril": {
+        "tool": "mythril",
+        "status": "unavailable",
+        "detail": "ModuleNotFoundError: No module named 'pkg_resources'"
+      }
+    }
+  },
+  "summary": {
+    "passed": 1,
+    "failed": 1,
+    "skipped": 0,
+    "timed_out": 1,
+    "aligned": 1,
+    "environment_sensitive": 1,
+    "investigate": 1,
+    "diverged": 0,
+    "detector_signals": 3
+  },
+  "results": [
+    {
+      "challenge": "shards",
+      "test_path": "test/shards/Shards.t.sol",
+      "command": "forge test --match-path test/shards/Shards.t.sol -vvv",
+      "returncode": 0,
+      "status": "PASSED",
+      "duration_sec": 5.655,
+      "timed_out": false,
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "comparison": "aligned",
+      "anchor_output": {
+        "detection_state": "signals_present",
+        "reproduction_state": "reproduced_real",
+        "council_state": "not_reviewed",
+        "detector_outputs": [
+          {
+            "tool": "slither",
+            "status": "completed",
+            "target": "src/shards/ShardsNFTMarketplace.sol",
+            "finding_count": 288,
+            "checks": [
+              "events-maths",
+              "locked-ether",
+              "missing-zero-check",
+              "naming-convention",
+              "pragma",
+              "reentrancy-events",
+              "reentrancy-no-eth",
+              "timestamp",
+              "unchecked-transfer",
+              "unindexed-event-address",
+              "uninitialized-local",
+              "unused-return",
+              "unused-state"
+            ],
+            "artifact_json": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T23-47-11Z/shards.slither.json",
+            "detail": "completed with 288 finding(s)"
+          },
+          {
+            "tool": "mythril",
+            "status": "unavailable",
+            "detail": "ModuleNotFoundError: No module named 'pkg_resources'"
+          }
+        ]
+      },
+      "notes": "Local challenge path should complete without RPC on a healthy setup.",
+      "log_path": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T23-47-11Z/shards.log"
+    },
+    {
+      "challenge": "wallet-mining",
+      "test_path": "test/wallet-mining/WalletMining.t.sol",
+      "command": "forge test --match-path test/wallet-mining/WalletMining.t.sol -vvv",
+      "returncode": 124,
+      "status": "TIMED_OUT",
+      "duration_sec": 90.098,
+      "timed_out": true,
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass_or_timeout_needs_investigation",
+      "comparison": "investigate_but_not_regression",
+      "anchor_output": {
+        "detection_state": "signals_present",
+        "reproduction_state": "repro_timed_out",
+        "council_state": "not_reviewed",
+        "detector_outputs": [
+          {
+            "tool": "slither",
+            "status": "completed",
+            "target": "src/wallet-mining/WalletDeployer.sol",
+            "finding_count": 9,
+            "checks": [
+              "assembly",
+              "constable-states",
+              "incorrect-return",
+              "missing-zero-check",
+              "naming-convention",
+              "pragma",
+              "unchecked-transfer"
+            ],
+            "artifact_json": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T23-47-11Z/wallet-mining.slither.json",
+            "detail": "completed with 9 finding(s)"
+          },
+          {
+            "tool": "mythril",
+            "status": "unavailable",
+            "detail": "ModuleNotFoundError: No module named 'pkg_resources'"
+          }
+        ]
+      },
+      "notes": "Known local challenge path, but timeout behavior must be measured and tracked explicitly.",
+      "log_path": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T23-47-11Z/wallet-mining.log"
+    },
+    {
+      "challenge": "withdrawal",
+      "test_path": "test/withdrawal/Withdrawal.t.sol",
+      "command": "forge test --match-path test/withdrawal/Withdrawal.t.sol -vvv",
+      "returncode": 1,
+      "status": "FAILED",
+      "duration_sec": 6.123,
+      "timed_out": false,
+      "requires_rpc": true,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "environment_dependent",
+      "comparison": "environment_sensitive",
+      "anchor_output": {
+        "detection_state": "signals_present",
+        "reproduction_state": "repro_failed",
+        "council_state": "not_reviewed",
+        "detector_outputs": [
+          {
+            "tool": "slither",
+            "status": "completed",
+            "target": "src/withdrawal/TokenBridge.sol",
+            "finding_count": 269,
+            "checks": [
+              "assembly",
+              "immutable-states",
+              "locked-ether",
+              "missing-zero-check",
+              "naming-convention",
+              "pragma",
+              "timestamp",
+              "unchecked-transfer",
+              "unused-state",
+              "write-after-write"
+            ],
+            "artifact_json": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T23-47-11Z/withdrawal.slither.json",
+            "detail": "completed with 269 finding(s)"
+          },
+          {
+            "tool": "mythril",
+            "status": "unavailable",
+            "detail": "ModuleNotFoundError: No module named 'pkg_resources'"
+          }
+        ]
+      },
+      "notes": "Fork-dependent path. Failure without RPC is informative, not necessarily a benchmark regression.",
+      "log_path": "benchmarks/damn-vulnerable-defi/runs/2026-06-26T23-47-11Z/withdrawal.log"
+    }
+  ]
+}

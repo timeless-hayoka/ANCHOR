@@ -1,0 +1,17 @@
+$ forge test --match-path test/shards/Shards.t.sol -vvv
+
+STDOUT
+Compiling 181 files with Solc 0.8.25
+Solc 0.8.25 finished in 4.67s
+Compiler run successful!
+
+Ran 2 tests for test/shards/Shards.t.sol:ShardsChallenge
+[PASS] test_assertInitialState() (gas: 80589)
+[PASS] test_shards() (gas: 720140)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 2.00ms (721.72µs CPU time)
+
+Ran 1 test suite in 8.14ms (2.00ms CPU time): 2 tests passed, 0 failed, 0 skipped (2 total tests)
+
+
+STDERR
+

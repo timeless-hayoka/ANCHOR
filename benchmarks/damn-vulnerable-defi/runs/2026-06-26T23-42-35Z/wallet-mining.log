@@ -1,0 +1,22 @@
+$ forge test --match-path test/wallet-mining/WalletMining.t.sol -vvv
+
+STDOUT
+Compiling 157 files with Solc 0.8.25
+Solc 0.8.25 finished in 4.34s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> test/wallet-mining/WalletMining.t.sol:235:37:
+    |
+235 |     function _computeCreate2Address(address deployer, bytes32 salt, bytes32 initCodeHash) private pure returns (address) {
+    |                                     ^^^^^^^^^^^^^^^^
+Note: The shadowed declaration is here:
+  --> test/wallet-mining/WalletMining.t.sol:38:5:
+   |
+38 |     address deployer = makeAddr("deployer");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+
+STDERR
+
+Timed out after 90s
