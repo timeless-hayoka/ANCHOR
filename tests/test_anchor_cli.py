@@ -71,6 +71,14 @@ def test_parser_accepts_benchmark_trends():
     assert args.json is True
 
 
+def test_parser_accepts_strategy():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["strategy", "--limit", "5", "--json"])
+    assert args.command == "strategy"
+    assert args.limit == 5
+    assert args.json is True
+
+
 def test_parser_accepts_benchmark_publish():
     parser = anchor_cli.create_parser()
     args = parser.parse_args(["benchmark", "publish", "run-a", "--note", "ship it"])
@@ -444,6 +452,7 @@ def test_render_outcome_insights_highlights_top_lessons():
     assert "accepted: 1" in rendered
     assert "Missing reproduction evidence (2)" in rendered
     assert "enzyme: 2" in rendered
+    assert "Lessons learned (grouped)" in rendered
 
 
 def test_cmd_benchmark_publish_updates_manifest_and_ledger(tmp_path, monkeypatch, capsys):

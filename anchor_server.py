@@ -23,9 +23,11 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse, RedirectResponse
 
+from anchor_cli import load_outcome_entries
 from anchor_scripts import allowed_script_names, load_script_registry, registry_summary
 from anchor_storage import build_storage_manifest, evidence_dir, storage_manifest_path, storage_summary, write_json
 from anchor_trends import compute_benchmark_trends
+from anchor_strategy import compute_strategy
 from scabench_adapter import adapt as adapt_scabench
 
 APP_VERSION = "1.0.0"
@@ -748,12 +750,20 @@ def _anchor_snapshot(limit: int = 8) -> dict[str, Any]:
         )
     latest = _latest_benchmark_entry(entries[: max(1, limit)])
     trends = compute_benchmark_trends(manifest.get("benchmarks", []), root=ROOT, limit=max(10, limit))
+    strategy = compute_strategy(
+        manifest.get("benchmarks", []),
+        load_outcome_entries(),
+        root=ROOT,
+        trends_limit=max(10, limit),
+        top_n=3,
+    )
     return {
         "identity": {"version": APP_VERSION, "service": "anchor", "release": f"ANCHOR {APP_VERSION}"},
         "history": {"runs": runs},
         "benchmarks": entries[: max(1, limit)],
         "benchmark_overview": _benchmark_overview(latest),
         "benchmark_trends": trends,
+        "benchmark_strategy": strategy,
         "script_registry": registry_summary(),
         "scabench": adapt_scabench(latest),
     }
@@ -778,6 +788,18 @@ async def api_anchor_snapshot(limit: int = 8) -> dict[str, Any]:
 async def api_anchor_benchmark_trends(limit: int = 10) -> dict[str, Any]:
     manifest = _load_benchmark_manifest()
     return compute_benchmark_trends(manifest.get("benchmarks", []), root=ROOT, limit=limit)
+
+
+@app.get("/api/anchor/strategy")
+async def api_anchor_strategy(limit: int = 10, top: int = 5) -> dict[str, Any]:
+    manifest = _load_benchmark_manifest()
+    return compute_strategy(
+        manifest.get("benchmarks", []),
+        load_outcome_entries(),
+        root=ROOT,
+        trends_limit=limit,
+        top_n=top,
+    )
 
 
 @app.get("/api/trinity/paths")

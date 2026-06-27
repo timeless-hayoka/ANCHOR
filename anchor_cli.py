@@ -11,6 +11,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+from anchor_strategy import compute_strategy, render_strategy
 from anchor_trends import compute_benchmark_trends, render_benchmark_trends
 
 ROOT = Path(__file__).resolve().parent
@@ -148,6 +149,11 @@ def create_parser() -> argparse.ArgumentParser:
             if getattr(action, "nargs", None) is not None:
                 kwargs["nargs"] = action.nargs
             outcome_record.add_argument(*action.option_strings, **kwargs)
+
+    strategy_parser = sub.add_parser("strategy", help="Evidence-driven hunt prioritization from trends and outcomes")
+    strategy_parser.add_argument("--limit", type=int, default=10, help="Published benchmark runs for trend context")
+    strategy_parser.add_argument("--top", type=int, default=5, help="Maximum ranked recommendations to include")
+    strategy_parser.add_argument("--json", action="store_true", help="Emit structured JSON instead of text")
 
     return parser
 
@@ -740,11 +746,18 @@ def render_outcome_insights(entries: list[dict], limit: int = 50, top_n: int = 5
     if not entries:
         return "No outcome ledger entries recorded yet."
 
+    from anchor_strategy import categorize_lesson, PATTERN_RECOMMENDATIONS
+
     rows = sorted(entries, key=lambda entry: entry.get("timestamp", ""), reverse=True)[:limit]
     by_status = Counter(entry.get("status", "unknown") for entry in rows)
     by_target = Counter(entry.get("target", "") or "unlabeled" for entry in rows)
     by_type = Counter(entry.get("type", "unknown") for entry in rows)
     lesson_counter = Counter((entry.get("lesson") or "").strip() for entry in rows if (entry.get("lesson") or "").strip())
+    pattern_counter: Counter[str] = Counter()
+    for entry in rows:
+        lesson = (entry.get("lesson") or entry.get("note") or "").strip()
+        if lesson:
+            pattern_counter[categorize_lesson(lesson)] += 1
 
     lines = [
         f"Last {len(rows)} outcomes",
@@ -758,7 +771,19 @@ def render_outcome_insights(entries: list[dict], limit: int = 50, top_n: int = 5
     for kind in OUTCOME_TYPES:
         if by_type.get(kind):
             lines.append(f"- {kind}: {by_type[kind]}")
-    lines.extend(["", "Top lessons"])
+    lines.extend(["", "Lessons learned (grouped)"])
+    if pattern_counter:
+        for label, count in pattern_counter.most_common(top_n):
+            lines.append(f"- {label}: {count}")
+    else:
+        lines.append("- No lessons recorded yet.")
+    top_pattern = pattern_counter.most_common(1)[0][0] if pattern_counter else None
+    if top_pattern and top_pattern not in {"Other", "Uncategorized"}:
+        lines.extend(["", "Common failure pattern", "", top_pattern, ""])
+        recommendation = PATTERN_RECOMMENDATIONS.get(top_pattern, "")
+        if recommendation:
+            lines.extend(["Recommendation", "", recommendation, ""])
+    lines.extend(["", "Top lessons (verbatim)"])
     if lesson_counter:
         for lesson, count in lesson_counter.most_common(top_n):
             lines.append(f"- {lesson} ({count})")
@@ -836,6 +861,21 @@ def cmd_benchmark_trends(args: argparse.Namespace) -> int:
         print(json.dumps(trends, indent=2))
     else:
         print(render_benchmark_trends(trends))
+    return 0
+
+
+def cmd_strategy(args: argparse.Namespace) -> int:
+    payload = compute_strategy(
+        load_manifest(),
+        load_outcome_entries(),
+        root=ROOT,
+        trends_limit=args.limit,
+        top_n=args.top,
+    )
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        print(render_strategy(payload))
     return 0
 
 
@@ -976,6 +1016,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_benchmark_latest(args)
     if args.command == "benchmark" and args.benchmark_command == "trends":
         return cmd_benchmark_trends(args)
+    if args.command == "strategy":
+        return cmd_strategy(args)
     if args.command == "benchmark" and args.benchmark_command == "publish":
         return cmd_benchmark_publish(args)
     if args.command == "benchmark":

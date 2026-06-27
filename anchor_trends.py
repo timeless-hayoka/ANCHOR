@@ -175,6 +175,38 @@ def compute_benchmark_trends(
                 }
             )
 
+    latest_entry = runs_chron[-1] if runs_chron else None
+    latest_index = benchmark_result_index(latest_entry, root) if latest_entry else {}
+    challenge_profiles: dict[str, dict[str, Any]] = {}
+    all_challenges = set(challenge_timelines) | set(latest_index)
+    for challenge in all_challenges:
+        timeline = challenge_timelines.get(challenge, [])
+        latest_result = latest_index.get(challenge, {})
+        last_status = (
+            timeline[-1]["status"]
+            if timeline
+            else str(latest_result.get("status", "UNKNOWN")).upper()
+        )
+        timeout_count = sum(1 for row in timeline if row["timed_out"] or row["status"] == "TIMED_OUT")
+        status_changes = sum(
+            1 for idx in range(1, len(timeline)) if timeline[idx]["status"] != timeline[idx - 1]["status"]
+        )
+        passed_count = sum(1 for row in timeline if row["status"] == "PASSED")
+        stability_ratio = passed_count / len(timeline) if timeline else (1.0 if last_status == "PASSED" else 0.0)
+        challenge_profiles[challenge] = {
+            "challenge": challenge,
+            "label": format_challenge_label(challenge),
+            "last_status": last_status,
+            "timeout_count": timeout_count,
+            "status_changes": status_changes,
+            "instability_score": status_changes * 2 + timeout_count,
+            "stability_ratio": stability_ratio,
+            "requires_rpc": bool(latest_result.get("requires_rpc")),
+            "comparison": str(latest_result.get("comparison", "")),
+        }
+
+    stability = _compute_stability_metrics(runs_chron, challenge_profiles, root)
+
     best_improvement = -999
     top_improved: dict[str, Any] | None = None
     worst_instability = -1
@@ -213,7 +245,7 @@ def compute_benchmark_trends(
             }
 
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "published_count": len(runs_chron),
         "limit": limit,
         "runs": run_rows,
@@ -222,6 +254,49 @@ def compute_benchmark_trends(
         "trend_direction": trend_direction,
         "top_improved_challenge": top_improved,
         "most_unstable_challenge": most_unstable,
+        "challenge_profiles": challenge_profiles,
+        "stability": stability,
+    }
+
+
+def _compute_stability_metrics(
+    runs_chron: list[dict],
+    challenge_profiles: dict[str, dict[str, Any]],
+    root: Path,
+) -> dict[str, Any]:
+    aligned_total = 0
+    env_sensitive_total = 0
+    investigate_total = 0
+    for entry in runs_chron[-3:]:
+        summary = summary_for_entry(entry, root)
+        aligned_total += int(summary.get("aligned") or 0)
+        env_sensitive_total += int(summary.get("environment_sensitive") or 0)
+        investigate_total += int(summary.get("investigate") or 0)
+
+    denom = aligned_total + env_sensitive_total + investigate_total
+    benchmark_level = {
+        "stable_pct": (aligned_total / denom) if denom else None,
+        "environment_sensitive_pct": (env_sensitive_total / denom) if denom else None,
+        "investigate_pct": (investigate_total / denom) if denom else None,
+        "sample_runs": min(3, len(runs_chron)),
+    }
+
+    challenge_bars: list[dict[str, Any]] = []
+    for challenge, profile in sorted(challenge_profiles.items(), key=lambda item: item[1]["stability_ratio"], reverse=True):
+        ratio = profile["stability_ratio"]
+        challenge_bars.append(
+            {
+                "challenge": challenge,
+                "label": profile["label"],
+                "stability_ratio": ratio,
+                "bar_filled": max(0, min(10, int(round(ratio * 10)))),
+                "bar_empty": max(0, min(10, 10 - int(round(ratio * 10)))),
+            }
+        )
+
+    return {
+        "benchmark": benchmark_level,
+        "challenges": challenge_bars,
     }
 
 
@@ -299,6 +374,31 @@ def render_benchmark_trends(trends: dict[str, Any]) -> str:
         )
     else:
         lines.extend(["Most Unstable", "", "—", ""])
+
+    stability = trends.get("stability") or {}
+    benchmark_stability = stability.get("benchmark") or {}
+    if benchmark_stability.get("stable_pct") is not None:
+        stable_pct = benchmark_stability["stable_pct"] * 100
+        env_pct = (benchmark_stability.get("environment_sensitive_pct") or 0) * 100
+        lines.extend(
+            [
+                "Benchmark Stability",
+                "",
+                f"Stable: {'█' * int(stable_pct / 10)}{'░' * (10 - int(stable_pct / 10))} {stable_pct:.0f}%",
+                f"Environment-sensitive: {'█' * max(1, int(env_pct / 10)) if env_pct else ''}{'░' * (10 - int(env_pct / 10))} {env_pct:.0f}%",
+                "",
+            ]
+        )
+
+    challenge_bars = stability.get("challenges") or []
+    if challenge_bars:
+        lines.append("Challenge Stability")
+        lines.append("")
+        for row in challenge_bars[:5]:
+            filled = row.get("bar_filled", 0)
+            empty = row.get("bar_empty", 10 - filled)
+            lines.append(f"{row.get('label', row.get('challenge', '—'))}: {'█' * filled}{'░' * empty}")
+        lines.append("")
 
     lines.append("Canonical source: anchor_trends.compute_benchmark_trends — use for dashboard and strategy.")
     return "\n".join(lines)
