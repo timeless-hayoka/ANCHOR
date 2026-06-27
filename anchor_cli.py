@@ -7,6 +7,7 @@ import json
 import runpy
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -19,6 +20,17 @@ DEFAULT_HISTORY_POLICY = {
     "default_history_view": "published_only",
     "published_tier": "published",
     "note": "Successful development reruns remain on disk, but only intentionally promoted runs are first-class published artifacts.",
+}
+OUTCOME_TYPES = ["benchmark", "pr", "issue", "finding"]
+OUTCOME_STATUSES = ["open", "published", "triaged", "accepted", "rejected", "patched", "merged"]
+LEGACY_STAGE_STATUS = {
+    "benchmark_published": ("benchmark", "published"),
+    "report_submitted": ("finding", "open"),
+    "triaged": ("finding", "triaged"),
+    "accepted": ("finding", "accepted"),
+    "rejected": ("finding", "rejected"),
+    "patched": ("finding", "patched"),
+    "merged": ("pr", "merged"),
 }
 BENCHMARK_RUNNERS = {
     ("dvd", "phase1"): ROOT / "benchmarks" / "damn-vulnerable-defi" / "run_phase1_benchmark.py",
@@ -68,13 +80,40 @@ def create_parser() -> argparse.ArgumentParser:
     outcome_history = outcome_sub.add_parser("history", help="Show recorded outcome ledger events")
     outcome_history.add_argument("--limit", type=int, default=10, help="Maximum number of outcome entries to show")
 
-    outcome_record = outcome_sub.add_parser("record", help="Append an outcome event to the ledger")
-    outcome_record.add_argument("--stage", required=True, choices=["benchmark_published", "report_submitted", "triaged", "accepted", "rejected", "patched", "merged"], help="Outcome stage")
-    outcome_record.add_argument("--target", default="", help="Protocol, benchmark family, or target label")
-    outcome_record.add_argument("--run-id", default="", help="Benchmark run id if applicable")
-    outcome_record.add_argument("--case-id", default="", help="Case id if applicable")
-    outcome_record.add_argument("--report-id", default="", help="External report or submission id if applicable")
-    outcome_record.add_argument("--note", default="", help="Short note for the outcome event")
+    outcome_summary = outcome_sub.add_parser("summary", help="Show aggregated outcome ledger status and lessons")
+    outcome_summary.add_argument("--limit", type=int, default=5, help="Maximum number of recent lessons to show")
+
+    outcome_add = outcome_sub.add_parser("add", help="Append a structured outcome event to the ledger")
+    outcome_add.add_argument("--type", required=True, choices=OUTCOME_TYPES, help="Outcome object type")
+    outcome_add.add_argument("--target", required=True, help="Benchmark family, protocol, repository, or target label")
+    outcome_add.add_argument("--status", required=True, choices=OUTCOME_STATUSES, help="Outcome status")
+    outcome_add.add_argument("--evidence", default="", help="Evidence pointer such as a run id, PR URL, issue URL, artifact path, or report link")
+    outcome_add.add_argument("--lesson", default="", help="What ANCHOR learned from this outcome")
+    outcome_add.add_argument("--run-id", default="", help="Benchmark run id if applicable")
+    outcome_add.add_argument("--case-id", default="", help="Case id if applicable")
+    outcome_add.add_argument("--report-id", default="", help="External report or submission id if applicable")
+    outcome_add.add_argument("--note", default="", help="Short note for the outcome event")
+
+    outcome_record = outcome_sub.add_parser("record", help=argparse.SUPPRESS)
+    for action in outcome_add._actions:
+        if action.dest in {"help"}:
+            continue
+        kwargs = {
+            "dest": action.dest,
+            "default": action.default,
+            "required": getattr(action, "required", False),
+            "help": argparse.SUPPRESS,
+        }
+        if action.option_strings:
+            if getattr(action, "choices", None) is not None:
+                kwargs["choices"] = action.choices
+            if getattr(action, "const", None) is not None and action.nargs == 0:
+                kwargs["const"] = action.const
+            if getattr(action, "type", None) is not None:
+                kwargs["type"] = action.type
+            if getattr(action, "nargs", None) is not None:
+                kwargs["nargs"] = action.nargs
+            outcome_record.add_argument(*action.option_strings, **kwargs)
 
     return parser
 
@@ -207,6 +246,41 @@ def ensure_outcome_dir() -> None:
     OUTCOMES_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def infer_outcome_type(entry: dict) -> str:
+    if entry.get("type") in OUTCOME_TYPES:
+        return entry["type"]
+    stage = entry.get("stage", "")
+    if stage in LEGACY_STAGE_STATUS:
+        return LEGACY_STAGE_STATUS[stage][0]
+    return "finding"
+
+
+def infer_outcome_status(entry: dict) -> str:
+    if entry.get("status") in OUTCOME_STATUSES:
+        return entry["status"]
+    stage = entry.get("stage", "")
+    if stage in LEGACY_STAGE_STATUS:
+        return LEGACY_STAGE_STATUS[stage][1]
+    return "open"
+
+
+def normalize_outcome_entry(entry: dict) -> dict:
+    normalized = dict(entry)
+    normalized.setdefault("timestamp", "unknown")
+    normalized["type"] = infer_outcome_type(entry)
+    normalized["status"] = infer_outcome_status(entry)
+    normalized.setdefault("target", "")
+    normalized.setdefault("run_id", "")
+    normalized.setdefault("case_id", "")
+    normalized.setdefault("report_id", "")
+    normalized.setdefault("note", "")
+    normalized.setdefault("lesson", "")
+    normalized.setdefault("evidence", "")
+    if not normalized["evidence"]:
+        normalized["evidence"] = normalized.get("report_id") or normalized.get("run_id") or normalized.get("note", "")
+    return normalized
+
+
 def load_outcome_entries() -> list[dict]:
     if not OUTCOME_LEDGER_PATH.exists():
         return []
@@ -214,7 +288,7 @@ def load_outcome_entries() -> list[dict]:
     for line in OUTCOME_LEDGER_PATH.read_text().splitlines():
         if not line.strip():
             continue
-        entries.append(json.loads(line))
+        entries.append(normalize_outcome_entry(json.loads(line)))
     return entries
 
 
@@ -224,21 +298,29 @@ def append_outcome_entry(entry: dict) -> None:
         fh.write(json.dumps(entry) + "\n")
 
 
+def summarize_text(value: str, limit: int = 36) -> str:
+    text = str(value or "—")
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3] + "..."
+
+
 def render_outcome_history(entries: list[dict], limit: int = 10) -> str:
     rows = sorted(entries, key=lambda entry: entry.get("timestamp", ""), reverse=True)[:limit]
     if not rows:
         return "No outcome ledger entries recorded yet."
 
-    headers = ["TIMESTAMP", "STAGE", "TARGET", "RUN ID", "CASE", "REPORT"]
+    headers = ["TIMESTAMP", "TYPE", "STATUS", "TARGET", "RUN ID", "REPORT", "LESSON"]
     table = []
     for entry in rows:
         table.append([
             entry.get("timestamp", "unknown"),
-            entry.get("stage", "unknown"),
+            entry.get("type", "unknown"),
+            entry.get("status", "unknown"),
             entry.get("target", "—") or "—",
             entry.get("run_id", "—") or "—",
-            entry.get("case_id", "—") or "—",
             entry.get("report_id", "—") or "—",
+            summarize_text(entry.get("lesson", "") or entry.get("note", "—"), limit=42),
         ])
 
     widths = [len(header) for header in headers]
@@ -251,6 +333,37 @@ def render_outcome_history(entries: list[dict], limit: int = 10) -> str:
 
     lines = [fmt(headers), fmt(["-" * width for width in widths])]
     lines.extend(fmt(row) for row in table)
+    return "\n".join(lines)
+
+
+def render_outcome_summary(entries: list[dict], lesson_limit: int = 5) -> str:
+    if not entries:
+        return "No outcome ledger entries recorded yet."
+
+    normalized = sorted(entries, key=lambda entry: entry.get("timestamp", ""), reverse=True)
+    by_type = Counter(entry.get("type", "unknown") for entry in normalized)
+    by_status = Counter(entry.get("status", "unknown") for entry in normalized)
+    by_target = Counter(entry.get("target", "") or "unlabeled" for entry in normalized)
+
+    lines = [
+        "Outcome summary",
+        f"- total events: {len(normalized)}",
+        f"- status mix: " + ", ".join(f"{status}={by_status[status]}" for status in OUTCOME_STATUSES if by_status.get(status)),
+        f"- type mix: " + ", ".join(f"{kind}={by_type[kind]}" for kind in OUTCOME_TYPES if by_type.get(kind)),
+        "",
+        "Top targets",
+    ]
+    for target, count in by_target.most_common(5):
+        lines.append(f"- {target}: {count} event(s)")
+
+    lessons = [entry for entry in normalized if entry.get("lesson")]
+    lines.extend(["", "Recent lessons"])
+    if not lessons:
+        lines.append("- No lessons recorded yet.")
+    else:
+        for entry in lessons[:lesson_limit]:
+            lines.append(f"- {entry.get('timestamp', 'unknown')} · {entry.get('target', 'unlabeled')}: {entry.get('lesson')}")
+
     return "\n".join(lines)
 
 
@@ -296,11 +409,15 @@ def cmd_benchmark_publish(args: argparse.Namespace) -> int:
     save_manifest_payload(payload)
     append_outcome_entry({
         "timestamp": utcnow_iso(),
+        "type": "benchmark",
+        "status": "published",
         "stage": "benchmark_published",
         "target": entry.get("target", ""),
         "run_id": entry.get("id", ""),
         "case_id": "",
         "report_id": "",
+        "evidence": entry.get("record", "") or entry.get("artifact_json", ""),
+        "lesson": "",
         "note": args.note or "Published benchmark artifact",
     })
     print(f"Published benchmark run: {entry.get('id')}")
@@ -327,18 +444,26 @@ def cmd_outcome_history(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_outcome_record(args: argparse.Namespace) -> int:
+def cmd_outcome_summary(args: argparse.Namespace) -> int:
+    print(render_outcome_summary(load_outcome_entries(), lesson_limit=args.limit))
+    return 0
+
+
+def cmd_outcome_add(args: argparse.Namespace) -> int:
     entry = {
         "timestamp": utcnow_iso(),
-        "stage": args.stage,
+        "type": args.type,
+        "status": args.status,
         "target": args.target,
         "run_id": args.run_id,
         "case_id": args.case_id,
         "report_id": args.report_id,
+        "evidence": args.evidence,
+        "lesson": args.lesson,
         "note": args.note,
     }
     append_outcome_entry(entry)
-    print(f"Recorded outcome event: {args.stage}")
+    print(f"Recorded outcome event: {args.type} {args.status}")
     return 0
 
 
@@ -358,8 +483,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_benchmark_run(args.benchmark_command, args.level)
     if args.command == "outcome" and args.outcome_command == "history":
         return cmd_outcome_history(args)
-    if args.command == "outcome" and args.outcome_command == "record":
-        return cmd_outcome_record(args)
+    if args.command == "outcome" and args.outcome_command == "summary":
+        return cmd_outcome_summary(args)
+    if args.command == "outcome" and args.outcome_command in {"add", "record"}:
+        return cmd_outcome_add(args)
 
     parser.error("unknown command")
     return 2

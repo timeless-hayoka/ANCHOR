@@ -45,21 +45,45 @@ def test_parser_accepts_benchmark_publish():
     assert args.note == "ship it"
 
 
-def test_parser_accepts_outcome_record():
+def test_parser_accepts_outcome_add():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args([
+        "outcome", "add",
+        "--type", "finding",
+        "--target", "enzyme",
+        "--status", "accepted",
+        "--evidence", "benchmarks/dvd/README.md",
+        "--lesson", "proof gate held",
+        "--run-id", "run-a",
+    ])
+    assert args.command == "outcome"
+    assert args.outcome_command == "add"
+    assert args.type == "finding"
+    assert args.status == "accepted"
+    assert args.evidence == "benchmarks/dvd/README.md"
+    assert args.lesson == "proof gate held"
+
+
+def test_parser_accepts_outcome_summary():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["outcome", "summary", "--limit", "3"])
+    assert args.command == "outcome"
+    assert args.outcome_command == "summary"
+    assert args.limit == 3
+
+
+def test_parser_accepts_legacy_outcome_record_alias():
     parser = anchor_cli.create_parser()
     args = parser.parse_args([
         "outcome", "record",
-        "--stage", "accepted",
-        "--target", "enzyme",
-        "--run-id", "run-a",
-        "--note", "validated",
+        "--type", "issue",
+        "--target", "solmate",
+        "--status", "open",
     ])
     assert args.command == "outcome"
     assert args.outcome_command == "record"
-    assert args.stage == "accepted"
-    assert args.target == "enzyme"
-    assert args.run_id == "run-a"
-    assert args.note == "validated"
+    assert args.type == "issue"
+    assert args.status == "open"
 
 
 def test_parser_accepts_env_init_python_override():
@@ -178,6 +202,55 @@ def test_render_benchmark_compare_reports_deltas():
     assert "medium_high_target_relevant_findings: 22 -> 18 (delta -4)" in rendered
 
 
+def test_render_outcome_history_supports_structured_and_legacy_entries():
+    rendered = anchor_cli.render_outcome_history([
+        {
+            "timestamp": "2026-06-27T02:00:00+00:00",
+            "type": "finding",
+            "status": "accepted",
+            "target": "enzyme",
+            "run_id": "run-a",
+            "report_id": "imm-1",
+            "lesson": "complete PoC wins trust",
+        },
+        {
+            "timestamp": "2026-06-27T01:00:00+00:00",
+            "stage": "benchmark_published",
+            "target": "damn-vulnerable-defi",
+            "run_id": "dvd-run",
+            "note": "published scaffold",
+        },
+    ], limit=5)
+    assert "TYPE" in rendered
+    assert "STATUS" in rendered
+    assert "finding" in rendered
+    assert "published" in rendered
+
+
+def test_render_outcome_summary_aggregates_status_and_lessons():
+    rendered = anchor_cli.render_outcome_summary([
+        {
+            "timestamp": "2026-06-27T02:00:00+00:00",
+            "type": "finding",
+            "status": "accepted",
+            "target": "enzyme",
+            "lesson": "complete PoC wins trust",
+        },
+        {
+            "timestamp": "2026-06-27T01:00:00+00:00",
+            "type": "pr",
+            "status": "merged",
+            "target": "solmate",
+            "lesson": "smaller diffs land faster",
+        },
+    ], lesson_limit=5)
+    assert "Outcome summary" in rendered
+    assert "accepted=1" in rendered
+    assert "merged=1" in rendered
+    assert "enzyme: 1 event(s)" in rendered
+    assert "complete PoC wins trust" in rendered
+
+
 def test_cmd_benchmark_publish_updates_manifest_and_ledger(tmp_path, monkeypatch, capsys):
     manifest_path = tmp_path / "index.json"
     ledger_path = tmp_path / "ledger.jsonl"
@@ -185,7 +258,7 @@ def test_cmd_benchmark_publish_updates_manifest_and_ledger(tmp_path, monkeypatch
     manifest_path.write_text(json.dumps({
         "history_policy": dict(anchor_cli.DEFAULT_HISTORY_POLICY),
         "benchmarks": [
-            {"id": "run-a", "target": "damn-vulnerable-defi", "executed_at": "2026-06-27T00:23:21+00:00"}
+            {"id": "run-a", "target": "damn-vulnerable-defi", "executed_at": "2026-06-27T00:23:21+00:00", "record": "benchmarks/run-a.md"}
         ],
     }))
     monkeypatch.setattr(anchor_cli, "MANIFEST_PATH", manifest_path)
@@ -203,34 +276,41 @@ def test_cmd_benchmark_publish_updates_manifest_and_ledger(tmp_path, monkeypatch
     assert entry["publication_note"] == "phase1 ready"
 
     ledger_entries = [json.loads(line) for line in ledger_path.read_text().splitlines() if line.strip()]
-    assert ledger_entries[0]["stage"] == "benchmark_published"
+    assert ledger_entries[0]["type"] == "benchmark"
+    assert ledger_entries[0]["status"] == "published"
     assert ledger_entries[0]["run_id"] == "run-a"
+    assert ledger_entries[0]["evidence"] == "benchmarks/run-a.md"
 
     out = capsys.readouterr().out
     assert "Published benchmark run: run-a" in out
 
 
-def test_cmd_outcome_record_appends_ledger(tmp_path, monkeypatch, capsys):
+def test_cmd_outcome_add_appends_ledger(tmp_path, monkeypatch, capsys):
     ledger_path = tmp_path / "ledger.jsonl"
     outcomes_dir = tmp_path / "outcomes"
     monkeypatch.setattr(anchor_cli, "OUTCOMES_DIR", outcomes_dir)
     monkeypatch.setattr(anchor_cli, "OUTCOME_LEDGER_PATH", ledger_path)
     monkeypatch.setattr(anchor_cli, "utcnow_iso", lambda: "2026-06-27T02:00:00+00:00")
 
-    rc = anchor_cli.cmd_outcome_record(type("Args", (), {
-        "stage": "accepted",
+    rc = anchor_cli.cmd_outcome_add(type("Args", (), {
+        "type": "finding",
+        "status": "accepted",
         "target": "enzyme",
         "run_id": "run-a",
         "case_id": "case-1",
         "report_id": "immunefi-42",
+        "evidence": "benchmarks/dvd/run-a/README.md",
+        "lesson": "accepted when reproduction is explicit",
         "note": "accepted for payout review",
     }))
     assert rc == 0
 
     ledger_entries = [json.loads(line) for line in ledger_path.read_text().splitlines() if line.strip()]
-    assert ledger_entries[0]["stage"] == "accepted"
+    assert ledger_entries[0]["type"] == "finding"
+    assert ledger_entries[0]["status"] == "accepted"
     assert ledger_entries[0]["target"] == "enzyme"
     assert ledger_entries[0]["report_id"] == "immunefi-42"
+    assert ledger_entries[0]["lesson"] == "accepted when reproduction is explicit"
 
     out = capsys.readouterr().out
-    assert "Recorded outcome event: accepted" in out
+    assert "Recorded outcome event: finding accepted" in out
