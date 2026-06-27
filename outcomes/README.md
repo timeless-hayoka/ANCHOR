@@ -14,6 +14,7 @@ Benchmark -> finding -> PR/report -> outcome -> lesson -> strategy update
 anchor outcome add --type finding --target enzyme --status accepted --evidence benchmarks/damn-vulnerable-defi/runs/.../README.md --lesson "explicit reproduction survives review" --report-id immunefi-123
 anchor outcome history --limit 10
 anchor outcome summary --limit 5
+anchor outcome insights --limit 50 --top 5
 ```
 
 ## Structured fields
@@ -22,11 +23,21 @@ Each entry can track:
 
 ```json
 {
+  "id": "finding-enzyme-20260627...",
+  "benchmark_id": "dvd-phase1-local-...",
+  "claim_id": "claim-...",
   "type": "benchmark | pr | issue | finding",
   "target": "solmate",
   "status": "open | published | triaged | accepted | rejected | patched | merged",
   "evidence": "artifact path, run id, PR URL, issue URL, or report link",
-  "lesson": "what ANCHOR learned"
+  "lesson": "what ANCHOR learned",
+  "links": {
+    "benchmark": "...",
+    "artifact": "...",
+    "pr": "...",
+    "issue": "...",
+    "report": "..."
+  }
 }
 ```
 

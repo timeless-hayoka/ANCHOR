@@ -587,6 +587,21 @@
           <div class="detail" id="contribSummary">Live engineering contribution counts will appear here when available.</div>
         </div>
 
+        <div class="block" id="outcomes">
+          <h3>Outcome Summary</h3>
+          <div class="rows contrib-grid">
+            <div class="kv"><span>Total</span><strong id="outcomeTotal">…</strong></div>
+            <div class="kv"><span>Published</span><strong id="outcomePublished">…</strong></div>
+            <div class="kv"><span>Merged</span><strong id="outcomeMerged">…</strong></div>
+            <div class="kv"><span>Accepted</span><strong id="outcomeAccepted">…</strong></div>
+            <div class="kv"><span>Rejected</span><strong id="outcomeRejected">…</strong></div>
+            <div class="kv"><span>Latest type</span><strong id="outcomeLatestType">…</strong></div>
+          </div>
+          <div class="panel-note loading" id="outcomeStatus">Loading outcome ledger…</div>
+          <div class="detail" id="outcomeSummary">Outcome totals and latest lessons will appear here.</div>
+          <div class="detail" id="outcomeLesson">Latest lesson will appear here.</div>
+        </div>
+
         <div class="block" id="archive">
           <h3>Archive</h3>
           <div class="rows">
@@ -685,6 +700,15 @@ const contribIssuesFiled = document.getElementById('contribIssuesFiled');
 const contribSource = document.getElementById('contribSource');
 const contribStatus = document.getElementById('contribStatus');
 const contribSummary = document.getElementById('contribSummary');
+const outcomeTotal = document.getElementById('outcomeTotal');
+const outcomePublished = document.getElementById('outcomePublished');
+const outcomeMerged = document.getElementById('outcomeMerged');
+const outcomeAccepted = document.getElementById('outcomeAccepted');
+const outcomeRejected = document.getElementById('outcomeRejected');
+const outcomeLatestType = document.getElementById('outcomeLatestType');
+const outcomeStatus = document.getElementById('outcomeStatus');
+const outcomeSummary = document.getElementById('outcomeSummary');
+const outcomeLesson = document.getElementById('outcomeLesson');
 const archiveStatus = document.getElementById('archiveStatus');
 const observerStatus = document.getElementById('observerStatus');
 const connectionState = document.getElementById('connectionState');
@@ -944,6 +968,88 @@ function formatBenchmarkSummary(entry) {
   ].filter(Boolean).join(' · ');
 }
 
+function normalizeOutcomeEntry(entry) {
+  const stageMap = {
+    benchmark_published: { type: 'benchmark', status: 'published' },
+    report_submitted: { type: 'finding', status: 'open' },
+    triaged: { type: 'finding', status: 'triaged' },
+    accepted: { type: 'finding', status: 'accepted' },
+    rejected: { type: 'finding', status: 'rejected' },
+    patched: { type: 'finding', status: 'patched' },
+    merged: { type: 'pr', status: 'merged' },
+  };
+  const legacy = stageMap[entry.stage] || {};
+  return {
+    ...entry,
+    type: entry.type || legacy.type || 'finding',
+    status: entry.status || legacy.status || 'open',
+    lesson: entry.lesson || '',
+    note: entry.note || '',
+  };
+}
+
+async function fetchOutcomeEntries() {
+  const candidates = ['../outcomes/ledger.jsonl', './outcomes/ledger.jsonl', '../../outcomes/ledger.jsonl', '/outcomes/ledger.jsonl'];
+  for (const candidate of candidates) {
+    try {
+      const res = await fetch(candidate);
+      if (!res.ok) continue;
+      const text = await res.text();
+      const entries = text.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => normalizeOutcomeEntry(JSON.parse(line)));
+      if (!entries.length) continue;
+      return entries.sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+    } catch (_) {
+      // try next candidate
+    }
+  }
+  return [];
+}
+
+async function loadOutcomes() {
+  setPanelNotice(outcomeStatus, 'loading', 'Loading outcome ledger…');
+  try {
+    const entries = await fetchOutcomeEntries();
+    if (!entries.length) {
+      outcomeTotal.textContent = '0';
+      outcomePublished.textContent = '0';
+      outcomeMerged.textContent = '0';
+      outcomeAccepted.textContent = '0';
+      outcomeRejected.textContent = '0';
+      outcomeLatestType.textContent = 'none';
+      outcomeSummary.textContent = 'No outcome entries recorded yet.';
+      outcomeLesson.textContent = 'Latest lesson: none yet.';
+      setPanelNotice(outcomeStatus, 'optional', 'No outcome entries recorded yet.');
+      return;
+    }
+    const count = (status) => entries.filter((entry) => entry.status === status).length;
+    const latest = entries[0];
+    const latestLesson = entries.find((entry) => entry.lesson);
+    outcomeTotal.textContent = String(entries.length);
+    outcomePublished.textContent = String(count('published'));
+    outcomeMerged.textContent = String(count('merged'));
+    outcomeAccepted.textContent = String(count('accepted'));
+    outcomeRejected.textContent = String(count('rejected'));
+    outcomeLatestType.textContent = latest.type || 'unknown';
+    outcomeSummary.textContent = [
+      `Target: ${latest.target || 'unknown'}`,
+      `Latest status: ${latest.status || 'unknown'}`,
+      latest.report_id ? `Report: ${latest.report_id}` : null,
+    ].filter(Boolean).join(' · ');
+    outcomeLesson.textContent = latestLesson ? `Latest lesson: ${latestLesson.lesson}` : `Latest lesson: ${latest.note || 'none yet.'}`;
+    setPanelNotice(outcomeStatus, 'ready', `Loaded ${entries.length} outcome event${entries.length === 1 ? '' : 's'}.`);
+  } catch (e) {
+    outcomeTotal.textContent = '—';
+    outcomePublished.textContent = '—';
+    outcomeMerged.textContent = '—';
+    outcomeAccepted.textContent = '—';
+    outcomeRejected.textContent = '—';
+    outcomeLatestType.textContent = 'unavailable';
+    outcomeSummary.textContent = 'Outcome ledger is unavailable right now.';
+    outcomeLesson.textContent = 'Latest lesson: unavailable.';
+    setPanelNotice(outcomeStatus, 'error', `Outcome ledger unavailable: ${e.message || 'unknown error'}`);
+  }
+}
+
 async function loadMetrics() {
   setPanelNotice(evidenceStatus, 'loading', 'Loading evidence metrics…');
   try {
@@ -1153,6 +1259,8 @@ function applyAnchorSnapshot(snapshot) {
   contribSummary.textContent = [repo, highlightText].join(' · ');
   setPanelNotice(contribStatus, contrib.source === 'github_cli' ? 'ready' : 'optional', contrib.source === 'github_cli' ? 'Contribution tracking loaded from GitHub.' : 'GitHub data unavailable; showing local fallback counts.');
 
+  loadOutcomes();
+
   document.getElementById('diiValue').textContent = Number(observer.dii?.dii_current || 0).toFixed(2);
   document.getElementById('diiTrend').textContent = observer.dii?.trend || 'flat';
   document.getElementById('needEnergy').textContent = observer.homeostasis?.needs?.energy?.current != null
@@ -1276,6 +1384,7 @@ async function refreshAll() {
 
 window.addEventListener('load', async () => {
   await refreshAll();
+  await loadOutcomes();
   addMessage('bot', 'ANCHOR is ready. Ask for a status summary, a reflection, or the next useful action.', true);
 });
 

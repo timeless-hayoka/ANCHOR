@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import re
 import runpy
 import subprocess
 import sys
@@ -23,6 +24,7 @@ DEFAULT_HISTORY_POLICY = {
 }
 OUTCOME_TYPES = ["benchmark", "pr", "issue", "finding"]
 OUTCOME_STATUSES = ["open", "published", "triaged", "accepted", "rejected", "patched", "merged"]
+OUTCOME_LINK_KEYS = ["benchmark", "artifact", "pr", "issue", "report"]
 LEGACY_STAGE_STATUS = {
     "benchmark_published": ("benchmark", "published"),
     "report_submitted": ("finding", "open"),
@@ -39,6 +41,16 @@ BENCHMARK_RUNNERS = {
 
 def utcnow_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def safe_slug(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", (value or "entry").lower()).strip("-")
+    return slug or "entry"
+
+
+def make_outcome_id(entry_type: str, target: str) -> str:
+    stamp = utcnow_iso().replace(":", "").replace("-", "")
+    return f"{entry_type}-{safe_slug(target)}-{stamp}"
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -80,18 +92,30 @@ def create_parser() -> argparse.ArgumentParser:
     outcome_history = outcome_sub.add_parser("history", help="Show recorded outcome ledger events")
     outcome_history.add_argument("--limit", type=int, default=10, help="Maximum number of outcome entries to show")
 
-    outcome_summary = outcome_sub.add_parser("summary", help="Show aggregated outcome ledger status and lessons")
+    outcome_summary = outcome_sub.add_parser("summary", help="Show compact outcome totals for dashboards and quick checks")
     outcome_summary.add_argument("--limit", type=int, default=5, help="Maximum number of recent lessons to show")
 
+    outcome_insights = outcome_sub.add_parser("insights", help="Analyze outcome trends, repeated lessons, and target-level patterns")
+    outcome_insights.add_argument("--limit", type=int, default=50, help="Maximum number of recent outcome entries to inspect")
+    outcome_insights.add_argument("--top", type=int, default=5, help="Maximum number of top lessons and targets to show")
+
     outcome_add = outcome_sub.add_parser("add", help="Append a structured outcome event to the ledger")
+    outcome_add.add_argument("--id", default="", help="Stable outcome entry id; generated automatically when omitted")
     outcome_add.add_argument("--type", required=True, choices=OUTCOME_TYPES, help="Outcome object type")
     outcome_add.add_argument("--target", required=True, help="Benchmark family, protocol, repository, or target label")
     outcome_add.add_argument("--status", required=True, choices=OUTCOME_STATUSES, help="Outcome status")
     outcome_add.add_argument("--evidence", default="", help="Evidence pointer such as a run id, PR URL, issue URL, artifact path, or report link")
     outcome_add.add_argument("--lesson", default="", help="What ANCHOR learned from this outcome")
     outcome_add.add_argument("--run-id", default="", help="Benchmark run id if applicable")
+    outcome_add.add_argument("--benchmark-id", default="", help="Benchmark identifier if separate from run id")
+    outcome_add.add_argument("--claim-id", default="", help="Claim identifier if applicable")
     outcome_add.add_argument("--case-id", default="", help="Case id if applicable")
     outcome_add.add_argument("--report-id", default="", help="External report or submission id if applicable")
+    outcome_add.add_argument("--link-benchmark", default="", help="Link to a benchmark page or record")
+    outcome_add.add_argument("--link-artifact", default="", help="Link to an artifact or evidence bundle")
+    outcome_add.add_argument("--link-pr", default="", help="Link to a pull request")
+    outcome_add.add_argument("--link-issue", default="", help="Link to an issue")
+    outcome_add.add_argument("--link-report", default="", help="Link to an external report or submission")
     outcome_add.add_argument("--note", default="", help="Short note for the outcome event")
 
     outcome_record = outcome_sub.add_parser("record", help=argparse.SUPPRESS)
@@ -107,8 +131,6 @@ def create_parser() -> argparse.ArgumentParser:
         if action.option_strings:
             if getattr(action, "choices", None) is not None:
                 kwargs["choices"] = action.choices
-            if getattr(action, "const", None) is not None and action.nargs == 0:
-                kwargs["const"] = action.const
             if getattr(action, "type", None) is not None:
                 kwargs["type"] = action.type
             if getattr(action, "nargs", None) is not None:
@@ -264,6 +286,21 @@ def infer_outcome_status(entry: dict) -> str:
     return "open"
 
 
+def build_links(entry: dict) -> dict:
+    links = dict(entry.get("links", {}) or {})
+    legacy_mapping = {
+        "benchmark": entry.get("link_benchmark"),
+        "artifact": entry.get("link_artifact"),
+        "pr": entry.get("link_pr"),
+        "issue": entry.get("link_issue"),
+        "report": entry.get("link_report"),
+    }
+    for key, value in legacy_mapping.items():
+        if value and not links.get(key):
+            links[key] = value
+    return {key: links.get(key, "") for key in OUTCOME_LINK_KEYS}
+
+
 def normalize_outcome_entry(entry: dict) -> dict:
     normalized = dict(entry)
     normalized.setdefault("timestamp", "unknown")
@@ -271,13 +308,26 @@ def normalize_outcome_entry(entry: dict) -> dict:
     normalized["status"] = infer_outcome_status(entry)
     normalized.setdefault("target", "")
     normalized.setdefault("run_id", "")
+    normalized.setdefault("benchmark_id", normalized.get("run_id", ""))
+    normalized.setdefault("claim_id", "")
     normalized.setdefault("case_id", "")
     normalized.setdefault("report_id", "")
     normalized.setdefault("note", "")
     normalized.setdefault("lesson", "")
     normalized.setdefault("evidence", "")
+    normalized["links"] = build_links(normalized)
+    if not normalized.get("id"):
+        base = normalized.get("target") or normalized.get("type") or "entry"
+        normalized["id"] = f"legacy-{safe_slug(base)}-{safe_slug(normalized.get('timestamp', 'unknown'))}"
     if not normalized["evidence"]:
-        normalized["evidence"] = normalized.get("report_id") or normalized.get("run_id") or normalized.get("note", "")
+        normalized["evidence"] = (
+            normalized["links"].get("artifact")
+            or normalized["links"].get("report")
+            or normalized["links"].get("benchmark")
+            or normalized.get("report_id")
+            or normalized.get("run_id")
+            or normalized.get("note", "")
+        )
     return normalized
 
 
@@ -367,6 +417,67 @@ def render_outcome_summary(entries: list[dict], lesson_limit: int = 5) -> str:
     return "\n".join(lines)
 
 
+def render_outcome_insights(entries: list[dict], limit: int = 50, top_n: int = 5) -> str:
+    if not entries:
+        return "No outcome ledger entries recorded yet."
+
+    rows = sorted(entries, key=lambda entry: entry.get("timestamp", ""), reverse=True)[:limit]
+    by_status = Counter(entry.get("status", "unknown") for entry in rows)
+    by_target = Counter(entry.get("target", "") or "unlabeled" for entry in rows)
+    by_type = Counter(entry.get("type", "unknown") for entry in rows)
+    lesson_counter = Counter((entry.get("lesson") or "").strip() for entry in rows if (entry.get("lesson") or "").strip())
+
+    lines = [
+        f"Last {len(rows)} outcomes",
+        "",
+        "Status mix",
+    ]
+    for status in OUTCOME_STATUSES:
+        if by_status.get(status):
+            lines.append(f"- {status}: {by_status[status]}")
+    lines.extend(["", "Type mix"])
+    for kind in OUTCOME_TYPES:
+        if by_type.get(kind):
+            lines.append(f"- {kind}: {by_type[kind]}")
+    lines.extend(["", "Top lessons"])
+    if lesson_counter:
+        for lesson, count in lesson_counter.most_common(top_n):
+            lines.append(f"- {lesson} ({count})")
+    else:
+        lines.append("- No lessons recorded yet.")
+    lines.extend(["", "Top targets"])
+    for target, count in by_target.most_common(top_n):
+        lines.append(f"- {target}: {count}")
+    return "\n".join(lines)
+
+
+def build_outcome_entry_from_args(args: argparse.Namespace) -> dict:
+    links = {
+        "benchmark": args.link_benchmark,
+        "artifact": args.link_artifact,
+        "pr": args.link_pr,
+        "issue": args.link_issue,
+        "report": args.link_report,
+    }
+    entry = {
+        "id": args.id or make_outcome_id(args.type, args.target),
+        "timestamp": utcnow_iso(),
+        "type": args.type,
+        "status": args.status,
+        "target": args.target,
+        "run_id": args.run_id,
+        "benchmark_id": args.benchmark_id or args.run_id,
+        "claim_id": args.claim_id,
+        "case_id": args.case_id,
+        "report_id": args.report_id,
+        "evidence": args.evidence,
+        "lesson": args.lesson,
+        "note": args.note,
+        "links": links,
+    }
+    return normalize_outcome_entry(entry)
+
+
 def cmd_env_init(args: argparse.Namespace) -> int:
     venv_dir = ROOT / ".venv"
     subprocess.run([args.python, "-m", "venv", str(venv_dir)], check=True)
@@ -407,19 +518,29 @@ def cmd_benchmark_publish(args: argparse.Namespace) -> int:
     if args.note:
         entry["publication_note"] = args.note
     save_manifest_payload(payload)
-    append_outcome_entry({
+    append_outcome_entry(normalize_outcome_entry({
+        "id": make_outcome_id("benchmark", entry.get("id", "benchmark")),
         "timestamp": utcnow_iso(),
         "type": "benchmark",
         "status": "published",
         "stage": "benchmark_published",
         "target": entry.get("target", ""),
         "run_id": entry.get("id", ""),
+        "benchmark_id": entry.get("id", ""),
+        "claim_id": "",
         "case_id": "",
         "report_id": "",
         "evidence": entry.get("record", "") or entry.get("artifact_json", ""),
         "lesson": "",
         "note": args.note or "Published benchmark artifact",
-    })
+        "links": {
+            "benchmark": entry.get("record", ""),
+            "artifact": entry.get("artifact_json", ""),
+            "pr": "",
+            "issue": "",
+            "report": "",
+        },
+    }))
     print(f"Published benchmark run: {entry.get('id')}")
     return 0
 
@@ -449,21 +570,15 @@ def cmd_outcome_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_outcome_insights(args: argparse.Namespace) -> int:
+    print(render_outcome_insights(load_outcome_entries(), limit=args.limit, top_n=args.top))
+    return 0
+
+
 def cmd_outcome_add(args: argparse.Namespace) -> int:
-    entry = {
-        "timestamp": utcnow_iso(),
-        "type": args.type,
-        "status": args.status,
-        "target": args.target,
-        "run_id": args.run_id,
-        "case_id": args.case_id,
-        "report_id": args.report_id,
-        "evidence": args.evidence,
-        "lesson": args.lesson,
-        "note": args.note,
-    }
+    entry = build_outcome_entry_from_args(args)
     append_outcome_entry(entry)
-    print(f"Recorded outcome event: {args.type} {args.status}")
+    print(f"Recorded outcome event: {entry['type']} {entry['status']}")
     return 0
 
 
@@ -485,6 +600,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_outcome_history(args)
     if args.command == "outcome" and args.outcome_command == "summary":
         return cmd_outcome_summary(args)
+    if args.command == "outcome" and args.outcome_command == "insights":
+        return cmd_outcome_insights(args)
     if args.command == "outcome" and args.outcome_command in {"add", "record"}:
         return cmd_outcome_add(args)
 

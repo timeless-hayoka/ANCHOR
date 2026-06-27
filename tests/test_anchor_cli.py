@@ -45,23 +45,31 @@ def test_parser_accepts_benchmark_publish():
     assert args.note == "ship it"
 
 
-def test_parser_accepts_outcome_add():
+def test_parser_accepts_outcome_add_with_links():
     parser = anchor_cli.create_parser()
     args = parser.parse_args([
         "outcome", "add",
+        "--id", "entry-1",
         "--type", "finding",
         "--target", "enzyme",
         "--status", "accepted",
         "--evidence", "benchmarks/dvd/README.md",
         "--lesson", "proof gate held",
         "--run-id", "run-a",
+        "--benchmark-id", "bench-a",
+        "--claim-id", "claim-a",
+        "--link-benchmark", "benchmarks/index.json",
+        "--link-artifact", "artifacts/evidence.json",
+        "--link-report", "https://immunefi.com/report/1",
     ])
     assert args.command == "outcome"
     assert args.outcome_command == "add"
     assert args.type == "finding"
     assert args.status == "accepted"
-    assert args.evidence == "benchmarks/dvd/README.md"
-    assert args.lesson == "proof gate held"
+    assert args.id == "entry-1"
+    assert args.benchmark_id == "bench-a"
+    assert args.claim_id == "claim-a"
+    assert args.link_report == "https://immunefi.com/report/1"
 
 
 def test_parser_accepts_outcome_summary():
@@ -70,6 +78,15 @@ def test_parser_accepts_outcome_summary():
     assert args.command == "outcome"
     assert args.outcome_command == "summary"
     assert args.limit == 3
+
+
+def test_parser_accepts_outcome_insights():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["outcome", "insights", "--limit", "50", "--top", "4"])
+    assert args.command == "outcome"
+    assert args.outcome_command == "insights"
+    assert args.limit == 50
+    assert args.top == 4
 
 
 def test_parser_accepts_legacy_outcome_record_alias():
@@ -202,9 +219,25 @@ def test_render_benchmark_compare_reports_deltas():
     assert "medium_high_target_relevant_findings: 22 -> 18 (delta -4)" in rendered
 
 
+def test_normalize_outcome_entry_supports_legacy_and_links():
+    normalized = anchor_cli.normalize_outcome_entry({
+        "timestamp": "2026-06-27T01:00:00+00:00",
+        "stage": "benchmark_published",
+        "target": "damn-vulnerable-defi",
+        "run_id": "dvd-run",
+        "link_artifact": "benchmarks/run-a.json",
+        "note": "published scaffold",
+    })
+    assert normalized["type"] == "benchmark"
+    assert normalized["status"] == "published"
+    assert normalized["links"]["artifact"] == "benchmarks/run-a.json"
+    assert normalized["benchmark_id"] == "dvd-run"
+
+
 def test_render_outcome_history_supports_structured_and_legacy_entries():
     rendered = anchor_cli.render_outcome_history([
-        {
+        anchor_cli.normalize_outcome_entry({
+            "id": "out-1",
             "timestamp": "2026-06-27T02:00:00+00:00",
             "type": "finding",
             "status": "accepted",
@@ -212,14 +245,14 @@ def test_render_outcome_history_supports_structured_and_legacy_entries():
             "run_id": "run-a",
             "report_id": "imm-1",
             "lesson": "complete PoC wins trust",
-        },
-        {
+        }),
+        anchor_cli.normalize_outcome_entry({
             "timestamp": "2026-06-27T01:00:00+00:00",
             "stage": "benchmark_published",
             "target": "damn-vulnerable-defi",
             "run_id": "dvd-run",
             "note": "published scaffold",
-        },
+        }),
     ], limit=5)
     assert "TYPE" in rendered
     assert "STATUS" in rendered
@@ -229,26 +262,57 @@ def test_render_outcome_history_supports_structured_and_legacy_entries():
 
 def test_render_outcome_summary_aggregates_status_and_lessons():
     rendered = anchor_cli.render_outcome_summary([
-        {
+        anchor_cli.normalize_outcome_entry({
             "timestamp": "2026-06-27T02:00:00+00:00",
             "type": "finding",
             "status": "accepted",
             "target": "enzyme",
             "lesson": "complete PoC wins trust",
-        },
-        {
+        }),
+        anchor_cli.normalize_outcome_entry({
             "timestamp": "2026-06-27T01:00:00+00:00",
             "type": "pr",
             "status": "merged",
             "target": "solmate",
             "lesson": "smaller diffs land faster",
-        },
+        }),
     ], lesson_limit=5)
     assert "Outcome summary" in rendered
     assert "accepted=1" in rendered
     assert "merged=1" in rendered
     assert "enzyme: 1 event(s)" in rendered
     assert "complete PoC wins trust" in rendered
+
+
+def test_render_outcome_insights_highlights_top_lessons():
+    rendered = anchor_cli.render_outcome_insights([
+        anchor_cli.normalize_outcome_entry({
+            "timestamp": "2026-06-27T03:00:00+00:00",
+            "type": "finding",
+            "status": "rejected",
+            "target": "enzyme",
+            "lesson": "Missing reproduction evidence",
+        }),
+        anchor_cli.normalize_outcome_entry({
+            "timestamp": "2026-06-27T02:00:00+00:00",
+            "type": "finding",
+            "status": "accepted",
+            "target": "enzyme",
+            "lesson": "Missing reproduction evidence",
+        }),
+        anchor_cli.normalize_outcome_entry({
+            "timestamp": "2026-06-27T01:00:00+00:00",
+            "type": "issue",
+            "status": "open",
+            "target": "solmate",
+            "lesson": "Environment mismatch",
+        }),
+    ], limit=50, top_n=5)
+    assert "Last 3 outcomes" in rendered
+    assert "rejected: 1" in rendered
+    assert "accepted: 1" in rendered
+    assert "Missing reproduction evidence (2)" in rendered
+    assert "enzyme: 2" in rendered
 
 
 def test_cmd_benchmark_publish_updates_manifest_and_ledger(tmp_path, monkeypatch, capsys):
@@ -258,7 +322,7 @@ def test_cmd_benchmark_publish_updates_manifest_and_ledger(tmp_path, monkeypatch
     manifest_path.write_text(json.dumps({
         "history_policy": dict(anchor_cli.DEFAULT_HISTORY_POLICY),
         "benchmarks": [
-            {"id": "run-a", "target": "damn-vulnerable-defi", "executed_at": "2026-06-27T00:23:21+00:00", "record": "benchmarks/run-a.md"}
+            {"id": "run-a", "target": "damn-vulnerable-defi", "executed_at": "2026-06-27T00:23:21+00:00", "record": "benchmarks/run-a.md", "artifact_json": "benchmarks/run-a.json"}
         ],
     }))
     monkeypatch.setattr(anchor_cli, "MANIFEST_PATH", manifest_path)
@@ -279,7 +343,8 @@ def test_cmd_benchmark_publish_updates_manifest_and_ledger(tmp_path, monkeypatch
     assert ledger_entries[0]["type"] == "benchmark"
     assert ledger_entries[0]["status"] == "published"
     assert ledger_entries[0]["run_id"] == "run-a"
-    assert ledger_entries[0]["evidence"] == "benchmarks/run-a.md"
+    assert ledger_entries[0]["links"]["benchmark"] == "benchmarks/run-a.md"
+    assert ledger_entries[0]["links"]["artifact"] == "benchmarks/run-a.json"
 
     out = capsys.readouterr().out
     assert "Published benchmark run: run-a" in out
@@ -293,24 +358,34 @@ def test_cmd_outcome_add_appends_ledger(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(anchor_cli, "utcnow_iso", lambda: "2026-06-27T02:00:00+00:00")
 
     rc = anchor_cli.cmd_outcome_add(type("Args", (), {
+        "id": "out-1",
         "type": "finding",
         "status": "accepted",
         "target": "enzyme",
         "run_id": "run-a",
+        "benchmark_id": "bench-a",
+        "claim_id": "claim-a",
         "case_id": "case-1",
         "report_id": "immunefi-42",
         "evidence": "benchmarks/dvd/run-a/README.md",
         "lesson": "accepted when reproduction is explicit",
+        "link_benchmark": "benchmarks/index.json",
+        "link_artifact": "artifacts/evidence.json",
+        "link_pr": "",
+        "link_issue": "",
+        "link_report": "https://immunefi.com/report/42",
         "note": "accepted for payout review",
     }))
     assert rc == 0
 
     ledger_entries = [json.loads(line) for line in ledger_path.read_text().splitlines() if line.strip()]
+    assert ledger_entries[0]["id"] == "out-1"
     assert ledger_entries[0]["type"] == "finding"
     assert ledger_entries[0]["status"] == "accepted"
     assert ledger_entries[0]["target"] == "enzyme"
     assert ledger_entries[0]["report_id"] == "immunefi-42"
     assert ledger_entries[0]["lesson"] == "accepted when reproduction is explicit"
+    assert ledger_entries[0]["links"]["report"] == "https://immunefi.com/report/42"
 
     out = capsys.readouterr().out
     assert "Recorded outcome event: finding accepted" in out
