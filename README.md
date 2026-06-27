@@ -8,6 +8,8 @@ ANCHOR is a local-first proof gate for authorized smart-contract security resear
 
 Licensed under the Apache License 2.0. See [LICENSE](LICENSE).
 
+**Portfolio architecture:** canonical ownership and data flow live in [timeless-hayoka/ARCHITECTURE.md](https://github.com/timeless-hayoka/timeless-hayoka/blob/main/ARCHITECTURE.md). ANCHOR owns benchmarks, outcome ledger, and evidence lifecycle.
+
 ## Start here
 
 If you are new to ANCHOR, use this order:
@@ -104,6 +106,14 @@ Each benchmark records:
 - `TRINITY_RUBRIC.md` - evidence rubric for Trinity decisions
 - `HUNT_HYPOTHESIS_TEMPLATE.md` - reusable hunt note for serious leads
 - `WEB3_HUNT_MODULES.md` - web3 hunt engines and evidence-gate order
+- `docs/ANCHOR_VAULT.md` - durable benchmark roadmap and corpus brief
+- `docs/APEX_MOTHERSHIP_INTEGRATION.md` - integration plan for borrowing useful Apex Mothership surfaces
+- `docs/APEX_MOTHERSHIP_DASHBOARD_SPEC.md` - concrete dashboard shape for benchmark visibility
+- `docs/SCRIPT_REGISTRY_DESIGN.md` - guardrailed helper-script registry design
+- `docs/EVIDENCE_STORAGE_INTERFACE.md` - shared evidence-storage contract
+- `docs/APEX_MOTHERSHIP_BACKLOG.md` - phased implementation backlog
+- `docs/ANCHOR_WORK_QUEUE.md` - current implementation backlog and follow-up tasks
+- `docs/ANCHOR_KNOWLEDGE_INGESTION.md` - repo-mining plan for knowledge ANCHOR can reuse
 - `outcomes/README.md` - outcome ledger stages tying benchmark evidence to real report outcomes
 
 ## Install and run
@@ -134,7 +144,7 @@ Open the console, set the server URL to `http://127.0.0.1:8000`, and connect the
 
 - This repo is the flagship.
 - `infj_bot` is the companion layer and internal reasoning surface.
-- `AI-Forge-Protocol` and `bounty-bot` are supporting evidence that the gate generalizes.
+- `AI-Forge-Protocol`, `bounty-bot`, and `apex-mothership` are supporting projects in the same ecosystem.
 - The public story stays honest: tamper-evident local signing, not legal chain-of-custody claims.
 
 ## Phase 2 target
