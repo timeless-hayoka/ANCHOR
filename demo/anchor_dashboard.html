@@ -904,6 +904,14 @@ async function updateObserver() {
   }
 }
 
+function selectLatestPublishedBenchmark(benchmarks) {
+  const rows = Array.isArray(benchmarks) ? benchmarks.slice() : [];
+  if (!rows.length) return null;
+  const published = rows.filter((entry) => (entry.publication_tier || 'development') === 'published');
+  const source = published.length ? published : rows;
+  return source.sort((a, b) => String(a.executed_at || '').localeCompare(String(b.executed_at || ''))).at(-1);
+}
+
 async function fetchLatestBenchmarkEntry() {
   const candidates = ['../benchmarks/index.json', './benchmarks/index.json', '../../benchmarks/index.json', '/benchmarks/index.json'];
   for (const candidate of candidates) {
@@ -913,7 +921,7 @@ async function fetchLatestBenchmarkEntry() {
       const data = await res.json();
       const benchmarks = Array.isArray(data.benchmarks) ? data.benchmarks : [];
       if (!benchmarks.length) continue;
-      return benchmarks.slice().sort((a, b) => String(a.executed_at || '').localeCompare(String(b.executed_at || ''))).at(-1);
+      return selectLatestPublishedBenchmark(benchmarks);
     } catch (_) {
       // try the next path
     }
@@ -924,8 +932,10 @@ async function fetchLatestBenchmarkEntry() {
 function formatBenchmarkSummary(entry) {
   if (!entry) return 'Evidence metrics are unavailable right now.';
   const summary = entry.results_summary || {};
+  const tier = entry.publication_tier || 'development';
   return [
     `Latest benchmark: ${entry.id || 'unknown'}`,
+    `Tier: ${tier}`,
     entry.level ? `Level: ${entry.level}` : null,
     summary.passed != null ? `${summary.passed} passed` : null,
     summary.failed != null ? `${summary.failed} failed` : null,

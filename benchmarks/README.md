@@ -72,6 +72,23 @@ Every benchmark should converge on the same structure:
 
 The machine-readable registry is stored in `benchmarks/index.json`.
 
+## Publication policy
+
+Successful reruns are kept on disk for traceability, but they are not all treated as first-class benchmark artifacts.
+
+- `development`: successful internal reruns kept for engineering history and comparison
+- `published`: intentionally promoted benchmark artifacts that show up by default in history and demo fallback views
+
+This gives ANCHOR two things at once:
+
+- honest internal repetition
+- a cleaner public benchmark record
+
+Promote a run when it is the one you want people to cite or compare against.
+
+```bash
+anchor benchmark publish <run_id> --note "phase1 baseline"
+```
 
 ## Benchmark history
 
@@ -80,3 +97,42 @@ anchor benchmark history --limit 5
 ```
 
 This prints the latest published benchmark runs with pass/fail/timeout counts, detector signal count, and scoped medium/high target-relevant detector findings.
+
+To include successful development reruns as well:
+
+```bash
+anchor benchmark history --all --limit 10
+```
+
+## Benchmark compare
+
+```bash
+anchor benchmark compare <run_a> <run_b>
+```
+
+This reports run-to-run deltas for:
+
+- pass/fail/timeout counts
+- raw detector findings
+- target-relevant detector findings
+- medium/high target-relevant findings
+- detector provenance shifts
+
+## Outcome ledger
+
+Benchmarks are only half the story. The outcome ledger is where benchmark evidence meets real-world report handling.
+
+```bash
+anchor outcome history --limit 10
+anchor outcome record --stage accepted --target enzyme --run-id <run_id> --report-id immunefi-123 --note "accepted for payout review"
+```
+
+Suggested stages:
+
+- `benchmark_published`
+- `report_submitted`
+- `triaged`
+- `accepted`
+- `rejected`
+- `patched`
+- `merged`

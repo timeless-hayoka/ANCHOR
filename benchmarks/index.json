@@ -23,7 +23,10 @@
         "comparative_data": "not_yet"
       },
       "verified": true,
-      "confidence": "baseline"
+      "confidence": "baseline",
+      "publication_tier": "published",
+      "published_at": "2026-06-26",
+      "publication_note": "Phase 0 public baseline artifact"
     },
     {
       "id": "dvd-phase1-local-2026-06-26T18-59-25Z",
@@ -54,7 +57,8 @@
         "passed": 1,
         "failed": 1,
         "timed_out": 1
-      }
+      },
+      "publication_tier": "development"
     },
     {
       "id": "dvd-phase1-local-2026-06-26T23-14-42Z",
@@ -90,7 +94,8 @@
         "environment_sensitive": 1,
         "investigate": 1,
         "diverged": 0
-      }
+      },
+      "publication_tier": "development"
     },
     {
       "id": "dvd-phase1-local-2026-06-26T23-39-19Z",
@@ -128,7 +133,8 @@
         "investigate": 1,
         "diverged": 0,
         "detector_signals": 3
-      }
+      },
+      "publication_tier": "development"
     },
     {
       "id": "dvd-phase1-local-2026-06-26T23-42-35Z",
@@ -166,7 +172,8 @@
         "investigate": 1,
         "diverged": 0,
         "detector_signals": 3
-      }
+      },
+      "publication_tier": "development"
     },
     {
       "id": "dvd-phase1-local-2026-06-26T23-47-11Z",
@@ -204,7 +211,8 @@
         "investigate": 1,
         "diverged": 0,
         "detector_signals": 3
-      }
+      },
+      "publication_tier": "development"
     },
     {
       "id": "dvd-phase1-local-2026-06-27T00-10-52Z",
@@ -261,7 +269,8 @@
         "raw_detector_findings": 566,
         "target_relevant_detector_findings": 304,
         "medium_high_target_relevant_findings": 22
-      }
+      },
+      "publication_tier": "development"
     },
     {
       "id": "dvd-phase1-local-2026-06-27T00-14-22Z",
@@ -318,7 +327,8 @@
         "raw_detector_findings": 566,
         "target_relevant_detector_findings": 304,
         "medium_high_target_relevant_findings": 22
-      }
+      },
+      "publication_tier": "development"
     },
     {
       "id": "dvd-phase1-local-2026-06-27T00-17-30Z",
@@ -375,7 +385,8 @@
         "raw_detector_findings": 566,
         "target_relevant_detector_findings": 304,
         "medium_high_target_relevant_findings": 22
-      }
+      },
+      "publication_tier": "development"
     },
     {
       "id": "dvd-phase1-local-2026-06-27T00-23-21Z",
@@ -432,7 +443,17 @@
         "raw_detector_findings": 566,
         "target_relevant_detector_findings": 304,
         "medium_high_target_relevant_findings": 22
-      }
+      },
+      "publication_tier": "published",
+      "published_at": "2026-06-27T01:30:43.655924+00:00",
+      "publication_note": "Phase 1 public scaffold artifact with scoped detector provenance"
     }
-  ]
+  ],
+  "history_policy": {
+    "artifact_retention": "keep_all_successful_runs",
+    "manifest_default_tier": "development",
+    "default_history_view": "published_only",
+    "published_tier": "published",
+    "note": "Successful development reruns remain on disk, but only intentionally promoted runs are first-class published artifacts."
+  }
 }

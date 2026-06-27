@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import runpy
 import subprocess
@@ -10,9 +11,22 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 MANIFEST_PATH = ROOT / "benchmarks" / "index.json"
+OUTCOMES_DIR = ROOT / "outcomes"
+OUTCOME_LEDGER_PATH = OUTCOMES_DIR / "ledger.jsonl"
+DEFAULT_HISTORY_POLICY = {
+    "artifact_retention": "keep_all_successful_runs",
+    "manifest_default_tier": "development",
+    "default_history_view": "published_only",
+    "published_tier": "published",
+    "note": "Successful development reruns remain on disk, but only intentionally promoted runs are first-class published artifacts.",
+}
 BENCHMARK_RUNNERS = {
     ("dvd", "phase1"): ROOT / "benchmarks" / "damn-vulnerable-defi" / "run_phase1_benchmark.py",
 }
+
+
+def utcnow_iso() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -27,8 +41,17 @@ def create_parser() -> argparse.ArgumentParser:
     benchmark_parser = sub.add_parser("benchmark", help="Run or inspect benchmark workflows")
     benchmark_sub = benchmark_parser.add_subparsers(dest="benchmark_command", required=True)
 
-    benchmark_history = benchmark_sub.add_parser("history", help="Show published benchmark history")
+    benchmark_history = benchmark_sub.add_parser("history", help="Show benchmark history")
     benchmark_history.add_argument("--limit", type=int, default=10, help="Maximum number of entries to show")
+    benchmark_history.add_argument("--all", action="store_true", help="Include development-tier reruns in addition to published artifacts")
+
+    benchmark_compare = benchmark_sub.add_parser("compare", help="Compare two benchmark runs by manifest run id")
+    benchmark_compare.add_argument("run_a")
+    benchmark_compare.add_argument("run_b")
+
+    benchmark_publish = benchmark_sub.add_parser("publish", help="Promote a run into first-class published benchmark history")
+    benchmark_publish.add_argument("run_id")
+    benchmark_publish.add_argument("--note", default="", help="Short publication note recorded in the manifest and outcome ledger")
 
     target_parsers = {}
     for target in sorted({key[0] for key in BENCHMARK_RUNNERS}):
@@ -39,27 +62,85 @@ def create_parser() -> argparse.ArgumentParser:
     for target, level in sorted(BENCHMARK_RUNNERS):
         target_parsers[target].add_parser(level, help=f"Run the {level} benchmark for {target}")
 
+    outcome_parser = sub.add_parser("outcome", help="Record and inspect real-world benchmark/report outcomes")
+    outcome_sub = outcome_parser.add_subparsers(dest="outcome_command", required=True)
+
+    outcome_history = outcome_sub.add_parser("history", help="Show recorded outcome ledger events")
+    outcome_history.add_argument("--limit", type=int, default=10, help="Maximum number of outcome entries to show")
+
+    outcome_record = outcome_sub.add_parser("record", help="Append an outcome event to the ledger")
+    outcome_record.add_argument("--stage", required=True, choices=["benchmark_published", "report_submitted", "triaged", "accepted", "rejected", "patched", "merged"], help="Outcome stage")
+    outcome_record.add_argument("--target", default="", help="Protocol, benchmark family, or target label")
+    outcome_record.add_argument("--run-id", default="", help="Benchmark run id if applicable")
+    outcome_record.add_argument("--case-id", default="", help="Case id if applicable")
+    outcome_record.add_argument("--report-id", default="", help="External report or submission id if applicable")
+    outcome_record.add_argument("--note", default="", help="Short note for the outcome event")
+
     return parser
 
 
-def load_manifest() -> list[dict]:
+def load_manifest_payload() -> dict:
     if not MANIFEST_PATH.exists():
-        return []
+        return {"history_policy": dict(DEFAULT_HISTORY_POLICY), "benchmarks": []}
     payload = json.loads(MANIFEST_PATH.read_text())
-    return payload.get("benchmarks", [])
+    payload.setdefault("history_policy", dict(DEFAULT_HISTORY_POLICY))
+    payload.setdefault("benchmarks", [])
+    return payload
 
 
-def render_benchmark_history(entries: list[dict], limit: int = 10) -> str:
-    rows = sorted(entries, key=lambda entry: entry.get("executed_at", ""), reverse=True)[:limit]
+def save_manifest_payload(payload: dict) -> None:
+    MANIFEST_PATH.write_text(json.dumps(payload, indent=2) + "\n")
+
+
+def load_manifest() -> list[dict]:
+    return load_manifest_payload().get("benchmarks", [])
+
+
+def benchmark_tier(entry: dict) -> str:
+    return entry.get("publication_tier", DEFAULT_HISTORY_POLICY["manifest_default_tier"])
+
+
+def sorted_entries(entries: list[dict], reverse: bool = True) -> list[dict]:
+    return sorted(entries, key=lambda entry: entry.get("executed_at", ""), reverse=reverse)
+
+
+def find_entry(entries: list[dict], run_id: str) -> dict:
+    for entry in entries:
+        if entry.get("id") == run_id:
+            return entry
+    raise KeyError(run_id)
+
+
+def metric_value(entry: dict, key: str) -> int | None:
+    value = entry.get("results_summary", {}).get(key)
+    return value if isinstance(value, int) else None
+
+
+def format_delta(before: int | None, after: int | None) -> str:
+    if before is None or after is None:
+        return "n/a"
+    delta = after - before
+    if delta > 0:
+        return f"+{delta}"
+    return str(delta)
+
+
+def render_benchmark_history(entries: list[dict], limit: int = 10, include_development: bool = False) -> str:
+    rows = sorted_entries(entries)
+    if not include_development:
+        rows = [entry for entry in rows if benchmark_tier(entry) == "published"]
+    rows = rows[:limit]
     if not rows:
-        return "No benchmark history published yet."
+        scope = "published benchmark history" if not include_development else "benchmark history"
+        return f"No {scope} available yet."
 
-    headers = ["RUN ID", "LEVEL", "PASS", "FAIL", "T/O", "SIG", "REL-HI", "CONF"]
+    headers = ["RUN ID", "TIER", "LEVEL", "PASS", "FAIL", "T/O", "SIG", "REL-HI", "CONF"]
     table = []
     for entry in rows:
         summary = entry.get("results_summary", {})
         table.append([
             entry.get("id", "unknown"),
+            benchmark_tier(entry),
             entry.get("level", "—"),
             str(summary.get("passed", "—")),
             str(summary.get("failed", "—")),
@@ -67,6 +148,97 @@ def render_benchmark_history(entries: list[dict], limit: int = 10) -> str:
             str(summary.get("detector_signals", "—")),
             str(summary.get("medium_high_target_relevant_findings", "—")),
             entry.get("confidence", "—"),
+        ])
+
+    widths = [len(header) for header in headers]
+    for row in table:
+        for idx, value in enumerate(row):
+            widths[idx] = max(widths[idx], len(value))
+
+    def fmt(row: list[str]) -> str:
+        return "  ".join(value.ljust(widths[idx]) for idx, value in enumerate(row))
+
+    lines = [fmt(headers), fmt(["-" * width for width in widths])]
+    lines.extend(fmt(row) for row in table)
+    return "\n".join(lines)
+
+
+def render_benchmark_compare(entry_a: dict, entry_b: dict) -> str:
+    lines = [
+        f"Comparing `{entry_a.get('id')}` -> `{entry_b.get('id')}`",
+        "",
+        "Metadata",
+        f"- target: {entry_a.get('target', 'unknown')} -> {entry_b.get('target', 'unknown')}",
+        f"- level: {entry_a.get('level', 'unknown')} -> {entry_b.get('level', 'unknown')}",
+        f"- tier: {benchmark_tier(entry_a)} -> {benchmark_tier(entry_b)}",
+        f"- executed_at: {entry_a.get('executed_at', 'unknown')} -> {entry_b.get('executed_at', 'unknown')}",
+        "",
+        "Summary deltas",
+    ]
+    for key, label in [
+        ("passed", "passed"),
+        ("failed", "failed"),
+        ("timed_out", "timed_out"),
+        ("detector_signals", "detector_signals"),
+        ("raw_detector_findings", "raw_detector_findings"),
+        ("target_relevant_detector_findings", "target_relevant_detector_findings"),
+        ("medium_high_target_relevant_findings", "medium_high_target_relevant_findings"),
+    ]:
+        before = metric_value(entry_a, key)
+        after = metric_value(entry_b, key)
+        lines.append(f"- {label}: {before if before is not None else '—'} -> {after if after is not None else '—'} (delta {format_delta(before, after)})")
+
+    prov_a = entry_a.get("detector_provenance", {})
+    prov_b = entry_b.get("detector_provenance", {})
+    slither_a = prov_a.get("slither", {})
+    slither_b = prov_b.get("slither", {})
+    myth_a = prov_a.get("mythril", {})
+    myth_b = prov_b.get("mythril", {})
+    lines.extend([
+        "",
+        "Detector provenance",
+        f"- slither: {slither_a.get('status', '—')} {slither_a.get('version', '')} -> {slither_b.get('status', '—')} {slither_b.get('version', '')}",
+        f"- mythril: {myth_a.get('status', '—')} -> {myth_b.get('status', '—')}",
+    ])
+    return "\n".join(lines)
+
+
+def ensure_outcome_dir() -> None:
+    OUTCOMES_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def load_outcome_entries() -> list[dict]:
+    if not OUTCOME_LEDGER_PATH.exists():
+        return []
+    entries = []
+    for line in OUTCOME_LEDGER_PATH.read_text().splitlines():
+        if not line.strip():
+            continue
+        entries.append(json.loads(line))
+    return entries
+
+
+def append_outcome_entry(entry: dict) -> None:
+    ensure_outcome_dir()
+    with OUTCOME_LEDGER_PATH.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(entry) + "\n")
+
+
+def render_outcome_history(entries: list[dict], limit: int = 10) -> str:
+    rows = sorted(entries, key=lambda entry: entry.get("timestamp", ""), reverse=True)[:limit]
+    if not rows:
+        return "No outcome ledger entries recorded yet."
+
+    headers = ["TIMESTAMP", "STAGE", "TARGET", "RUN ID", "CASE", "REPORT"]
+    table = []
+    for entry in rows:
+        table.append([
+            entry.get("timestamp", "unknown"),
+            entry.get("stage", "unknown"),
+            entry.get("target", "—") or "—",
+            entry.get("run_id", "—") or "—",
+            entry.get("case_id", "—") or "—",
+            entry.get("report_id", "—") or "—",
         ])
 
     widths = [len(header) for header in headers]
@@ -93,7 +265,45 @@ def cmd_env_init(args: argparse.Namespace) -> int:
 
 
 def cmd_benchmark_history(args: argparse.Namespace) -> int:
-    print(render_benchmark_history(load_manifest(), limit=args.limit))
+    print(render_benchmark_history(load_manifest(), limit=args.limit, include_development=args.all))
+    return 0
+
+
+def cmd_benchmark_compare(args: argparse.Namespace) -> int:
+    entries = load_manifest()
+    try:
+        entry_a = find_entry(entries, args.run_a)
+        entry_b = find_entry(entries, args.run_b)
+    except KeyError as exc:
+        print(f"Unknown run id: {exc.args[0]}", file=sys.stderr)
+        return 1
+    print(render_benchmark_compare(entry_a, entry_b))
+    return 0
+
+
+def cmd_benchmark_publish(args: argparse.Namespace) -> int:
+    payload = load_manifest_payload()
+    entries = payload.get("benchmarks", [])
+    try:
+        entry = find_entry(entries, args.run_id)
+    except KeyError:
+        print(f"Unknown run id: {args.run_id}", file=sys.stderr)
+        return 1
+    entry["publication_tier"] = "published"
+    entry["published_at"] = utcnow_iso()
+    if args.note:
+        entry["publication_note"] = args.note
+    save_manifest_payload(payload)
+    append_outcome_entry({
+        "timestamp": utcnow_iso(),
+        "stage": "benchmark_published",
+        "target": entry.get("target", ""),
+        "run_id": entry.get("id", ""),
+        "case_id": "",
+        "report_id": "",
+        "note": args.note or "Published benchmark artifact",
+    })
+    print(f"Published benchmark run: {entry.get('id')}")
     return 0
 
 
@@ -112,6 +322,26 @@ def cmd_benchmark_run(target: str, level: str) -> int:
         return 1
 
 
+def cmd_outcome_history(args: argparse.Namespace) -> int:
+    print(render_outcome_history(load_outcome_entries(), limit=args.limit))
+    return 0
+
+
+def cmd_outcome_record(args: argparse.Namespace) -> int:
+    entry = {
+        "timestamp": utcnow_iso(),
+        "stage": args.stage,
+        "target": args.target,
+        "run_id": args.run_id,
+        "case_id": args.case_id,
+        "report_id": args.report_id,
+        "note": args.note,
+    }
+    append_outcome_entry(entry)
+    print(f"Recorded outcome event: {args.stage}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = create_parser()
     args = parser.parse_args(argv)
@@ -120,8 +350,16 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_env_init(args)
     if args.command == "benchmark" and args.benchmark_command == "history":
         return cmd_benchmark_history(args)
+    if args.command == "benchmark" and args.benchmark_command == "compare":
+        return cmd_benchmark_compare(args)
+    if args.command == "benchmark" and args.benchmark_command == "publish":
+        return cmd_benchmark_publish(args)
     if args.command == "benchmark":
         return cmd_benchmark_run(args.benchmark_command, args.level)
+    if args.command == "outcome" and args.outcome_command == "history":
+        return cmd_outcome_history(args)
+    if args.command == "outcome" and args.outcome_command == "record":
+        return cmd_outcome_record(args)
 
     parser.error("unknown command")
     return 2

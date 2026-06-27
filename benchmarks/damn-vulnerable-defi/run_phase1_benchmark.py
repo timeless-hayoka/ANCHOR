@@ -18,6 +18,13 @@ LABEL = os.environ.get("ANCHOR_BENCHMARK_LABEL", "dvd-phase1-local")
 TIMEOUT_SEC = int(os.environ.get("ANCHOR_BENCHMARK_TIMEOUT_SEC", "90"))
 EXPECTATIONS_PATH = Path(__file__).with_name("challenge_expectations.json")
 MANIFEST_PATH = BENCHMARKS_ROOT / "index.json"
+DEFAULT_HISTORY_POLICY = {
+    "artifact_retention": "keep_all_successful_runs",
+    "manifest_default_tier": "development",
+    "default_history_view": "published_only",
+    "published_tier": "published",
+    "note": "Successful development reruns remain on disk, but only intentionally promoted runs are first-class published artifacts.",
+}
 SEVERITY_ORDER = ["High", "Medium", "Low", "Informational", "Optimization"]
 SIGNAL_IMPACTS = {"High", "Medium"}
 
@@ -271,18 +278,24 @@ def latest_manifest_entry(entries: list[dict]) -> dict | None:
     return max(entries, key=lambda entry: entry.get("executed_at", ""))
 
 
-def update_manifest(entry: dict) -> dict:
+def load_manifest_payload() -> dict:
     if MANIFEST_PATH.exists():
-        manifest = json.loads(MANIFEST_PATH.read_text())
+        payload = json.loads(MANIFEST_PATH.read_text())
     else:
-        manifest = {"benchmarks": []}
+        payload = {"benchmarks": []}
+    payload.setdefault("history_policy", dict(DEFAULT_HISTORY_POLICY))
+    payload.setdefault("benchmarks", [])
+    return payload
 
-    benchmarks = [item for item in manifest.get("benchmarks", []) if item.get("id") != entry["id"]]
+
+def update_manifest(entry: dict) -> dict:
+    payload = load_manifest_payload()
+    benchmarks = [item for item in payload.get("benchmarks", []) if item.get("id") != entry["id"]]
     benchmarks.append(entry)
     benchmarks.sort(key=lambda item: item.get("executed_at", ""))
-    manifest["benchmarks"] = benchmarks
-    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n")
-    return manifest
+    payload["benchmarks"] = benchmarks
+    MANIFEST_PATH.write_text(json.dumps(payload, indent=2) + "\n")
+    return payload
 
 
 def main() -> int:
@@ -387,7 +400,7 @@ def main() -> int:
     }
 
     payload = {
-        "schema_version": "1.3",
+        "schema_version": "1.4",
         "benchmark_id": LABEL,
         "level": "Phase 1 scaffold",
         "executed_at": now.isoformat(),
@@ -419,6 +432,7 @@ def main() -> int:
         "title": "Damn Vulnerable DeFi Phase 1 scaffold run with detector stage",
         "status": "scaffold",
         "level": "Phase 1",
+        "publication_tier": "development",
         "commit": short_commit(anchor_commit),
         "branch": anchor_branch,
         "executed_at": payload["executed_at"],
@@ -460,8 +474,8 @@ def main() -> int:
         f"- Per-challenge timeout: `{TIMEOUT_SEC}s`",
         "",
         "## Detector provenance",
-        f"- Slither: `{slither_provenance['status']}`{f' · {slither_provenance.get("version")}' if slither_provenance.get('version') else ""}",
-        f"- Mythril: `{mythril_probe['status']}`{f' · {mythril_probe.get("detail")}' if mythril_probe.get('detail') else ""}",
+        f"- Slither: `{slither_provenance['status']}`{f' · {slither_provenance.get("version")}' if slither_provenance.get('version') else ''}",
+        f"- Mythril: `{mythril_probe['status']}`{f' · {mythril_probe.get("detail")}' if mythril_probe.get('detail') else ''}",
         "",
         "## Results summary",
         f"- passed: `{summary['passed']}`",
@@ -499,6 +513,10 @@ def main() -> int:
             f"  - log: `{item['log_path']}`",
         ])
     lines.extend([
+        "",
+        "## Publication tier",
+        "- This run is recorded as a `development` artifact in the manifest by default.",
+        "- Promote a run into first-class published history with `anchor benchmark publish <run_id>`.",
         "",
         "## Limitations",
         "- Detector-stage outputs now include provenance and scoped summaries, but detector quality is still based on one active detector on this machine.",

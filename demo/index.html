@@ -418,7 +418,8 @@
 
     <section class="panel footer">
       <strong style="color: var(--text);">How to use this page publicly</strong><br>
-      Put this on GitHub Pages or any static host and link people here first. It gives them a clean, non-threatening way to understand the product before they dive into the repo or the hunt details. If they want the deeper story, send them to <code>README.md</code>, <code>docs/</code>, and <code>benchmarks/</code> next.
+      Put this on GitHub Pages or any static host and link people here first. It gives them a clean, non-threatening way to understand the product before they dive into the repo or the hunt details. If they want the deeper story, send them to <code>README.md</code>, <code>docs/</code>, and <code>benchmarks/</code> next.<br><br>
+      <span style="color: var(--muted);">This repository is licensed under Apache 2.0. See <code>LICENSE</code> for the full terms.</span>
     </section>
   </div>
   <script>
@@ -445,6 +446,14 @@
       stepNode.className = 'step ' + (value === 'high' ? 'done' : (value === 'partial' ? 'partial' : 'todo'));
     }
 
+    function selectLatestPublishedBenchmark(benchmarks) {
+      const rows = Array.isArray(benchmarks) ? benchmarks.slice() : [];
+      if (!rows.length) return null;
+      const sortByExecutedAt = (a, b) => String(a.executed_at || '').localeCompare(String(b.executed_at || ''));
+      const published = rows.filter((entry) => (entry.publication_tier || 'development') === 'published');
+      return (published.length ? published : rows).sort(sortByExecutedAt).at(-1);
+    }
+
     async function loadLatestBenchmark() {
       try {
         const res = await fetch('../benchmarks/index.json');
@@ -452,23 +461,25 @@
         const data = await res.json();
         const benchmarks = Array.isArray(data.benchmarks) ? data.benchmarks : [];
         if (!benchmarks.length) return;
-        const latest = benchmarks.slice().sort((a, b) => String(a.executed_at || '').localeCompare(String(b.executed_at || ''))).at(-1);
+        const latest = selectLatestPublishedBenchmark(benchmarks);
         const summary = latest.results_summary || {};
+        const tier = latest.publication_tier || 'development';
         document.getElementById('benchmarkLevel').textContent = latest.level || 'Unknown';
         document.getElementById('benchmarkMaturityNote').textContent = [
           latest.title || 'Latest benchmark artifact',
+          `tier ${tier}`,
           summary.passed != null ? `${summary.passed} passed` : null,
           summary.failed != null ? `${summary.failed} failed` : null,
           summary.timed_out != null ? `${summary.timed_out} timed out` : null,
         ].filter(Boolean).join(' · ');
         document.getElementById('metaBenchmarkId').textContent = latest.id || 'unknown';
-        document.getElementById('metaBenchmarkLevel').textContent = [latest.level || 'Unknown', latest.status || 'unknown'].join(' · ');
+        document.getElementById('metaBenchmarkLevel').textContent = [latest.level || 'Unknown', latest.status || 'unknown', tier].join(' · ');
         document.getElementById('metaCommit').innerHTML = `<code>${latest.commit || 'unknown'}</code>`;
         document.getElementById('metaBranch').innerHTML = `<code>${latest.branch || 'unknown'}</code>`;
         document.getElementById('metaForge').innerHTML = `<code>${latest.environment?.forge_version || 'unknown'}</code>`;
         document.getElementById('metaExecutionModel').textContent = latest.environment?.os || 'Local-first benchmark run';
         document.getElementById('metaEvidenceStatus').textContent = [
-          latest.record ? 'Published artifact' : 'Artifact pending',
+          tier === 'published' ? 'Published artifact' : 'Development artifact',
           summary.detector_signals != null ? `${summary.detector_signals} detector-signal challenges` : null,
           latest.artifact_json ? 'Machine-readable manifest entry' : null,
         ].filter(Boolean).join(' · ');
@@ -478,7 +489,7 @@
         setConfidence('Detection', ladder.detection);
         setConfidence('Reproduction', ladder.reproduction);
         setConfidence('Comparative', ladder.comparative_data);
-        document.getElementById('artifactSpotlight').innerHTML = `<strong style="color: var(--text);">${latest.title || latest.id || 'Latest benchmark'}</strong><br>Latest recorded run: ${latest.executed_at || 'unknown time'}. Summary: ${summary.passed ?? 0} passed, ${summary.failed ?? 0} failed, ${summary.timed_out ?? 0} timed out.`;
+        document.getElementById('artifactSpotlight').innerHTML = `<strong style="color: var(--text);">${latest.title || latest.id || 'Latest benchmark'}</strong><br>Latest selected run: ${latest.executed_at || 'unknown time'} (${tier}). Summary: ${summary.passed ?? 0} passed, ${summary.failed ?? 0} failed, ${summary.timed_out ?? 0} timed out.`;
       } catch (_) {
         // Static fallback is already rendered in markup.
       }

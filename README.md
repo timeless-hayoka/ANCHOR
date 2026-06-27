@@ -6,6 +6,8 @@ AI says there may be a bug. ANCHOR asks for evidence.
 
 ANCHOR is a local-first proof gate for authorized smart-contract security research. It turns raw tool output into a reproducible case, refuses to promote claims without proof, and preserves the trail from signal to signed evidence.
 
+Licensed under the Apache License 2.0. See [LICENSE](LICENSE).
+
 ## Start here
 
 If you are new to ANCHOR, use this order:
@@ -102,6 +104,7 @@ Each benchmark records:
 - `TRINITY_RUBRIC.md` - evidence rubric for Trinity decisions
 - `HUNT_HYPOTHESIS_TEMPLATE.md` - reusable hunt note for serious leads
 - `WEB3_HUNT_MODULES.md` - web3 hunt engines and evidence-gate order
+- `outcomes/README.md` - outcome ledger stages tying benchmark evidence to real report outcomes
 
 ## Install and run
 
