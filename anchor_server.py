@@ -20,22 +20,24 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse, RedirectResponse
+
+from anchor_scripts import allowed_script_names, load_script_registry, registry_summary
+from anchor_storage import build_storage_manifest, evidence_dir, storage_manifest_path, storage_summary, write_json
+from anchor_trends import compute_benchmark_trends
+from scabench_adapter import adapt as adapt_scabench
 
 APP_VERSION = "1.0.0"
 ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = Path(os.getenv("ANCHOR_PROJECT_ROOT", str(ROOT))).expanduser().resolve()
+DEMO_ROOT = Path(os.getenv("ANCHOR_DEMO_ROOT", str(ROOT / "demo"))).expanduser().resolve()
+BENCHMARKS_ROOT = ROOT / "benchmarks"
+BENCHMARK_MANIFEST = BENCHMARKS_ROOT / "index.json"
 SIGNING_KEY_PATH = Path(os.getenv("ANCHOR_SIGNING_KEY_PATH", str(ROOT / "anchor_signing_key.pem"))).expanduser()
 DEFAULT_HOST = os.getenv("ANCHOR_SERVER_HOST", "127.0.0.1")
 DEFAULT_PORT = int(os.getenv("ANCHOR_SERVER_PORT", "8000"))
 DEFAULT_SCRIPT = os.getenv("ANCHOR_DEFAULT_HUNT_SCRIPT", "trinity_hunt_v4_2_fixed.py")
-ALLOWED_SCRIPT_NAMES = {
-    name.strip()
-    for name in os.getenv(
-        "ANCHOR_ALLOWED_HUNT_SCRIPTS",
-        "trinity_hunt_v4_2_fixed.py,anchor_hunt.py",
-    ).split(",")
-    if name.strip()
-}
 ALLOW_HUNT_ARGS = os.getenv("ANCHOR_ALLOW_HUNT_ARGS", "0").strip().lower() in {"1", "true", "yes"}
 BENCHMARK = "3a8b8bf0"
 LADDER = {"DETECTED": 0, "CORRELATED": 1, "REPRODUCED_REAL": 2}
@@ -444,6 +446,16 @@ RUNS: dict[str, Run] = {}
 CASE_INDEX: dict[str, dict[str, Any]] = {}
 
 
+def benchmark_display_key(entry: dict[str, Any]) -> tuple[int, float]:
+    tier_rank = 0 if entry.get("publication_tier", "development") == "published" else 1
+    executed_at = str(entry.get("executed_at", ""))
+    try:
+        timestamp = datetime.fromisoformat(executed_at.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        timestamp = float("-inf") if not executed_at else 0.0
+    return (tier_rank, -timestamp)
+
+
 def _sse_frame(event: dict[str, Any]) -> str:
     return f"data: {json.dumps(event, ensure_ascii=True)}\n\n"
 
@@ -459,6 +471,50 @@ def _terminal_registry(run: Run) -> dict[str, Any]:
     if run.registry is not None:
         return run.registry
     return build_registry_from_cases(run)
+
+
+def _latest_benchmark_entry(entries: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not entries:
+        return None
+    return sorted(entries, key=benchmark_display_key)[0]
+
+
+def _benchmark_overview(entry: dict[str, Any] | None) -> dict[str, Any]:
+    scabench = adapt_scabench(entry)
+    if not entry:
+        return {
+            "benchmark_id": "",
+            "title": "",
+            "target": "",
+            "status": "",
+            "publication_tier": "",
+            "record": "",
+            "artifact_json": "",
+            "storage_manifest": "",
+            "storage_status": "",
+            "evidence_path": "",
+            "signature_state": "",
+            "regression_report": "",
+            "executed_at": "",
+            "scabench": scabench,
+        }
+    storage = entry.get("storage") if isinstance(entry.get("storage"), dict) else {}
+    return {
+        "benchmark_id": entry.get("id", ""),
+        "title": entry.get("title", ""),
+        "target": entry.get("target", ""),
+        "status": entry.get("status", ""),
+        "publication_tier": entry.get("publication_tier", ""),
+        "record": entry.get("record", ""),
+        "artifact_json": entry.get("artifact_json", ""),
+        "storage_manifest": entry.get("storage_manifest", ""),
+        "storage_status": storage.get("status", entry.get("storage_status", "")),
+        "evidence_path": storage.get("evidence_path", entry.get("evidence_path", "")),
+        "signature_state": storage.get("signature_state", entry.get("signature_state", "")),
+        "regression_report": entry.get("regression_report", ""),
+        "executed_at": entry.get("executed_at", ""),
+        "scabench": scabench,
+    }
 
 
 async def demo_run(run: Run) -> None:
@@ -511,7 +567,7 @@ async def hunt_run(run: Run) -> None:
         run.registry = build_registry_from_cases(run)
         await run.emit("run.completed", {"reproduced": 0, "total": 0, "precision": 0.0, "recall": 0.0, "f1": 0.0})
         return
-    if script.name not in ALLOWED_SCRIPT_NAMES:
+    if script.name not in allowed_script_names():
         await run.emit("log.line", {"message": f"hunt script rejected: {script.name} is not allowlisted.", "text": "hunt script rejected"})
         run.registry = build_registry_from_cases(run)
         await run.emit("run.completed", {"reproduced": 0, "total": 0, "precision": 0.0, "recall": 0.0, "f1": 0.0})
@@ -635,7 +691,12 @@ app.add_middleware(
 
 
 @app.get("/")
-async def root() -> dict[str, Any]:
+async def root() -> RedirectResponse:
+    return RedirectResponse(url="/index.html")
+
+
+@app.get("/api/service")
+async def service_info() -> dict[str, Any]:
     return {
         "service": "anchor",
         "version": APP_VERSION,
@@ -645,6 +706,127 @@ async def root() -> dict[str, Any]:
         "runs": len(RUNS),
         "signing_key_hint": SIGNING_HINT,
     }
+
+
+def _load_benchmark_manifest() -> dict[str, Any]:
+    if not BENCHMARK_MANIFEST.exists():
+        return {"benchmarks": []}
+    try:
+        payload = json.loads(BENCHMARK_MANIFEST.read_text())
+    except json.JSONDecodeError:
+        return {"benchmarks": []}
+    payload.setdefault("benchmarks", [])
+    return payload
+
+
+def _anchor_snapshot(limit: int = 8) -> dict[str, Any]:
+    manifest = _load_benchmark_manifest()
+    entries = sorted(manifest.get("benchmarks", []), key=benchmark_display_key)
+    runs = []
+    for entry in entries[: max(1, limit)]:
+        summary = entry.get("results_summary") or {}
+        parts = []
+        if summary:
+            parts.append(
+                "passed={passed} failed={failed} timed_out={timed_out}".format(
+                    passed=summary.get("passed", "—"),
+                    failed=summary.get("failed", "—"),
+                    timed_out=summary.get("timed_out", "—"),
+                )
+            )
+        runs.append(
+            {
+                "run_id": entry.get("id"),
+                "id": entry.get("id"),
+                "case_id": entry.get("id"),
+                "title": entry.get("title") or entry.get("id"),
+                "summary": "; ".join(parts) if parts else entry.get("status", "benchmark"),
+                "target": entry.get("target"),
+                "level": entry.get("level"),
+                "executed_at": entry.get("executed_at"),
+            }
+        )
+    latest = _latest_benchmark_entry(entries[: max(1, limit)])
+    trends = compute_benchmark_trends(manifest.get("benchmarks", []), root=ROOT, limit=max(10, limit))
+    return {
+        "identity": {"version": APP_VERSION, "service": "anchor", "release": f"ANCHOR {APP_VERSION}"},
+        "history": {"runs": runs},
+        "benchmarks": entries[: max(1, limit)],
+        "benchmark_overview": _benchmark_overview(latest),
+        "benchmark_trends": trends,
+        "script_registry": registry_summary(),
+        "scabench": adapt_scabench(latest),
+    }
+
+
+@app.get("/api/health")
+async def api_health() -> dict[str, Any]:
+    return {"ok": True, "service": "anchor", "version": APP_VERSION, "runs": len(RUNS)}
+
+
+@app.get("/api/anchor/session")
+async def api_anchor_session() -> dict[str, Any]:
+    return {"authenticated": True, "release": f"ANCHOR {APP_VERSION}", "mode": "local"}
+
+
+@app.get("/api/anchor/snapshot")
+async def api_anchor_snapshot(limit: int = 8) -> dict[str, Any]:
+    return _anchor_snapshot(limit=limit)
+
+
+@app.get("/api/anchor/benchmark/trends")
+async def api_anchor_benchmark_trends(limit: int = 10) -> dict[str, Any]:
+    manifest = _load_benchmark_manifest()
+    return compute_benchmark_trends(manifest.get("benchmarks", []), root=ROOT, limit=limit)
+
+
+@app.get("/api/trinity/paths")
+async def api_trinity_paths() -> dict[str, Any]:
+    return {
+        "dvd_root": os.environ.get("ANCHOR_DVD_ROOT", "/home/crexs/damn-vulnerable-defi"),
+        "benchmark_manifest": str(BENCHMARK_MANIFEST),
+        "demo_root": str(DEMO_ROOT),
+        "script_registry": str(load_script_registry().get("registry_path", "scripts/registry.json")),
+        "storage_root": str(BENCHMARKS_ROOT),
+    }
+
+
+@app.get("/api/trinity/scripts")
+async def api_trinity_scripts() -> dict[str, Any]:
+    registry = load_script_registry()
+    return {"registry": registry, "summary": registry_summary(registry)}
+
+
+@app.post("/api/trinity/chat")
+async def api_trinity_chat(req: Request) -> dict[str, Any]:
+    body = await req.json()
+    message = str((body or {}).get("message", "")).strip()
+    return {
+        "ok": True,
+        "reply": (
+            "Trinity is in local ANCHOR mode. Use the Live Run tab or run "
+            "`./anchor benchmark dvd phase1` to stream a real DVD benchmark."
+            + (f" You asked: {message[:240]}" if message else "")
+        ),
+        "mode": "local",
+    }
+
+
+@app.get("/benchmarks/index.json")
+async def benchmark_manifest_file() -> FileResponse:
+    if not BENCHMARK_MANIFEST.exists():
+        raise HTTPException(status_code=404, detail="benchmark manifest not found")
+    return FileResponse(BENCHMARK_MANIFEST, media_type="application/json")
+
+
+@app.get("/api/trinity/runs/{run_id}/events")
+async def api_trinity_run_events(run_id: str, request: Request):
+    if run_id in RUNS:
+        return await run_events(run_id, request)
+    run = create_run("demo")
+    RUNS[run.run_id] = run
+    run.task = asyncio.create_task(run_driver(run))
+    return await run_events(run.run_id, request)
 
 
 @app.get("/pubkey")
@@ -679,7 +861,7 @@ async def create_run_route(req: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if run.mode == "hunt" and run.params.get("script") is not None:
         script_name = Path(run.params["script"]).name
-        if script_name not in ALLOWED_SCRIPT_NAMES:
+        if script_name not in allowed_script_names():
             raise HTTPException(status_code=400, detail=f"hunt script {script_name} is not allowlisted")
     RUNS[run.run_id] = run
     run.task = asyncio.create_task(run_driver(run))
@@ -825,6 +1007,10 @@ async def evidence_sign(req: Request) -> dict[str, Any]:
     bundle.pop("signature", None)
     bundle.pop("integrity", None)
     return {"ok": True, "signed_bundle": sign_bundle(bundle), "signing_hint": SIGNING_HINT, "public_key": PUBLIC_KEY_HEX}
+
+
+if DEMO_ROOT.is_dir():
+    app.mount("/", StaticFiles(directory=str(DEMO_ROOT), html=True), name="demo")
 
 
 if __name__ == "__main__":

@@ -11,6 +11,8 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+from anchor_trends import compute_benchmark_trends, render_benchmark_trends
+
 ROOT = Path(__file__).resolve().parent
 MANIFEST_PATH = ROOT / "benchmarks" / "index.json"
 OUTCOMES_DIR = ROOT / "outcomes"
@@ -36,6 +38,7 @@ LEGACY_STAGE_STATUS = {
 }
 BENCHMARK_RUNNERS = {
     ("dvd", "phase1"): ROOT / "benchmarks" / "damn-vulnerable-defi" / "run_phase1_benchmark.py",
+    ("ethernaut", "phase1"): ROOT / "benchmarks" / "ethernaut" / "run_phase1_benchmark.py",
 }
 
 
@@ -72,6 +75,15 @@ def create_parser() -> argparse.ArgumentParser:
     benchmark_compare = benchmark_sub.add_parser("compare", help="Compare two benchmark runs by manifest run id")
     benchmark_compare.add_argument("run_a")
     benchmark_compare.add_argument("run_b")
+
+    benchmark_latest = benchmark_sub.add_parser("latest", help="Show the latest published benchmark summary")
+
+    benchmark_trends = benchmark_sub.add_parser(
+        "trends",
+        help="Historical trends from published benchmark runs (canonical trend source)",
+    )
+    benchmark_trends.add_argument("--limit", type=int, default=10, help="Maximum published runs to analyze")
+    benchmark_trends.add_argument("--json", action="store_true", help="Emit structured JSON instead of text")
 
     benchmark_publish = benchmark_sub.add_parser("publish", help="Promote a run into first-class published benchmark history")
     benchmark_publish.add_argument("run_id")
@@ -157,12 +169,40 @@ def load_manifest() -> list[dict]:
     return load_manifest_payload().get("benchmarks", [])
 
 
+def benchmark_run_dir(entry: dict) -> Path | None:
+    for key in ("record", "artifact_json", "storage_manifest"):
+        value = entry.get(key)
+        if not value:
+            continue
+        candidate = ROOT / value
+        if candidate.is_dir():
+            return candidate
+        if candidate.name in {"README.md", "benchmark.json", "storage.json", "PUBLISHED.md"}:
+            return candidate.parent
+        return candidate.parent
+    return None
+
+
 def benchmark_tier(entry: dict) -> str:
     return entry.get("publication_tier", DEFAULT_HISTORY_POLICY["manifest_default_tier"])
 
 
+def benchmark_display_key(entry: dict) -> tuple[int, float]:
+    tier_rank = 0 if benchmark_tier(entry) == "published" else 1
+    executed_at = str(entry.get("executed_at", ""))
+    try:
+        parsed = dt.datetime.fromisoformat(executed_at.replace("Z", "+00:00"))
+        timestamp = parsed.timestamp()
+    except Exception:
+        timestamp = float("-inf") if not executed_at else 0.0
+    return (tier_rank, -timestamp)
+
+
 def sorted_entries(entries: list[dict], reverse: bool = True) -> list[dict]:
-    return sorted(entries, key=lambda entry: entry.get("executed_at", ""), reverse=reverse)
+    rows = sorted(entries, key=benchmark_display_key)
+    if reverse:
+        return rows
+    return list(reversed(rows))
 
 
 def find_entry(entries: list[dict], run_id: str) -> dict:
@@ -264,6 +304,268 @@ def render_benchmark_compare(entry_a: dict, entry_b: dict) -> str:
     return "\n".join(lines)
 
 
+def find_latest_published_benchmark(entries: list[dict]) -> dict | None:
+    published = [entry for entry in sorted_entries(entries) if benchmark_tier(entry) == "published"]
+    return published[0] if published else None
+
+
+def benchmark_regression_summary(current: dict, baseline: dict | None) -> dict[str, int]:
+    current_results = benchmark_result_index(current)
+    baseline_results = benchmark_result_index(baseline)
+
+    resolved = 0
+    regressions = 0
+    environment_sensitive = 0
+    stable = 0
+
+    for challenge in sorted(set(baseline_results) | set(current_results)):
+        current_result = current_results.get(challenge, {})
+        baseline_result = baseline_results.get(challenge, {})
+        current_status = str(current_result.get("status", current_result.get("reproduction_status", "unknown"))).upper()
+        baseline_status = str(baseline_result.get("status", baseline_result.get("reproduction_status", "unknown"))).upper()
+        if current_result.get("comparison") == "environment_sensitive" or baseline_result.get("comparison") == "environment_sensitive":
+            environment_sensitive += 1
+            continue
+        if status_score(current_status) > status_score(baseline_status):
+            resolved += 1
+        elif status_score(current_status) < status_score(baseline_status):
+            regressions += 1
+        else:
+            stable += 1
+
+    return {
+        "resolved": resolved,
+        "regressions": regressions,
+        "environment_sensitive": environment_sensitive,
+        "stable": stable,
+    }
+
+
+def render_benchmark_latest(entry: dict | None, baseline: dict | None = None) -> str:
+    if not entry:
+        return "No published benchmark available yet."
+
+    if baseline is None:
+        baseline = find_previous_published_benchmark(load_manifest(), entry.get("id", ""))
+    summary = entry.get("results_summary", {}) or {}
+    regression = benchmark_regression_summary(entry, baseline)
+    regression_report = entry.get("regression_report", "")
+    if not regression_report and benchmark_run_dir(entry) is not None:
+        regression_report = str((benchmark_run_dir(entry) / "REGRESSION_REPORT.md").relative_to(ROOT))
+
+    lines = [
+        "Latest Published Benchmark",
+        "",
+        f"Run: {entry.get('id', 'unknown')}",
+        f"Status: {benchmark_tier(entry)}",
+        f"Level: {entry.get('level', 'unknown')}",
+        f"Target: {entry.get('target', 'unknown')}",
+        f"Executed At: {entry.get('executed_at', 'unknown')}",
+        f"Confidence: {entry.get('confidence', '\u2014')}",
+        "",
+        "Summary",
+        f"- passed: {summary.get('passed', '\u2014')}",
+        f"- failed: {summary.get('failed', '\u2014')}",
+        f"- timed_out: {summary.get('timed_out', '\u2014')}",
+        f"- detector_signals: {summary.get('detector_signals', '\u2014')}",
+        f"- medium_high_target_relevant_findings: {summary.get('medium_high_target_relevant_findings', '\u2014')}",
+        "",
+        "Regression",
+        f"- resolved: {regression['resolved']}",
+        f"- regressions: {regression['regressions']}",
+        f"- environment_sensitive: {regression['environment_sensitive']}",
+        f"- stable: {regression['stable']}",
+        f"- report: {regression_report or '\u2014'}",
+    ]
+
+    published_record = entry.get("published_record", "")
+    storage_manifest = entry.get("storage_manifest", "")
+    artifact_json = entry.get("artifact_json", "")
+    if published_record or storage_manifest or artifact_json:
+        lines.extend([
+            "",
+            "Artifacts",
+            f"- published_record: {published_record or '\u2014'}",
+            f"- storage_manifest: {storage_manifest or '\u2014'}",
+            f"- artifact_json: {artifact_json or '\u2014'}",
+        ])
+
+    lines.extend([
+        "",
+        "Use `anchor benchmark history` to compare this run against the published ledger.",
+    ])
+    return "\n".join(lines)
+
+
+def parse_iso_timestamp(value: str) -> dt.datetime | None:
+    if not value or value in {"unknown", ""}:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=dt.timezone.utc)
+        return parsed
+    except Exception:
+        return None
+
+
+def load_benchmark_artifact(entry: dict | None) -> dict:
+    if not entry:
+        return {"results": [], "summary": {}}
+    candidates = []
+    for key in ("artifact_json", "record"):
+        value = entry.get(key)
+        if value:
+            candidates.append(ROOT / value)
+    run_dir = benchmark_run_dir(entry)
+    if run_dir is not None:
+        candidates.append(run_dir / "benchmark.json")
+    for candidate in candidates:
+        if candidate.exists():
+            try:
+                payload = json.loads(candidate.read_text())
+                if isinstance(payload, dict):
+                    return payload
+            except Exception:
+                continue
+    return {"results": [], "summary": entry.get("results_summary", {}) or {}}
+
+
+def benchmark_result_index(entry: dict | None) -> dict[str, dict]:
+    payload = load_benchmark_artifact(entry)
+    index: dict[str, dict] = {}
+    for result in payload.get("results", []) or []:
+        challenge = result.get("challenge")
+        if challenge:
+            index[str(challenge)] = result
+    return index
+
+
+def status_score(value: str) -> int:
+    return {
+        "PASSED": 3,
+        "SKIPPED": 2,
+        "TIMED_OUT": 1,
+        "FAILED": 0,
+    }.get(value, -1)
+
+
+def find_previous_published_benchmark(entries: list[dict], current_id: str) -> dict | None:
+    published = [entry for entry in entries if benchmark_tier(entry) == "published" and entry.get("id") != current_id]
+    if not published:
+        return None
+    current = next((entry for entry in entries if entry.get("id") == current_id), None)
+    current_ts = parse_iso_timestamp(current.get("executed_at", "")) if current else None
+    if current_ts is not None:
+        older = [
+            entry
+            for entry in published
+            if (parse_iso_timestamp(entry.get("executed_at", "")) or dt.datetime.min.replace(tzinfo=dt.timezone.utc)) < current_ts
+        ]
+        if older:
+            return max(older, key=lambda entry: entry.get("executed_at", ""))
+    return max(published, key=lambda entry: entry.get("executed_at", ""))
+
+
+def render_benchmark_regression_report(current: dict, baseline: dict | None) -> str:
+    current_payload = load_benchmark_artifact(current)
+    baseline_payload = load_benchmark_artifact(baseline)
+    current_results = benchmark_result_index(current)
+    baseline_results = benchmark_result_index(baseline)
+    current_summary = current_payload.get("summary", {}) or current.get("results_summary", {}) or {}
+    baseline_summary = baseline_payload.get("summary", {}) or (baseline.get("results_summary", {}) if baseline else {}) or {}
+
+    resolved = []
+    regressions = []
+    environment_sensitive = []
+    stable = []
+    all_challenges = sorted(set(baseline_results) | set(current_results))
+    for challenge in all_challenges:
+        current_result = current_results.get(challenge, {})
+        baseline_result = baseline_results.get(challenge, {})
+        current_status = str(current_result.get("status", current_result.get("reproduction_status", "unknown"))).upper()
+        baseline_status = str(baseline_result.get("status", baseline_result.get("reproduction_status", "unknown"))).upper()
+        if current_result.get("comparison") == "environment_sensitive" or baseline_result.get("comparison") == "environment_sensitive":
+            environment_sensitive.append((challenge, baseline_status, current_status))
+            continue
+        if status_score(current_status) > status_score(baseline_status):
+            resolved.append((challenge, baseline_status, current_status))
+        elif status_score(current_status) < status_score(baseline_status):
+            regressions.append((challenge, baseline_status, current_status))
+        else:
+            stable.append((challenge, baseline_status, current_status))
+
+    lines = [
+        f"# Benchmark Regression Report - {current.get('id', 'current')}",
+        "",
+        "## Baseline",
+        f"- current run: `{current.get('id', 'unknown')}`",
+        f"- current tier: `{benchmark_tier(current)}`",
+        f"- current executed_at: `{current.get('executed_at', 'unknown')}`",
+    ]
+    if baseline:
+        lines.extend([
+            f"- baseline run: `{baseline.get('id', 'unknown')}`",
+            f"- baseline tier: `{benchmark_tier(baseline)}`",
+            f"- baseline executed_at: `{baseline.get('executed_at', 'unknown')}`",
+        ])
+    else:
+        lines.append("- baseline run: none available")
+
+    lines.extend([
+        "",
+        "## Summary",
+        render_benchmark_compare(baseline or current, current),
+        "",
+        f"- resolved challenges: {len(resolved)}",
+        f"- regressions: {len(regressions)}",
+        f"- environment-sensitive: {len(environment_sensitive)}",
+        f"- stable: {len(stable)}",
+        "",
+        "## Resolved",
+    ])
+    if resolved:
+        for challenge, before, after in resolved:
+            lines.append(f"- `{challenge}`: {before} -> {after}")
+    else:
+        lines.append("- none")
+
+    lines.extend(["", "## Regressions"])
+    if regressions:
+        for challenge, before, after in regressions:
+            lines.append(f"- `{challenge}`: {before} -> {after}")
+    else:
+        lines.append("- none")
+
+    lines.extend(["", "## Environment-Sensitive"])
+    if environment_sensitive:
+        for challenge, before, after in environment_sensitive:
+            lines.append(f"- `{challenge}`: {before} -> {after}")
+    else:
+        lines.append("- none")
+
+    lines.extend(["", "## Metrics"])
+    for key, label in [
+        ("passed", "passed"),
+        ("failed", "failed"),
+        ("timed_out", "timed_out"),
+        ("detector_signals", "detector_signals"),
+        ("raw_detector_findings", "raw_detector_findings"),
+        ("target_relevant_detector_findings", "target_relevant_detector_findings"),
+        ("medium_high_target_relevant_findings", "medium_high_target_relevant_findings"),
+    ]:
+        before = baseline_summary.get(key) if isinstance(baseline_summary, dict) else None
+        after = current_summary.get(key) if isinstance(current_summary, dict) else None
+        lines.append(f"- {label}: {before if before is not None else '—'} -> {after if after is not None else '—'} (delta {format_delta(before, after)})")
+
+    lines.extend([
+        "",
+        "## Notes",
+        "- Published benchmark artifacts should cite `PUBLISHED.md` and this regression report together.",
+        "- The report compares the newly published run against the most recent older published baseline.",
+    ])
+    return "\n".join(lines) + "\n"
+
 def ensure_outcome_dir() -> None:
     OUTCOMES_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -355,8 +657,25 @@ def summarize_text(value: str, limit: int = 36) -> str:
     return text[: limit - 3] + "..."
 
 
+def outcome_display_key(entry: dict) -> tuple[int, float]:
+    status = entry.get("status", "")
+    type_ = entry.get("type", "")
+    priority = 2
+    if type_ == "benchmark" and status == "published":
+        priority = 0
+    elif type_ == "pr" and status == "merged":
+        priority = 1
+    timestamp = str(entry.get("timestamp", ""))
+    try:
+        parsed = dt.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        ts = parsed.timestamp()
+    except Exception:
+        ts = float("-inf") if not timestamp else 0.0
+    return (priority, -ts)
+
+
 def render_outcome_history(entries: list[dict], limit: int = 10) -> str:
-    rows = sorted(entries, key=lambda entry: entry.get("timestamp", ""), reverse=True)[:limit]
+    rows = sorted(entries, key=outcome_display_key)[:limit]
     if not rows:
         return "No outcome ledger entries recorded yet."
 
@@ -505,6 +824,21 @@ def cmd_benchmark_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_benchmark_latest(args: argparse.Namespace) -> int:
+    del args
+    print(render_benchmark_latest(find_latest_published_benchmark(load_manifest())))
+    return 0
+
+
+def cmd_benchmark_trends(args: argparse.Namespace) -> int:
+    trends = compute_benchmark_trends(load_manifest(), root=ROOT, limit=args.limit)
+    if args.json:
+        print(json.dumps(trends, indent=2))
+    else:
+        print(render_benchmark_trends(trends))
+    return 0
+
+
 def cmd_benchmark_publish(args: argparse.Namespace) -> int:
     payload = load_manifest_payload()
     entries = payload.get("benchmarks", [])
@@ -513,14 +847,61 @@ def cmd_benchmark_publish(args: argparse.Namespace) -> int:
     except KeyError:
         print(f"Unknown run id: {args.run_id}", file=sys.stderr)
         return 1
+
+    published_at = utcnow_iso()
+    previous_published = find_previous_published_benchmark(entries, entry.get("id", ""))
     entry["publication_tier"] = "published"
-    entry["published_at"] = utcnow_iso()
+    entry["status"] = "published"
+    entry["published_at"] = published_at
     if args.note:
         entry["publication_note"] = args.note
+
+    run_dir = benchmark_run_dir(entry)
+    published_record = None
+    regression_report = None
+    if run_dir and run_dir.exists():
+        storage_path = run_dir / "storage.json"
+        if storage_path.exists():
+            try:
+                storage_payload = json.loads(storage_path.read_text())
+                if isinstance(storage_payload, dict):
+                    storage_payload["status"] = "published"
+                    storage_payload["published_at"] = published_at
+                    storage_payload["publication_note"] = args.note or "Published benchmark artifact"
+                    storage_path.write_text(json.dumps(storage_payload, indent=2) + "\n", encoding="utf-8")
+                    entry["storage_manifest"] = str(storage_path.relative_to(ROOT))
+                    entry["storage_status"] = "published"
+            except Exception:
+                pass
+        published_record_path = run_dir / "PUBLISHED.md"
+        published_record_path.write_text(
+            "# Published Benchmark Run\n\n"
+            f"- Benchmark ID: `{entry.get('id', '')}`\n"
+            f"- Published at: `{published_at}`\n"
+            f"- Tier: `published`\n"
+            f"- Status: `{entry.get('status', 'published')}`\n"
+            f"- Note: `{args.note or 'Published benchmark artifact'}`\n"
+            f"- Benchmark record: `{entry.get('record', '')}`\n"
+            f"- Benchmark artifact: `{entry.get('artifact_json', '')}`\n"
+            f"- Storage manifest: `{entry.get('storage_manifest', '')}`\n\n"
+            "This file marks the promoted artifact that should be cited by default.\n",
+            encoding="utf-8",
+        )
+        published_record = str(published_record_path.relative_to(ROOT))
+        entry["published_record"] = published_record
+
+        regression_report_path = run_dir / "REGRESSION_REPORT.md"
+        regression_report_path.write_text(
+            render_benchmark_regression_report(entry, previous_published),
+            encoding="utf-8",
+        )
+        regression_report = str(regression_report_path.relative_to(ROOT))
+        entry["regression_report"] = regression_report
+
     save_manifest_payload(payload)
     append_outcome_entry(normalize_outcome_entry({
         "id": make_outcome_id("benchmark", entry.get("id", "benchmark")),
-        "timestamp": utcnow_iso(),
+        "timestamp": published_at,
         "type": "benchmark",
         "status": "published",
         "stage": "benchmark_published",
@@ -530,20 +911,19 @@ def cmd_benchmark_publish(args: argparse.Namespace) -> int:
         "claim_id": "",
         "case_id": "",
         "report_id": "",
-        "evidence": entry.get("record", "") or entry.get("artifact_json", ""),
+        "evidence": regression_report or published_record or entry.get("record", "") or entry.get("artifact_json", ""),
         "lesson": "",
         "note": args.note or "Published benchmark artifact",
         "links": {
             "benchmark": entry.get("record", ""),
-            "artifact": entry.get("artifact_json", ""),
+            "artifact": published_record or entry.get("artifact_json", ""),
             "pr": "",
             "issue": "",
-            "report": "",
+            "report": regression_report or "",
         },
     }))
     print(f"Published benchmark run: {entry.get('id')}")
     return 0
-
 
 def cmd_benchmark_run(target: str, level: str) -> int:
     runner = BENCHMARK_RUNNERS[(target, level)]
@@ -592,6 +972,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_benchmark_history(args)
     if args.command == "benchmark" and args.benchmark_command == "compare":
         return cmd_benchmark_compare(args)
+    if args.command == "benchmark" and args.benchmark_command == "latest":
+        return cmd_benchmark_latest(args)
+    if args.command == "benchmark" and args.benchmark_command == "trends":
+        return cmd_benchmark_trends(args)
     if args.command == "benchmark" and args.benchmark_command == "publish":
         return cmd_benchmark_publish(args)
     if args.command == "benchmark":
