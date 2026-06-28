@@ -126,6 +126,34 @@ uvicorn anchor_server:app --host 127.0.0.1 --port 8000
 
 On first start the server creates `anchor_signing_key.pem` with owner-only permissions and reuses it later so evidence signatures stay stable.
 
+## Model backend runtime
+
+ANCHOR now uses a provider-neutral backend layer in `backends/` with a compatibility shim at `backend_runtime.py`.
+
+It exposes:
+
+- `BackendInterface`
+- `BackendFactory`
+- `OpenAIBackend`
+- `OpenAIFirstBackend`
+- `OllamaBackend`
+
+The current provider plan is OpenAI-first:
+
+- provider: OpenAI
+- API: Responses API
+- model: `gpt-5.4-mini` by default
+- environment variable: `OPENAI_API_KEY`
+- fallback provider: Ollama
+- fallback model: `qwen3:4b`
+- default Ollama endpoint: `http://127.0.0.1:11434`
+
+```bash
+pip install openai
+```
+
+Set `ANCHOR_OPENAI_MODEL` if you want to override the default model name. The hunt loop only talks to `BackendInterface`; it does not import OpenAI or Ollama directly.
+
 ## Benchmark command
 
 The repo now ships with a single local entrypoint that prefers `./.venv/bin/python` when it exists and otherwise falls back to `python3`.
@@ -134,7 +162,13 @@ The repo now ships with a single local entrypoint that prefers `./.venv/bin/pyth
 ./anchor benchmark dvd phase1
 ```
 
-That command runs the current Damn Vulnerable DeFi Phase 1 scaffold, writes a fresh benchmark artifact under `benchmarks/damn-vulnerable-defi/runs/`, and updates `benchmarks/index.json` so the latest summary shows up in the demo surfaces.
+For a structured hunt plan from a target note:
+
+```bash
+./anchor hunt plan --target targets/enzyme-blue.md
+```
+
+The benchmark command writes a fresh benchmark artifact under `benchmarks/damn-vulnerable-defi/runs/` and updates `benchmarks/index.json` so the latest summary shows up in the demo surfaces. The hunt plan command turns a target note into a structured, falsifiable queue.
 
 ## Connect the console
 
