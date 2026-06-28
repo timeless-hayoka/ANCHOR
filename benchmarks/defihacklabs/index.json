@@ -1,0 +1,15 @@
+{
+  "family": "defihacklabs",
+  "title": "DeFiHackLabs curated subset index",
+  "scope": "curated benchmark notes only",
+  "status": "scaffold",
+  "entries": [
+    {
+      "id": "defihacklabs-2025-subset-scaffold",
+      "label": "DeFiHackLabs 2025 subset",
+      "status": "pending",
+      "note": "Populate with verified incidents only after source notes are ingested into the vault.",
+      "artifact": "benchmarks/defihacklabs/README.md"
+    }
+  ]
+}

@@ -15,10 +15,11 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE).
 If you are new to ANCHOR, use this order:
 
 1. [demo/index.html](demo/index.html) - see the product and proof gate quickly
-2. [docs/METHODOLOGY.md](docs/METHODOLOGY.md) - understand the hunt workflow
-3. [docs/PROOF_GATE.md](docs/PROOF_GATE.md) - understand what counts as a finding
-4. [benchmarks/README.md](benchmarks/README.md) - inspect published benchmark artifacts
-5. [targets/enzyme-blue.md](targets/enzyme-blue.md) - see the current real-world target note
+2. [docs/REPRODUCTION.md](docs/REPRODUCTION.md) - reproduce benchmarks on a clean machine (Phase C credibility gate)
+3. [docs/METHODOLOGY.md](docs/METHODOLOGY.md) - understand the hunt workflow
+4. [docs/PROOF_GATE.md](docs/PROOF_GATE.md) - understand what counts as a finding
+5. [benchmarks/README.md](benchmarks/README.md) - inspect published benchmark artifacts
+6. [targets/enzyme-blue.md](targets/enzyme-blue.md) - see the current real-world target note
 
 If you want the short public-facing wording for profiles and outreach, use [docs/PROFILE_COPY.md](docs/PROFILE_COPY.md).
 
@@ -114,6 +115,7 @@ Each benchmark records:
 - `docs/APEX_MOTHERSHIP_BACKLOG.md` - phased implementation backlog
 - `docs/ANCHOR_WORK_QUEUE.md` - current implementation backlog and follow-up tasks
 - `docs/ANCHOR_KNOWLEDGE_INGESTION.md` - repo-mining plan for knowledge ANCHOR can reuse
+- `docs/ANCHOR_SYSTEM_SPEC.md` - canonical unified system spec for the whole ANCHOR pipeline
 - `outcomes/README.md` - outcome ledger stages tying benchmark evidence to real report outcomes
 
 ## Install and run

@@ -34,13 +34,64 @@ def test_anchor_server_demo_run_streams_and_signs(monkeypatch: pytest.MonkeyPatc
     assert stat.S_IMODE(Path(server.SIGNING_KEY_PATH).stat().st_mode) == 0o600
 
     with TestClient(server.app) as client:
-        root = client.get("/")
-        assert root.status_code == 200
-        assert root.json()["service"] == "anchor"
+        root = client.get("/api/service")
+
+
+def test_anchor_snapshot_prefers_published_benchmark(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    server = load_server(monkeypatch, tmp_path)
+    manifest_path = tmp_path / "benchmarks.json"
+    manifest_path.write_text(json.dumps({
+        "benchmarks": [
+            {
+                "id": "dev-run",
+                "target": "damn-vulnerable-defi",
+                "title": "Development run",
+                "status": "scaffold",
+                "publication_tier": "development",
+                "executed_at": "2026-06-27T09:00:00+00:00",
+            },
+            {
+                "id": "pub-run",
+                "target": "damn-vulnerable-defi",
+                "title": "Published run",
+                "status": "published",
+                "publication_tier": "published",
+                "executed_at": "2026-06-26T09:00:00+00:00",
+                "results_summary": {"passed": 15, "failed": 2, "timed_out": 1, "detector_signals": 58, "medium_high_target_relevant_findings": 58},
+            },
+        ]
+    }))
+    server.BENCHMARK_MANIFEST = manifest_path
+
+    with TestClient(server.app) as client:
+        snapshot = client.get("/api/anchor/snapshot?limit=5")
+        assert snapshot.status_code == 200
+        snap = snapshot.json()
+        assert snap["benchmark_overview"]["benchmark_id"] == "pub-run"
+        assert snap["benchmark_overview"]["regression_report"] == ""
+        assert snap["research_loop"]["benchmark_id"] == "pub-run"
+        assert snap["research_loop"]["queue_depth"] >= 1
+        assert snap["benchmarks"][0]["id"] == "pub-run"
+        service = client.get("/api/service")
+        assert service.status_code == 200
+        assert service.json()["service"] == "anchor"
 
         pubkey = client.get("/pubkey")
         assert pubkey.status_code == 200
         assert pubkey.json()["algorithm"] == "ed25519"
+
+        scripts = client.get("/api/trinity/scripts")
+        assert scripts.status_code == 200
+        assert scripts.json()["summary"]["script_count"] >= 1
+
+        snapshot = client.get("/api/anchor/snapshot?limit=5")
+        assert snapshot.status_code == 200
+        snap = snapshot.json()
+        assert "benchmark_overview" in snap
+        assert "research_loop" in snap
+        assert "script_registry" in snap
+        assert "scabench" in snap
+        assert "score" in snap["scabench"]
 
         started = client.post("/runs", json={"mode": "demo"})
         assert started.status_code == 200

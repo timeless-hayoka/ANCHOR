@@ -31,6 +31,7 @@ Every benchmark record should include:
 ## Current benchmark families
 
 - [damn-vulnerable-defi](damn-vulnerable-defi/README.md)
+- [defihacklabs](defihacklabs/README.md)
 - [ethernaut](ethernaut/README.md)
 - [openzeppelin](openzeppelin/README.md)
 - [custom](custom/README.md)

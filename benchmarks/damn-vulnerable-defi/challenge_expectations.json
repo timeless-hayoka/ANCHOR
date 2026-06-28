@@ -1,7 +1,106 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "target": "damn-vulnerable-defi",
   "challenge_set": [
+    {
+      "challenge": "abi-smuggling",
+      "test_path": "test/abi-smuggling/ABISmuggling.t.sol",
+      "slither_target": "src/abi-smuggling/SelfAuthorizedVault.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "Local ABI encoding smuggling challenge."
+    },
+    {
+      "challenge": "backdoor",
+      "test_path": "test/backdoor/Backdoor.t.sol",
+      "slither_target": "src/backdoor/WalletRegistry.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "Local wallet registry backdoor challenge."
+    },
+    {
+      "challenge": "climber",
+      "test_path": "test/climber/Climber.t.sol",
+      "slither_target": "src/climber/ClimberTimelock.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "Timelock privilege escalation challenge."
+    },
+    {
+      "challenge": "compromised",
+      "test_path": "test/compromised/Compromised.t.sol",
+      "slither_target": "src/compromised/TrustfulOracle.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "Oracle compromise via leaked keys."
+    },
+    {
+      "challenge": "curvy-puppet",
+      "test_path": "test/curvy-puppet/CurvyPuppet.t.sol",
+      "slither_target": "src/curvy-puppet/CurvyPuppetLending.sol",
+      "requires_rpc": true,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "environment_dependent",
+      "notes": "Requires MAINNET_FORKING_URL for mainnet fork."
+    },
+    {
+      "challenge": "free-rider",
+      "test_path": "test/free-rider/FreeRider.t.sol",
+      "slither_target": "src/free-rider/FreeRiderNFTMarketplace.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "NFT marketplace flash-loan challenge."
+    },
+    {
+      "challenge": "naive-receiver",
+      "test_path": "test/naive-receiver/NaiveReceiver.t.sol",
+      "slither_target": "src/naive-receiver/FlashLoanReceiver.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "Repeated flash-loan fee drain."
+    },
+    {
+      "challenge": "puppet",
+      "test_path": "test/puppet/Puppet.t.sol",
+      "slither_target": "src/puppet/PuppetPool.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "Uniswap V1 oracle manipulation."
+    },
+    {
+      "challenge": "puppet-v2",
+      "test_path": "test/puppet-v2/PuppetV2.t.sol",
+      "slither_target": "src/puppet-v2/PuppetV2Pool.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "Uniswap V2 oracle manipulation."
+    },
+    {
+      "challenge": "puppet-v3",
+      "test_path": "test/puppet-v3/PuppetV3.t.sol",
+      "slither_target": "src/puppet-v3/PuppetV3Pool.sol",
+      "requires_rpc": true,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "environment_dependent",
+      "notes": "Requires MAINNET_FORKING_URL for mainnet fork."
+    },
+    {
+      "challenge": "selfie",
+      "test_path": "test/selfie/Selfie.t.sol",
+      "slither_target": "src/selfie/SelfiePool.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "Governance flash-loan attack."
+    },
     {
       "challenge": "shards",
       "test_path": "test/shards/Shards.t.sol",
@@ -12,22 +111,60 @@
       "notes": "Local challenge path should complete without RPC on a healthy setup."
     },
     {
+      "challenge": "side-entrance",
+      "test_path": "test/side-entrance/SideEntrance.t.sol",
+      "slither_target": "src/side-entrance/SideEntranceLenderPool.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "ETH accounting side entrance."
+    },
+    {
+      "challenge": "the-rewarder",
+      "test_path": "test/the-rewarder/TheRewarder.t.sol",
+      "slither_target": "src/the-rewarder/TheRewarderDistributor.sol",
+      "requires_rpc": false,
+      "timeout_sec": 120,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "Merkle reward distributor timing attack; allow extra time for heavy setup."
+    },
+    {
+      "challenge": "truster",
+      "test_path": "test/truster/Truster.t.sol",
+      "slither_target": "src/truster/TrusterLenderPool.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "Arbitrary call during flash loan."
+    },
+    {
+      "challenge": "unstoppable",
+      "test_path": "test/unstoppable/Unstoppable.t.sol",
+      "slither_target": "src/unstoppable/UnstoppableVault.sol",
+      "requires_rpc": false,
+      "expected_ground_truth": "known_solve_path_exists",
+      "expected_phase1_outcome": "pass",
+      "notes": "Flash-loan balance check bypass."
+    },
+    {
       "challenge": "wallet-mining",
       "test_path": "test/wallet-mining/WalletMining.t.sol",
       "slither_target": "src/wallet-mining/WalletDeployer.sol",
       "requires_rpc": false,
+      "timeout_sec": 300,
       "expected_ground_truth": "known_solve_path_exists",
       "expected_phase1_outcome": "pass_or_timeout_needs_investigation",
-      "notes": "Known local challenge path, but timeout behavior must be measured and tracked explicitly."
+      "notes": "CREATE2 brute-force path; extended timeout for local reproduction."
     },
     {
       "challenge": "withdrawal",
       "test_path": "test/withdrawal/Withdrawal.t.sol",
       "slither_target": "src/withdrawal/TokenBridge.sol",
-      "requires_rpc": true,
+      "requires_rpc": false,
       "expected_ground_truth": "known_solve_path_exists",
       "expected_phase1_outcome": "environment_dependent",
-      "notes": "Fork-dependent path. Failure without RPC is informative, not necessarily a benchmark regression."
+      "notes": "Bridge withdrawal path; may fail until exploit PoC is complete on this branch."
     }
   ]
 }

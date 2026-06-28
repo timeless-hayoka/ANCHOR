@@ -250,7 +250,9 @@ def compute_benchmark_trends(
         "limit": limit,
         "runs": run_rows,
         "average_reproduction_rate": avg_rate,
+        "average_reproduction_rate_display": format_percent(avg_rate),
         "trend_delta": trend_delta,
+        "trend_delta_display": format_trend_arrow(trend_delta).replace("→ n/a", "n/a"),
         "trend_direction": trend_direction,
         "top_improved_challenge": top_improved,
         "most_unstable_challenge": most_unstable,
@@ -276,8 +278,11 @@ def _compute_stability_metrics(
     denom = aligned_total + env_sensitive_total + investigate_total
     benchmark_level = {
         "stable_pct": (aligned_total / denom) if denom else None,
+        "stable_pct_display": format_percent((aligned_total / denom) if denom else None),
         "environment_sensitive_pct": (env_sensitive_total / denom) if denom else None,
+        "environment_sensitive_pct_display": format_percent((env_sensitive_total / denom) if denom else None),
         "investigate_pct": (investigate_total / denom) if denom else None,
+        "investigate_pct_display": format_percent((investigate_total / denom) if denom else None),
         "sample_runs": min(3, len(runs_chron)),
     }
 

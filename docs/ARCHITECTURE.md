@@ -2,6 +2,8 @@
 
 ANCHOR separates reasoning, validation, governance, and retained evidence.
 
+For the unified internal module tree and end-to-end workflow, see [ANCHOR_SYSTEM_SPEC.md](ANCHOR_SYSTEM_SPEC.md).
+
 ## Components
 
 ### Product: ANCHOR

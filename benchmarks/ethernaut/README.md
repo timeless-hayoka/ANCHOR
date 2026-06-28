@@ -45,3 +45,8 @@ Document where puzzle-style contracts overfit detection strategies.
 ## Evidence artifacts
 
 Store benchmark notes, level mappings, and reproduction artifacts here.
+
+## Phase 1 runner
+
+- [run_phase1_benchmark.py](run_phase1_benchmark.py)
+- [index.json](index.json)

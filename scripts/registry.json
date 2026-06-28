@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "kind": "anchor.script_registry",
+  "registry_path": "scripts/registry.json",
+  "scripts": [
+    {
+      "id": "dvd-phase1-runner",
+      "name": "run_phase1_benchmark.py",
+      "path": "benchmarks/damn-vulnerable-defi/run_phase1_benchmark.py",
+      "description": "Run the Phase 1 Damn Vulnerable DeFi benchmark scaffold.",
+      "language": "python",
+      "owner": "anchor",
+      "scope": "benchmark",
+      "allowed_inputs": ["ANCHOR_DVD_ROOT", "ANCHOR_BENCHMARK_TIMEOUT_SEC"],
+      "requires_authorization": false,
+      "output_types": ["benchmark.json", "README.md", "storage.json"],
+      "audit_tag": "benchmark-runner"
+    },
+    {
+      "id": "anchor-cli",
+      "name": "anchor_cli.py",
+      "path": "anchor_cli.py",
+      "description": "ANCHOR local workflow entrypoint and ledger helper.",
+      "language": "python",
+      "owner": "anchor",
+      "scope": "workflow",
+      "allowed_inputs": ["ANCHOR_BENCHMARK_LABEL"],
+      "requires_authorization": false,
+      "output_types": ["stdout", "ledger.jsonl"],
+      "audit_tag": "workflow-entrypoint"
+    },
+    {
+      "id": "anchor-emit",
+      "name": "anchor_emit.py",
+      "path": "anchor_emit.py",
+      "description": "Stream proof-gate events into a run console.",
+      "language": "python",
+      "owner": "anchor",
+      "scope": "telemetry",
+      "allowed_inputs": ["ANCHOR_SERVER_URL", "ANCHOR_RUN_ID"],
+      "requires_authorization": false,
+      "output_types": ["sse-events", "log.lines"],
+      "audit_tag": "event-stream"
+    }
+  ]
+}

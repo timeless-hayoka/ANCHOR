@@ -25,6 +25,8 @@ from starlette.responses import FileResponse, RedirectResponse
 
 from anchor_cli import load_outcome_entries
 from anchor_scripts import allowed_script_names, load_script_registry, registry_summary
+from anchor_sarif import build_research_loop
+from anchor_sarif.parser import Finding
 from anchor_storage import build_storage_manifest, evidence_dir, storage_manifest_path, storage_summary, write_json
 from anchor_trends import compute_benchmark_trends
 from anchor_strategy import compute_strategy
@@ -757,6 +759,7 @@ def _anchor_snapshot(limit: int = 8) -> dict[str, Any]:
         trends_limit=max(10, limit),
         top_n=3,
     )
+    research_loop = _research_loop_snapshot(latest, strategy, trends, limit=max(1, limit))
     return {
         "identity": {"version": APP_VERSION, "service": "anchor", "release": f"ANCHOR {APP_VERSION}"},
         "history": {"runs": runs},
@@ -764,9 +767,75 @@ def _anchor_snapshot(limit: int = 8) -> dict[str, Any]:
         "benchmark_overview": _benchmark_overview(latest),
         "benchmark_trends": trends,
         "benchmark_strategy": strategy,
+        "research_loop": research_loop,
         "script_registry": registry_summary(),
         "scabench": adapt_scabench(latest),
     }
+
+
+def _research_loop_snapshot(
+    latest_benchmark: dict[str, Any] | None,
+    strategy: dict[str, Any],
+    trends: dict[str, Any],
+    *,
+    limit: int = 5,
+) -> dict[str, Any]:
+    queue = strategy.get("recommendations") or []
+    benchmark_label = (latest_benchmark or {}).get("title") or (latest_benchmark or {}).get("id") or "benchmark"
+    benchmark_target = (latest_benchmark or {}).get("target") or "unknown"
+    findings: list[Finding] = []
+
+    for idx, recommendation in enumerate(queue[: max(1, limit)]):
+        findings.append(
+            Finding(
+                tool="anchor",
+                rule_id=str(recommendation.get("challenge") or f"benchmark-{idx + 1}"),
+                level=str(recommendation.get("confidence") or "note"),
+                message=str(recommendation.get("reason") or benchmark_label),
+                file_path=str(benchmark_target),
+                start_line=1,
+                properties={
+                    "source": "anchor_server.snapshot",
+                    "label": recommendation.get("label") or recommendation.get("challenge") or benchmark_label,
+                },
+            )
+        )
+
+    if not findings:
+        findings.append(
+            Finding(
+                tool="anchor",
+                rule_id=str((latest_benchmark or {}).get("id") or "benchmark-overview"),
+                level="note",
+                message=str((latest_benchmark or {}).get("status") or benchmark_label),
+                file_path=str(benchmark_target),
+                start_line=1,
+                properties={
+                    "source": "anchor_server.snapshot",
+                    "label": benchmark_label,
+                },
+            )
+        )
+
+    loop = build_research_loop(findings)
+    payload = loop.to_dict()
+    payload.update(
+        {
+            "source": "anchor_server.snapshot",
+            "benchmark_id": (latest_benchmark or {}).get("id"),
+            "benchmark_title": benchmark_label,
+            "benchmark_target": benchmark_target,
+            "open_recommendations": len([row for row in (strategy.get("recommendations") or []) if row.get("status") == "open"]),
+            "queue_depth": len(loop.queue),
+            "assumption_count": len(loop.assumption_cards),
+            "universe_count": len(loop.universe_report),
+            "incentive_surface_count": len(loop.incentive_surface),
+            "mev_report_count": len(loop.mev_reports),
+            "top_queue": loop.queue[0].to_dict() if loop.queue else None,
+            "trend_direction": trends.get("trend_direction") or trends.get("trend_delta_display"),
+        }
+    )
+    return payload
 
 
 @app.get("/api/health")

@@ -10,6 +10,8 @@ import subprocess
 from collections import Counter
 from pathlib import Path
 
+from anchor_storage import build_storage_manifest, evidence_dir, storage_manifest_path, storage_summary, write_json
+
 ANCHOR_ROOT = Path(__file__).resolve().parents[2]
 DVD_ROOT = Path(os.environ.get("ANCHOR_DVD_ROOT", "/home/crexs/damn-vulnerable-defi"))
 BENCHMARKS_ROOT = ANCHOR_ROOT / "benchmarks"
@@ -307,6 +309,8 @@ def main() -> int:
     stamp = now.strftime("%Y-%m-%dT%H-%M-%SZ")
     run_dir = RUNS_ROOT / stamp
     run_dir.mkdir(parents=True, exist_ok=True)
+    evidence_root = evidence_dir(run_dir)
+    evidence_root.mkdir(parents=True, exist_ok=True)
 
     forge_version = run(["forge", "--version"])
     anchor_commit = git_value(ANCHOR_ROOT, "rev-parse", "HEAD")
@@ -325,18 +329,19 @@ def main() -> int:
     results = []
     for item in expectations:
         rel = item["test_path"]
+        challenge_timeout = int(item.get("timeout_sec", TIMEOUT_SEC))
         cmd = ["forge", "test", "--match-path", rel, "-vvv"]
         started = dt.datetime.now(dt.timezone.utc)
         timed_out = False
         try:
-            proc = run(cmd, cwd=DVD_ROOT, timeout=TIMEOUT_SEC)
+            proc = run(cmd, cwd=DVD_ROOT, timeout=challenge_timeout)
         except subprocess.TimeoutExpired as exc:
             timed_out = True
             proc = subprocess.CompletedProcess(
                 cmd,
                 returncode=124,
                 stdout=normalize_text(exc.stdout),
-                stderr=normalize_text(exc.stderr) + f"\nTimed out after {TIMEOUT_SEC}s",
+                stderr=normalize_text(exc.stderr) + f"\nTimed out after {challenge_timeout}s",
             )
         ended = dt.datetime.now(dt.timezone.utc)
         observed_status = status_from(proc, timed_out)
@@ -361,6 +366,7 @@ def main() -> int:
             "status": observed_status,
             "duration_sec": round(duration, 3),
             "timed_out": timed_out,
+            "timeout_sec": challenge_timeout,
             "requires_rpc": item["requires_rpc"],
             "expected_ground_truth": item["expected_ground_truth"],
             "expected_phase1_outcome": item["expected_phase1_outcome"],
@@ -426,6 +432,24 @@ def main() -> int:
     json_path = run_dir / "benchmark.json"
     json_path.write_text(json.dumps(payload, indent=2) + "\n")
 
+    storage_json_path = storage_manifest_path(run_dir)
+    storage_manifest = build_storage_manifest(
+        benchmark_id=LABEL,
+        run_id=f"{LABEL}-{stamp}",
+        target="damn-vulnerable-defi",
+        stage="Phase 1",
+        status="scaffold",
+        created_at=payload["executed_at"],
+        artifact_type="benchmark_run",
+        artifact_path=rel_to_anchor(json_path),
+        evidence_path=rel_to_anchor(evidence_root),
+        manifest_path=rel_to_anchor(storage_json_path),
+        ledger_path=rel_to_anchor(ANCHOR_ROOT / "outcomes" / "ledger.jsonl"),
+        archive_path=rel_to_anchor(run_dir),
+        signature_state="pending",
+    )
+    write_json(storage_json_path, storage_manifest)
+
     manifest_entry = {
         "id": f"{LABEL}-{stamp}",
         "target": "damn-vulnerable-defi",
@@ -444,6 +468,11 @@ def main() -> int:
         "detector_provenance": detector_provenance,
         "record": rel_to_anchor(run_dir / "README.md"),
         "artifact_json": rel_to_anchor(json_path),
+        "storage_manifest": rel_to_anchor(storage_json_path),
+        "storage": storage_summary(storage_manifest),
+        "storage_status": "ready",
+        "evidence_path": rel_to_anchor(evidence_root),
+        "signature_state": storage_manifest["signature_state"],
         "expectations": rel_to_anchor(EXPECTATIONS_PATH),
         "confidence_ladder": {
             "methodology": "high",

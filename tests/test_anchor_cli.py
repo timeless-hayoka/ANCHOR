@@ -154,6 +154,33 @@ def test_parser_accepts_env_init_python_override():
     assert args.python == "/usr/bin/python3"
 
 
+def test_parser_accepts_sarif_process_when_available():
+    if not anchor_cli.HAS_SARIF:
+        return
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args([
+        "sarif", "process",
+        "slither.sarif", "codeql.sarif",
+        "--db", "my_findings.db",
+        "--llm",
+    ])
+    assert args.command == "sarif"
+    assert args.sarif_command == "process"
+    assert args.sarif_files == ["slither.sarif", "codeql.sarif"]
+    assert args.db == "my_findings.db"
+    assert args.llm is True
+
+
+def test_parser_accepts_sarif_visualize_when_available():
+    if not anchor_cli.HAS_SARIF:
+        return
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["sarif", "visualize", "--output", "clusters.html"])
+    assert args.command == "sarif"
+    assert args.sarif_command == "visualize"
+    assert args.output == "clusters.html"
+
+
 def test_render_benchmark_history_contains_scoped_columns():
     rendered = anchor_cli.render_benchmark_history([
         {
@@ -349,6 +376,69 @@ def test_render_benchmark_latest_includes_regression_and_artifacts():
     assert "- environment_sensitive: 0" in rendered
     assert "benchmarks/damn-vulnerable-defi/runs/new-published/REGRESSION_REPORT.md" in rendered
     assert "benchmarks/damn-vulnerable-defi/runs/new-published/PUBLISHED.md" in rendered
+def test_render_benchmark_latest_includes_research_loop_summary():
+    current = {
+        "id": "new-published",
+        "target": "damn-vulnerable-defi",
+        "level": "Phase 1",
+        "confidence": "high",
+        "executed_at": "2026-06-27T23:24:21.000000+00:00",
+        "publication_tier": "published",
+        "results_summary": {"passed": 16, "failed": 2, "timed_out": 0, "detector_signals": 18, "medium_high_target_relevant_findings": 58},
+        "regression_report": "benchmarks/damn-vulnerable-defi/runs/new-published/REGRESSION_REPORT.md",
+        "published_record": "benchmarks/damn-vulnerable-defi/runs/new-published/PUBLISHED.md",
+        "storage_manifest": "benchmarks/damn-vulnerable-defi/runs/new-published/storage.json",
+        "artifact_json": "benchmarks/damn-vulnerable-defi/runs/new-published/benchmark.json",
+    }
+    baseline = {
+        "id": "old-published",
+        "target": "damn-vulnerable-defi",
+        "level": "Phase 1",
+        "confidence": "scaffold",
+        "executed_at": "2026-06-26T23:24:21.000000+00:00",
+        "publication_tier": "published",
+        "results_summary": {"passed": 15, "failed": 2, "timed_out": 1, "detector_signals": 17, "medium_high_target_relevant_findings": 56},
+    }
+    original_load_artifact = anchor_cli.load_benchmark_artifact
+    original_load_manifest = anchor_cli.load_manifest
+    original_load_outcomes = anchor_cli.load_outcome_entries
+    def fake_load_benchmark_artifact(entry):
+        if entry and entry.get("id") == "new-published":
+            return {
+                "summary": current["results_summary"],
+                "results": [
+                    {"challenge": "wallet-mining", "status": "PASSED"},
+                    {"challenge": "curvy-puppet", "status": "FAILED"},
+                    {"challenge": "puppet-v3", "status": "FAILED"},
+                ],
+            }
+        if entry and entry.get("id") == "old-published":
+            return {
+                "summary": baseline["results_summary"],
+                "results": [
+                    {"challenge": "wallet-mining", "status": "TIMED_OUT"},
+                    {"challenge": "curvy-puppet", "status": "FAILED"},
+                    {"challenge": "puppet-v3", "status": "FAILED"},
+                ],
+            }
+        return {"summary": {}, "results": []}
+    anchor_cli.load_benchmark_artifact = fake_load_benchmark_artifact
+    anchor_cli.load_manifest = lambda: [baseline, current]
+    anchor_cli.load_outcome_entries = lambda: [{"timestamp": "2026-06-27T00:00:00+00:00", "type": "benchmark", "status": "published", "target": "damn-vulnerable-defi", "lesson": "wallet-mining timed out"}]
+    try:
+        rendered = anchor_cli.render_benchmark_latest(current, baseline)
+    finally:
+        anchor_cli.load_benchmark_artifact = original_load_artifact
+        anchor_cli.load_manifest = original_load_manifest
+        anchor_cli.load_outcome_entries = original_load_outcomes
+    assert "Research Loop" in rendered
+    assert "- queue_depth:" in rendered
+    assert "- assumptions:" in rendered
+    assert "- universes:" in rendered
+    assert "- incentive_surface:" in rendered
+    assert "- mev_models:" in rendered
+
+
 def test_normalize_outcome_entry_supports_legacy_and_links():
     normalized = anchor_cli.normalize_outcome_entry({
         "timestamp": "2026-06-27T01:00:00+00:00",

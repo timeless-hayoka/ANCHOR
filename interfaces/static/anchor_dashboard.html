@@ -391,6 +391,10 @@
 
     .bar { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.05); overflow: hidden; margin-top: 10px; }
     .bar > div { height: 100%; width: 50%; background: linear-gradient(90deg, rgba(242,204,96,0.95), rgba(121,192,255,0.92)); }
+    .stability-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 4px 0; font-size: 0.92rem; }
+    .stability-row .label { flex: 1; min-width: 0; }
+    .stability-row .bar-text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.02em; color: var(--muted); white-space: nowrap; }
+    .strategy-detail { margin-top: 8px; line-height: 1.45; }
 
     .list,
     .record-list {
@@ -559,6 +563,74 @@
           <div class="detail" id="evidenceSummary">Verified findings and benchmark signals will appear here.</div>
         </div>
 
+        <div class="block" id="benchmark">
+          <h3>Benchmark Overview</h3>
+          <div class="rows metrics-grid">
+            <div class="kv"><span>Benchmark</span><strong id="benchmarkId">…</strong></div>
+            <div class="kv"><span>Status</span><strong id="benchmarkStatus">…</strong></div>
+            <div class="kv"><span>Tier</span><strong id="benchmarkTier">…</strong></div>
+            <div class="kv"><span>Target</span><strong id="benchmarkTarget">…</strong></div>
+          </div>
+          <div class="rows">
+            <div class="kv"><span>Artifact</span><strong id="benchmarkArtifact">…</strong></div>
+            <div class="kv"><span>Storage</span><strong id="benchmarkStorage">…</strong></div>
+            <div class="kv"><span>Evidence</span><strong id="benchmarkEvidence">…</strong></div>
+            <div class="kv"><span>Regression</span><strong id="benchmarkRegression">…</strong></div>
+            <div class="kv"><span>Scripts</span><strong id="benchmarkScripts">…</strong></div>
+          </div>
+          <div class="rows metrics-grid" style="margin-top:12px">
+            <div class="kv"><span>ScaBench score</span><strong id="benchmarkScaScore">…</strong></div>
+            <div class="kv"><span>Grade</span><strong id="benchmarkScaGrade">…</strong></div>
+            <div class="kv"><span>Signal ratio</span><strong id="benchmarkScaSignals">…</strong></div>
+            <div class="kv"><span>Coverage</span><strong id="benchmarkScaCoverage">…</strong></div>
+          </div>
+          <div class="panel-note loading" id="benchmarkStatusNote">Loading benchmark overview…</div>
+          <div class="detail" id="benchmarkSummary">Latest benchmark, storage, ScaBench, and script registry status will appear here.</div>
+        </div>
+
+        <div class="block" id="benchmark-trends">
+          <h3>Benchmark Trends</h3>
+          <div class="rows metrics-grid">
+            <div class="kv"><span>Avg reproduction</span><strong id="trendsAvgRate">…</strong></div>
+            <div class="kv"><span>Trend</span><strong id="trendsDirection">…</strong></div>
+            <div class="kv"><span>Top improved</span><strong id="trendsTopImproved">…</strong></div>
+            <div class="kv"><span>Most unstable</span><strong id="trendsMostUnstable">…</strong></div>
+          </div>
+          <div class="panel-note loading" id="trendsStatus">Loading benchmark trends…</div>
+          <div class="detail" id="trendsSummary">Canonical trend output from snapshot (no client-side math).</div>
+          <div id="trendsStabilityList"></div>
+        </div>
+
+        <div class="block" id="benchmark-strategy">
+          <h3>Hunt Strategy</h3>
+          <div class="rows">
+            <div class="kv"><span>Next hunt</span><strong id="strategyNextHunt">…</strong></div>
+            <div class="kv"><span>Confidence</span><strong id="strategyConfidence">…</strong></div>
+            <div class="kv"><span>Effort</span><strong id="strategyEffort">…</strong></div>
+            <div class="kv"><span>ROI</span><strong id="strategyRoi">…</strong></div>
+          </div>
+          <div class="panel-note loading" id="strategyStatus">Loading hunt strategy…</div>
+          <div class="detail strategy-detail" id="strategyReason">Reason and expected gain render from snapshot fields only.</div>
+          <div class="detail" id="strategyExpectedGain"></div>
+          <div id="strategyRecommendations"></div>
+        </div>
+
+        <div class="block" id="research-loop">
+          <h3>Research Loop</h3>
+          <div class="rows metrics-grid">
+            <div class="kv"><span>Queue depth</span><strong id="researchLoopQueueDepth">…</strong></div>
+            <div class="kv"><span>Assumptions</span><strong id="researchLoopAssumptions">…</strong></div>
+            <div class="kv"><span>Universes</span><strong id="researchLoopUniverse">…</strong></div>
+            <div class="kv"><span>MEV models</span><strong id="researchLoopMev">…</strong></div>
+          </div>
+          <div class="rows">
+            <div class="kv"><span>Incentive surface</span><strong id="researchLoopIncentive">…</strong></div>
+            <div class="kv"><span>Top queue</span><strong id="researchLoopTopQueue">…</strong></div>
+          </div>
+          <div class="panel-note loading" id="researchLoopStatus">Loading research-loop summary…</div>
+          <div class="detail" id="researchLoopSummary">Benchmark strategy feeds the combined research-loop summary here.</div>
+        </div>
+
         <div class="block" id="vault">
           <h3>Vault Visibility</h3>
           <div class="rows vault-grid">
@@ -684,6 +756,44 @@ const healthBar = document.getElementById('healthBar');
 const releaseStatus = document.getElementById('releaseStatus');
 const historyStatus = document.getElementById('historyStatus');
 const evidenceStatus = document.getElementById('evidenceStatus');
+const trendsAvgRate = document.getElementById('trendsAvgRate');
+const trendsDirection = document.getElementById('trendsDirection');
+const trendsTopImproved = document.getElementById('trendsTopImproved');
+const trendsMostUnstable = document.getElementById('trendsMostUnstable');
+const trendsSummary = document.getElementById('trendsSummary');
+const trendsStatus = document.getElementById('trendsStatus');
+const trendsStabilityList = document.getElementById('trendsStabilityList');
+const strategyNextHunt = document.getElementById('strategyNextHunt');
+const strategyConfidence = document.getElementById('strategyConfidence');
+const strategyEffort = document.getElementById('strategyEffort');
+const strategyRoi = document.getElementById('strategyRoi');
+const strategyReason = document.getElementById('strategyReason');
+const strategyExpectedGain = document.getElementById('strategyExpectedGain');
+const strategyStatus = document.getElementById('strategyStatus');
+const strategyRecommendations = document.getElementById('strategyRecommendations');
+const researchLoopSummary = document.getElementById('researchLoopSummary');
+const researchLoopQueueDepth = document.getElementById('researchLoopQueueDepth');
+const researchLoopAssumptions = document.getElementById('researchLoopAssumptions');
+const researchLoopUniverse = document.getElementById('researchLoopUniverse');
+const researchLoopIncentive = document.getElementById('researchLoopIncentive');
+const researchLoopMev = document.getElementById('researchLoopMev');
+const researchLoopTopQueue = document.getElementById('researchLoopTopQueue');
+const researchLoopStatus = document.getElementById('researchLoopStatus');
+const benchmarkId = document.getElementById('benchmarkId');
+const benchmarkStatus = document.getElementById('benchmarkStatus');
+const benchmarkTier = document.getElementById('benchmarkTier');
+const benchmarkTarget = document.getElementById('benchmarkTarget');
+const benchmarkArtifact = document.getElementById('benchmarkArtifact');
+const benchmarkStorage = document.getElementById('benchmarkStorage');
+const benchmarkEvidence = document.getElementById('benchmarkEvidence');
+const benchmarkRegression = document.getElementById('benchmarkRegression');
+const benchmarkScripts = document.getElementById('benchmarkScripts');
+const benchmarkScaScore = document.getElementById('benchmarkScaScore');
+const benchmarkScaGrade = document.getElementById('benchmarkScaGrade');
+const benchmarkScaSignals = document.getElementById('benchmarkScaSignals');
+const benchmarkScaCoverage = document.getElementById('benchmarkScaCoverage');
+const benchmarkStatusNote = document.getElementById('benchmarkStatusNote');
+const benchmarkSummary = document.getElementById('benchmarkSummary');
 const vaultNewsBriefs = document.getElementById('vaultNewsBriefs');
 const vaultLatestBrief = document.getElementById('vaultLatestBrief');
 const vaultFreshness = document.getElementById('vaultFreshness');
@@ -1145,6 +1255,108 @@ async function loadContributions() {
 }
 
 
+function renderBenchmarkTrendsPanel(trends) {
+  if (!trends || !trends.published_count) {
+    trendsAvgRate.textContent = '—';
+    trendsDirection.textContent = '—';
+    trendsTopImproved.textContent = '—';
+    trendsMostUnstable.textContent = '—';
+    trendsSummary.textContent = 'No published benchmark history in snapshot yet.';
+    trendsStabilityList.innerHTML = '';
+    setPanelNotice(trendsStatus, 'optional', 'Trends unavailable until published runs exist in the manifest.');
+    return;
+  }
+
+  trendsAvgRate.textContent = trends.average_reproduction_rate_display || 'n/a';
+  trendsDirection.textContent = trends.trend_delta_display || trends.trend_direction || '—';
+  trendsTopImproved.textContent = trends.top_improved_challenge?.label || '—';
+  trendsMostUnstable.textContent = trends.most_unstable_challenge?.label || '—';
+  trendsSummary.textContent = [
+    `Published runs analyzed: ${trends.published_count}`,
+    trends.stability?.benchmark?.stable_pct_display ? `Stable: ${trends.stability.benchmark.stable_pct_display}` : null,
+    trends.stability?.benchmark?.investigate_pct_display ? `Investigate: ${trends.stability.benchmark.investigate_pct_display}` : null,
+  ].filter(Boolean).join(' · ');
+
+  const bars = trends.stability?.challenges || [];
+  trendsStabilityList.innerHTML = '';
+  if (bars.length) {
+    const heading = document.createElement('div');
+    heading.className = 'detail';
+    heading.textContent = 'Challenge stability (from snapshot bars):';
+    trendsStabilityList.appendChild(heading);
+    bars.slice(0, 8).forEach((row) => {
+      const line = document.createElement('div');
+      line.className = 'stability-row';
+      const filled = '█'.repeat(row.bar_filled ?? 0);
+      const empty = '░'.repeat(row.bar_empty ?? 0);
+      line.innerHTML = `<span class="label">${escapeHtml(row.label || row.challenge || '—')}</span><span class="bar-text">${filled}${empty}</span>`;
+      trendsStabilityList.appendChild(line);
+    });
+  }
+  setPanelNotice(trendsStatus, 'ready', 'Benchmark trends loaded from snapshot (canonical engine).');
+}
+
+function renderBenchmarkStrategyPanel(strategy) {
+  const next = strategy?.next_hunt;
+  if (!next) {
+    strategyNextHunt.textContent = '—';
+    strategyConfidence.textContent = '—';
+    strategyEffort.textContent = '—';
+    strategyRoi.textContent = '—';
+    strategyReason.textContent = 'No open hunt recommendation in snapshot.';
+    strategyExpectedGain.textContent = '';
+    strategyRecommendations.innerHTML = '';
+    setPanelNotice(strategyStatus, 'optional', 'Strategy idle — all tracked challenges passing or insufficient history.');
+    return;
+  }
+
+  strategyNextHunt.textContent = next.label || next.challenge || '—';
+  strategyConfidence.textContent = next.confidence ? String(next.confidence).toUpperCase() : '—';
+  strategyEffort.textContent = next.effort ? String(next.effort).toUpperCase() : '—';
+  strategyRoi.textContent = next.roi_stars || String(next.roi ?? '—');
+  strategyReason.textContent = next.reason || '—';
+  strategyExpectedGain.textContent = next.expected_gain ? `Expected gain: ${next.expected_gain}` : '';
+
+  strategyRecommendations.innerHTML = '';
+  const rows = (strategy.recommendations || []).slice(0, 5);
+  if (rows.length) {
+    rows.forEach((row) => {
+      const item = document.createElement('div');
+      item.className = 'detail';
+      item.textContent = `${row.label || row.challenge}: ${row.reason || row.status || '—'}`;
+      strategyRecommendations.appendChild(item);
+    });
+  }
+  setPanelNotice(strategyStatus, 'ready', 'Hunt strategy loaded from snapshot (consumes trends).');
+}
+
+function renderResearchLoopPanel(loop) {
+  if (!loop) {
+    researchLoopSummary.textContent = 'No research-loop summary yet.';
+    researchLoopQueueDepth.textContent = '—';
+    researchLoopAssumptions.textContent = '—';
+    researchLoopUniverse.textContent = '—';
+    researchLoopIncentive.textContent = '—';
+    researchLoopMev.textContent = '—';
+    researchLoopTopQueue.textContent = '—';
+    setPanelNotice(researchLoopStatus, 'optional', 'Research loop idle until a benchmark strategy is available.');
+    return;
+  }
+
+  researchLoopSummary.textContent = [
+    `Benchmark: ${loop.benchmark_title || loop.benchmark_id || 'unknown'}`,
+    loop.trend_direction ? `Trend: ${String(loop.trend_direction).toUpperCase()}` : null,
+    loop.open_recommendations != null ? `Open recommendations: ${loop.open_recommendations}` : null,
+  ].filter(Boolean).join(' · ');
+  researchLoopQueueDepth.textContent = String(loop.queue_depth ?? loop.rewritten_findings ?? 0);
+  researchLoopAssumptions.textContent = String(loop.assumption_count ?? loop.assumption_cards?.length ?? 0);
+  researchLoopUniverse.textContent = String(loop.universe_count ?? loop.universe_report?.length ?? 0);
+  researchLoopIncentive.textContent = String(loop.incentive_surface_count ?? loop.incentive_surface?.length ?? 0);
+  researchLoopMev.textContent = String(loop.mev_report_count ?? loop.mev_reports?.length ?? 0);
+  researchLoopTopQueue.textContent = loop.top_queue?.title || loop.top_queue?.reason || '—';
+  setPanelNotice(researchLoopStatus, 'ready', 'Research loop summary loaded from snapshot and benchmark strategy.');
+}
+
 function applyAnchorSnapshot(snapshot) {
   if (!snapshot) return;
   const release = snapshot.identity || snapshot.release || {};
@@ -1152,6 +1364,9 @@ function applyAnchorSnapshot(snapshot) {
   const history = snapshot.history || {};
   const metrics = snapshot.metrics || {};
   const vault = snapshot.vault || {};
+  const benchmark = snapshot.benchmark_overview || {};
+  const scriptRegistry = snapshot.script_registry || {};
+  const scabench = snapshot.scabench || benchmark.scabench || {};
   const contrib = snapshot.contributions || {};
   const observer = snapshot.observer || {};
   const phi = snapshot.phi || {};
@@ -1234,6 +1449,35 @@ function applyAnchorSnapshot(snapshot) {
     metrics.latest_benchmark?.reproduction_success != null ? `Latest benchmark reproduction: ${Number(metrics.latest_benchmark.reproduction_success || 0).toFixed(2)}` : null,
   ].filter(Boolean).join(' · ');
   setPanelNotice(evidenceStatus, 'ready', `Loaded ${metrics.claims_generated ?? 0} generated claim${(metrics.claims_generated ?? 0) === 1 ? '' : 's'}.`);
+
+
+  benchmarkId.textContent = benchmark.benchmark_id || benchmark.id || '—';
+  benchmarkStatus.textContent = benchmark.status || '—';
+  benchmarkTier.textContent = benchmark.publication_tier || '—';
+  benchmarkTarget.textContent = benchmark.target || '—';
+  benchmarkArtifact.textContent = benchmark.artifact_json || benchmark.record || '—';
+  benchmarkStorage.textContent = benchmark.storage_manifest || benchmark.storage_status || '—';
+  benchmarkEvidence.textContent = benchmark.evidence_path || benchmark.signature_state || '—';
+  benchmarkRegression.textContent = benchmark.regression_report || '—';
+  benchmarkScripts.textContent = `${scriptRegistry.allowed_count ?? 0} allowed / ${scriptRegistry.script_count ?? 0} total`;
+  benchmarkSummary.textContent = [
+    `Title: ${benchmark.title || 'unknown'}`,
+    benchmark.executed_at ? `Executed: ${benchmark.executed_at}` : null,
+    benchmark.storage_status ? `Storage: ${benchmark.storage_status}` : null,
+    benchmark.signature_state ? `Signature: ${benchmark.signature_state}` : null,
+    benchmark.regression_report ? `Regression: ${benchmark.regression_report}` : null,
+    scriptRegistry.registry_path ? `Registry: ${scriptRegistry.registry_path}` : null,
+    scabench.summary ? scabench.summary : null,
+  ].filter(Boolean).join(' · ');
+  benchmarkScaScore.textContent = scabench.score != null ? `${scabench.score}/100` : '—';
+  benchmarkScaGrade.textContent = scabench.grade || '—';
+  benchmarkScaSignals.textContent = scabench.signal_ratio != null ? `${Number(scabench.signal_ratio).toFixed(2)}` : '—';
+  benchmarkScaCoverage.textContent = scabench.coverage_ratio != null ? `${Number(scabench.coverage_ratio).toFixed(2)}` : '—';
+  setPanelNotice(benchmarkStatusNote, benchmark.benchmark_id ? 'ready' : 'optional', benchmark.benchmark_id ? 'Latest benchmark overview loaded from the live backend.' : 'No benchmark run has been published yet.');
+
+  renderBenchmarkTrendsPanel(snapshot.benchmark_trends || null);
+  renderBenchmarkStrategyPanel(snapshot.benchmark_strategy || null);
+  renderResearchLoopPanel(snapshot.research_loop || null);
 
   vaultNewsBriefs.textContent = String(vault.news_briefs ?? 0);
   vaultLatestBrief.textContent = vault.last_daily_brief || 'none';

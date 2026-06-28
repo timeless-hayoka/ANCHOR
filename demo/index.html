@@ -456,7 +456,7 @@
 
     async function loadLatestBenchmark() {
       try {
-        const res = await fetch('../benchmarks/index.json');
+        const res = await fetch('/benchmarks/index.json');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const benchmarks = Array.isArray(data.benchmarks) ? data.benchmarks : [];

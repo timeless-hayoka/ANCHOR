@@ -447,6 +447,261 @@
       "publication_tier": "published",
       "published_at": "2026-06-27T01:30:43.655924+00:00",
       "publication_note": "Phase 1 public scaffold artifact with scoped detector provenance"
+    },
+    {
+      "id": "dvd-phase1-local-2026-06-27T02-21-32Z",
+      "target": "damn-vulnerable-defi",
+      "title": "Damn Vulnerable DeFi Phase 1 scaffold run with detector stage",
+      "status": "scaffold",
+      "level": "Phase 1",
+      "publication_tier": "development",
+      "commit": "a11634dd",
+      "branch": "main",
+      "executed_at": "2026-06-27T02:21:32.622120+00:00",
+      "environment": {
+        "forge_version": "forge Version: 1.7.1\nCommit SHA: 4072e48705af9d93e3c0f6e29e93b5e9a40caed8\nBuild Timestamp: 2026-05-08T07:50:55.527285345Z (1778226655)\nBuild Profile: dist",
+        "os": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+        "per_challenge_timeout_sec": 90
+      },
+      "detector_provenance": {
+        "slither": {
+          "tool": "slither",
+          "path": "/home/crexs/.local/bin/slither",
+          "status": "available",
+          "version": "0.11.5",
+          "detail": "0.11.5"
+        },
+        "mythril": {
+          "tool": "mythril",
+          "path": "/home/crexs/.local/bin/myth",
+          "status": "unavailable",
+          "version": null,
+          "detail": "ModuleNotFoundError: No module named 'pkg_resources'"
+        }
+      },
+      "record": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T02-21-32Z/README.md",
+      "artifact_json": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T02-21-32Z/benchmark.json",
+      "expectations": "benchmarks/damn-vulnerable-defi/challenge_expectations.json",
+      "confidence_ladder": {
+        "methodology": "high",
+        "environment": "high",
+        "detection": "partial",
+        "reproduction": "partial",
+        "comparative_data": "partial"
+      },
+      "verified": true,
+      "confidence": "scaffold",
+      "results_summary": {
+        "passed": 1,
+        "failed": 1,
+        "skipped": 0,
+        "timed_out": 1,
+        "aligned": 1,
+        "environment_sensitive": 1,
+        "investigate": 1,
+        "diverged": 0,
+        "detector_signals": 3,
+        "raw_detector_findings": 566,
+        "target_relevant_detector_findings": 304,
+        "medium_high_target_relevant_findings": 22
+      }
+    },
+    {
+      "id": "dvd-phase1-local-2026-06-27T02-55-45Z",
+      "target": "damn-vulnerable-defi",
+      "title": "Damn Vulnerable DeFi Phase 1 scaffold run with detector stage",
+      "status": "scaffold",
+      "level": "Phase 1",
+      "publication_tier": "development",
+      "commit": "a11634dd",
+      "branch": "main",
+      "executed_at": "2026-06-27T02:55:45.516770+00:00",
+      "environment": {
+        "forge_version": "forge Version: 1.7.1\nCommit SHA: 4072e48705af9d93e3c0f6e29e93b5e9a40caed8\nBuild Timestamp: 2026-05-08T07:50:55.527285345Z (1778226655)\nBuild Profile: dist",
+        "os": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+        "per_challenge_timeout_sec": 90
+      },
+      "detector_provenance": {
+        "slither": {
+          "tool": "slither",
+          "path": "/home/crexs/.local/bin/slither",
+          "status": "available",
+          "version": "0.11.5",
+          "detail": "0.11.5"
+        },
+        "mythril": {
+          "tool": "mythril",
+          "path": "/home/crexs/.local/bin/myth",
+          "status": "unavailable",
+          "version": null,
+          "detail": "ModuleNotFoundError: No module named 'pkg_resources'"
+        }
+      },
+      "record": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T02-55-45Z/README.md",
+      "artifact_json": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T02-55-45Z/benchmark.json",
+      "expectations": "benchmarks/damn-vulnerable-defi/challenge_expectations.json",
+      "confidence_ladder": {
+        "methodology": "high",
+        "environment": "high",
+        "detection": "partial",
+        "reproduction": "partial",
+        "comparative_data": "partial"
+      },
+      "verified": true,
+      "confidence": "scaffold",
+      "results_summary": {
+        "passed": 14,
+        "failed": 3,
+        "skipped": 0,
+        "timed_out": 1,
+        "aligned": 14,
+        "environment_sensitive": 3,
+        "investigate": 1,
+        "diverged": 0,
+        "detector_signals": 15,
+        "raw_detector_findings": 980,
+        "target_relevant_detector_findings": 461,
+        "medium_high_target_relevant_findings": 58
+      }
+    },
+    {
+      "id": "dvd-phase1-local-2026-06-27T08-55-16Z",
+      "target": "damn-vulnerable-defi",
+      "title": "Damn Vulnerable DeFi Phase 1 scaffold run with detector stage",
+      "status": "scaffold",
+      "level": "Phase 1",
+      "publication_tier": "published",
+      "commit": "a11634dd",
+      "branch": "main",
+      "executed_at": "2026-06-27T08:55:16.019852+00:00",
+      "environment": {
+        "forge_version": "forge Version: 1.7.1\nCommit SHA: 4072e48705af9d93e3c0f6e29e93b5e9a40caed8\nBuild Timestamp: 2026-05-08T07:50:55.527285345Z (1778226655)\nBuild Profile: dist",
+        "os": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+        "per_challenge_timeout_sec": 90
+      },
+      "detector_provenance": {
+        "slither": {
+          "tool": "slither",
+          "path": "/home/crexs/.local/bin/slither",
+          "status": "available",
+          "version": "0.11.5",
+          "detail": "0.11.5"
+        },
+        "mythril": {
+          "tool": "mythril",
+          "path": "/home/crexs/.local/bin/myth",
+          "status": "unavailable",
+          "version": null,
+          "detail": "ModuleNotFoundError: No module named 'pkg_resources'"
+        }
+      },
+      "record": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T08-55-16Z/README.md",
+      "artifact_json": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T08-55-16Z/benchmark.json",
+      "expectations": "benchmarks/damn-vulnerable-defi/challenge_expectations.json",
+      "confidence_ladder": {
+        "methodology": "high",
+        "environment": "high",
+        "detection": "partial",
+        "reproduction": "partial",
+        "comparative_data": "partial"
+      },
+      "verified": true,
+      "confidence": "scaffold",
+      "results_summary": {
+        "passed": 15,
+        "failed": 2,
+        "skipped": 0,
+        "timed_out": 1,
+        "aligned": 14,
+        "environment_sensitive": 3,
+        "investigate": 1,
+        "diverged": 0,
+        "detector_signals": 15,
+        "raw_detector_findings": 980,
+        "target_relevant_detector_findings": 461,
+        "medium_high_target_relevant_findings": 58
+      },
+      "published_at": "2026-06-27T14:57:30.711428+00:00",
+      "publication_note": "phase1 near-complete baseline"
+    },
+    {
+      "id": "dvd-phase1-local-2026-06-27T16-06-54Z",
+      "target": "damn-vulnerable-defi",
+      "title": "Damn Vulnerable DeFi Phase 1 scaffold run with detector stage",
+      "status": "published",
+      "level": "Phase 1",
+      "publication_tier": "published",
+      "commit": "a11634dd",
+      "branch": "main",
+      "executed_at": "2026-06-27T16:06:54.550650+00:00",
+      "environment": {
+        "forge_version": "forge Version: 1.7.1\nCommit SHA: 4072e48705af9d93e3c0f6e29e93b5e9a40caed8\nBuild Timestamp: 2026-05-08T07:50:55.527285345Z (1778226655)\nBuild Profile: dist",
+        "os": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+        "per_challenge_timeout_sec": 300
+      },
+      "detector_provenance": {
+        "slither": {
+          "tool": "slither",
+          "path": "/home/crexs/.local/bin/slither",
+          "status": "available",
+          "version": "0.11.5",
+          "detail": "0.11.5"
+        },
+        "mythril": {
+          "tool": "mythril",
+          "path": "/home/crexs/.local/bin/myth",
+          "status": "unavailable",
+          "version": null,
+          "detail": "ModuleNotFoundError: No module named 'pkg_resources'"
+        }
+      },
+      "record": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/README.md",
+      "artifact_json": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/benchmark.json",
+      "storage_manifest": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/storage.json",
+      "storage": {
+        "benchmark_id": "dvd-phase1-local",
+        "run_id": "dvd-phase1-local-2026-06-27T16-06-54Z",
+        "target": "damn-vulnerable-defi",
+        "stage": "Phase 1",
+        "status": "scaffold",
+        "artifact_path": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/benchmark.json",
+        "evidence_path": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/evidence",
+        "manifest_path": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/storage.json",
+        "ledger_path": "outcomes/ledger.jsonl",
+        "archive_path": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z",
+        "signature_state": "pending",
+        "created_at": "2026-06-27T16:06:54.550650+00:00"
+      },
+      "storage_status": "published",
+      "evidence_path": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/evidence",
+      "signature_state": "pending",
+      "expectations": "benchmarks/damn-vulnerable-defi/challenge_expectations.json",
+      "confidence_ladder": {
+        "methodology": "high",
+        "environment": "high",
+        "detection": "partial",
+        "reproduction": "partial",
+        "comparative_data": "partial"
+      },
+      "verified": true,
+      "confidence": "scaffold",
+      "results_summary": {
+        "passed": 16,
+        "failed": 2,
+        "skipped": 0,
+        "timed_out": 0,
+        "aligned": 14,
+        "environment_sensitive": 3,
+        "investigate": 1,
+        "diverged": 0,
+        "detector_signals": 15,
+        "raw_detector_findings": 980,
+        "target_relevant_detector_findings": 461,
+        "medium_high_target_relevant_findings": 58
+      },
+      "published_at": "2026-06-27T16:10:32.674132+00:00",
+      "publication_note": "wallet-mining now passes with the 300s cap; phase1 near-complete baseline",
+      "published_record": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/PUBLISHED.md"
     }
   ],
   "history_policy": {

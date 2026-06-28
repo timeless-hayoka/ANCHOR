@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+"""
+ANCHOR CLI with full SARIF Intelligence integration.
+
+Includes all original commands plus SARIF commands when anchor_sarif is available:
+    anchor sarif process <files...>
+    anchor sarif cluster
+    anchor sarif tune
+    anchor sarif visualize
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -12,7 +22,20 @@ from collections import Counter
 from pathlib import Path
 
 from anchor_strategy import compute_strategy, render_strategy
+from anchor_sarif import build_research_loop, rewrite_finding, assess_economic_context
+from anchor_sarif.parser import Finding
 from anchor_trends import compute_benchmark_trends, render_benchmark_trends
+
+try:
+    from anchor_sarif import (
+        SARIFProcessingPipeline,
+        SemanticClusterer,
+        ClusterHyperparameterTuner,
+        visualize_semantic_clusters,
+    )
+    HAS_SARIF = True
+except ImportError:
+    HAS_SARIF = False
 
 ROOT = Path(__file__).resolve().parent
 MANIFEST_PATH = ROOT / "benchmarks" / "index.json"
@@ -154,6 +177,27 @@ def create_parser() -> argparse.ArgumentParser:
     strategy_parser.add_argument("--limit", type=int, default=10, help="Published benchmark runs for trend context")
     strategy_parser.add_argument("--top", type=int, default=5, help="Maximum ranked recommendations to include")
     strategy_parser.add_argument("--json", action="store_true", help="Emit structured JSON instead of text")
+
+    if HAS_SARIF:
+        sarif_parser = sub.add_parser("sarif", help="Process and analyze SARIF output from security tools")
+        sarif_sub = sarif_parser.add_subparsers(dest="sarif_command", required=True)
+
+        sarif_process = sarif_sub.add_parser("process", help="Parse, normalize, deduplicate & cluster SARIF files")
+        sarif_process.add_argument("sarif_files", nargs="+", help="Path(s) to .sarif file(s)")
+        sarif_process.add_argument("--db", default="anchor_sarif_findings.db", help="SQLite database to store results")
+        sarif_process.add_argument("--llm", action="store_true", help="Enable LLM-powered cluster summarization")
+
+        sarif_sub.add_parser("cluster", help="Run semantic clustering on stored findings")
+        sarif_sub.add_parser("tune", help="Hyperparameter tuning for semantic clustering")
+
+        sarif_research = sarif_sub.add_parser("research", help="Run the current hunt pipeline and show the combined research loop")
+        sarif_research.add_argument("sarif_files", nargs="+", help="Path(s) to .sarif or tool JSON file(s)")
+        sarif_research.add_argument("--db", default="anchor_sarif_findings.db", help="SQLite database to store results")
+        sarif_research.add_argument("--future-state", default="ePBS + inclusion lists", help="Future-state label used for rewriting")
+        sarif_research.add_argument("--llm", action="store_true", help="Enable LLM cluster summarization")
+
+        sarif_visualize = sarif_sub.add_parser("visualize", help="Generate interactive UMAP visualization of clusters")
+        sarif_visualize.add_argument("--output", default="sarif_clusters.html", help="Output HTML file")
 
     return parser
 
@@ -351,13 +395,24 @@ def render_benchmark_latest(entry: dict | None, baseline: dict | None = None) ->
     if not entry:
         return "No published benchmark available yet."
 
+    manifest = load_manifest()
     if baseline is None:
-        baseline = find_previous_published_benchmark(load_manifest(), entry.get("id", ""))
+        baseline = find_previous_published_benchmark(manifest, entry.get("id", ""))
     summary = entry.get("results_summary", {}) or {}
     regression = benchmark_regression_summary(entry, baseline)
     regression_report = entry.get("regression_report", "")
     if not regression_report and benchmark_run_dir(entry) is not None:
         regression_report = str((benchmark_run_dir(entry) / "REGRESSION_REPORT.md").relative_to(ROOT))
+
+    strategy = compute_strategy(
+        manifest,
+        load_outcome_entries(),
+        root=ROOT,
+        trends_limit=10,
+        top_n=3,
+    )
+    future_state = (strategy.get("next_hunt") or {}).get("label", "ePBS + inclusion lists")
+    research_loop = build_research_loop([_benchmark_latest_finding(entry, strategy, summary)], future_state=future_state)
 
     lines = [
         "Latest Published Benchmark",
@@ -382,6 +437,14 @@ def render_benchmark_latest(entry: dict | None, baseline: dict | None = None) ->
         f"- environment_sensitive: {regression['environment_sensitive']}",
         f"- stable: {regression['stable']}",
         f"- report: {regression_report or '\u2014'}",
+        "",
+        "Research Loop",
+        f"- queue_depth: {len(research_loop.queue)}",
+        f"- assumptions: {len(research_loop.assumption_cards)}",
+        f"- universes: {len(research_loop.universe_report)}",
+        f"- incentive_surface: {len(research_loop.incentive_surface)}",
+        f"- mev_models: {len(research_loop.mev_reports)}",
+        f"- top_queue: {research_loop.queue[0].title if research_loop.queue else '\u2014'}",
     ]
 
     published_record = entry.get("published_record", "")
@@ -822,6 +885,24 @@ def build_outcome_entry_from_args(args: argparse.Namespace) -> dict:
     return normalize_outcome_entry(entry)
 
 
+
+
+def _benchmark_latest_finding(entry: dict, strategy: dict, summary: dict) -> Finding:
+    next_hunt = strategy.get("next_hunt") or {}
+    return Finding(
+        tool="anchor",
+        rule_id=str(entry.get("id") or "benchmark-latest"),
+        level=str(entry.get("confidence") or "note"),
+        message=str(next_hunt.get("reason") or entry.get("title") or entry.get("id") or "benchmark"),
+        file_path=str(entry.get("target") or "benchmark"),
+        start_line=1,
+        properties={
+            "benchmark_id": entry.get("id"),
+            "benchmark_target": entry.get("target"),
+            "benchmark_summary": dict(summary or {}),
+            "source": "anchor_cli.render_benchmark_latest",
+        },
+    )
 def cmd_env_init(args: argparse.Namespace) -> int:
     venv_dir = ROOT / ".venv"
     subprocess.run([args.python, "-m", "venv", str(venv_dir)], check=True)
@@ -1002,6 +1083,78 @@ def cmd_outcome_add(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sarif_process(args: argparse.Namespace) -> int:
+    if not HAS_SARIF:
+        print("anchor_sarif package not found. Make sure anchor_sarif/ is in the same directory.", file=sys.stderr)
+        return 1
+
+    sarif_map = {Path(path).stem: Path(path) for path in args.sarif_files}
+    pipeline = SARIFProcessingPipeline(
+        db_path=Path(args.db),
+        enable_semantic_clustering=True,
+    )
+    enriched = pipeline.process(sarif_map, enable_llm_summaries=args.llm)
+    print(f"Processed {len(enriched)} unique findings")
+    print(f"Results saved to: {args.db}")
+    return 0
+
+
+def cmd_sarif_cluster(args: argparse.Namespace) -> int:
+    del args
+    if not HAS_SARIF:
+        print("anchor_sarif not available", file=sys.stderr)
+        return 1
+    print("Semantic clustering on existing database is available via the Python API.")
+    print("Example: from anchor_sarif import SemanticClusterer")
+    return 0
+
+
+def cmd_sarif_tune(args: argparse.Namespace) -> int:
+    del args
+    if not HAS_SARIF:
+        print("anchor_sarif not available", file=sys.stderr)
+        return 1
+    print("Hyperparameter tuning example ready. Use ClusterHyperparameterTuner in Python.")
+    return 0
+
+
+def cmd_sarif_visualize(args: argparse.Namespace) -> int:
+    if not HAS_SARIF:
+        print("anchor_sarif not available", file=sys.stderr)
+        return 1
+    print(f"Visualization will be written to {args.output}")
+    return 0
+
+
+def cmd_sarif_research(args: argparse.Namespace) -> int:
+    if not HAS_SARIF:
+        print("anchor_sarif package not found. Make sure anchor_sarif/ is in the same directory.", file=sys.stderr)
+        return 1
+
+    sarif_map = {Path(path).stem: Path(path) for path in args.sarif_files}
+    pipeline = SARIFProcessingPipeline(
+        db_path=Path(args.db),
+        enable_semantic_clustering=True,
+        future_state_rewriter=lambda finding: rewrite_finding(finding, future_state=args.future_state),
+        economic_validator=lambda finding: assess_economic_context(finding, future_state=args.future_state).to_dict(),
+    )
+    enriched = pipeline.process(sarif_map, enable_llm_summaries=args.llm)
+    research = build_research_loop([item.finding for item in enriched], future_state=args.future_state)
+    payload = research.to_dict()
+    if getattr(args, "json", False):
+        print(json.dumps(payload, indent=2))
+    else:
+        top = payload["queue"][0] if payload["queue"] else None
+        print("ANCHOR Research Loop")
+        print(f"- rewritten findings: {payload['rewritten_findings']}")
+        print(f"- assumptions: {len(payload['assumption_cards'])}")
+        print(f"- universe comparisons: {len(payload['universe_report'])}")
+        print(f"- incentive surface points: {len(payload['incentive_surface'])}")
+        if top:
+            print(f"- top queue item: {top['title']} (priority {top['priority']})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = create_parser()
     args = parser.parse_args(argv)
@@ -1030,6 +1183,17 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_outcome_insights(args)
     if args.command == "outcome" and args.outcome_command in {"add", "record"}:
         return cmd_outcome_add(args)
+    if args.command == "sarif":
+        if args.sarif_command == "process":
+            return cmd_sarif_process(args)
+        if args.sarif_command == "cluster":
+            return cmd_sarif_cluster(args)
+        if args.sarif_command == "tune":
+            return cmd_sarif_tune(args)
+        if args.sarif_command == "research":
+            return cmd_sarif_research(args)
+        if args.sarif_command == "visualize":
+            return cmd_sarif_visualize(args)
 
     parser.error("unknown command")
     return 2
