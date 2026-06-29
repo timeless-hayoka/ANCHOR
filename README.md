@@ -19,7 +19,8 @@ If you are new to ANCHOR, use this order:
 3. [docs/METHODOLOGY.md](docs/METHODOLOGY.md) - understand the hunt workflow
 4. [docs/PROOF_GATE.md](docs/PROOF_GATE.md) - understand what counts as a finding
 5. [benchmarks/README.md](benchmarks/README.md) - inspect published benchmark artifacts
-6. [targets/enzyme-blue.md](targets/enzyme-blue.md) - see the current real-world target note
+6. [knowledge/README.md](knowledge/README.md) - structured reference corpus (SARIF, evidence models, architecture)
+7. [targets/enzyme-blue.md](targets/enzyme-blue.md) - see the current real-world target note
 
 If you want the short public-facing wording for profiles and outreach, use [docs/PROFILE_COPY.md](docs/PROFILE_COPY.md).
 
@@ -90,6 +91,39 @@ Each benchmark records:
 - lessons learned
 - evidence artifacts
 
+## Knowledge corpus
+
+Structured operator docs live in [`knowledge/`](knowledge/README.md) — retrieve slices via CLI, HTTP, Python, or Drift MCP (do not paste the whole corpus into prompts).
+
+**CLI**
+
+```bash
+./anchor knowledge list
+./anchor knowledge show sarif
+./anchor knowledge search "confidence scoring"
+./anchor knowledge refs --subsystem pipeline
+```
+
+**HTTP** (with `anchor_server` running on port 8000)
+
+- `GET /api/knowledge` — list topics
+- `GET /api/knowledge/{slug}` — full topic body
+- `GET /api/knowledge/search?q=...` — search
+
+**Drift MCP** (clone [infj-bot](https://github.com/timeless-hayoka/infj-bot) beside this repo, set `ANCHOR_ROOT` to this directory)
+
+- `anchor_knowledge_list`, `anchor_knowledge_search`, `anchor_knowledge_get`, `anchor_knowledge_refs`
+
+**Clone layout**
+
+```text
+~/projects/
+  ANCHOR/          ← this repo
+  infj_bot/        ← companion + MCP (branch: anchor)
+```
+
+Set `ANCHOR_ROOT=/path/to/ANCHOR` if the repos are not siblings.
+
 
 ## Public demo
 
@@ -114,7 +148,7 @@ Each benchmark records:
 - `docs/EVIDENCE_STORAGE_INTERFACE.md` - shared evidence-storage contract
 - `docs/APEX_MOTHERSHIP_BACKLOG.md` - phased implementation backlog
 - `docs/ANCHOR_WORK_QUEUE.md` - current implementation backlog and follow-up tasks
-- `docs/ANCHOR_KNOWLEDGE_INGESTION.md` - repo-mining plan for knowledge ANCHOR can reuse
+- `knowledge/` + `knowledge_provider.py` - structured reference corpus and retrieval API
 - `docs/ANCHOR_SYSTEM_SPEC.md` - canonical unified system spec for the whole ANCHOR pipeline
 - `outcomes/README.md` - outcome ledger stages tying benchmark evidence to real report outcomes
 
