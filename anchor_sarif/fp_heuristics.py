@@ -103,9 +103,19 @@ def assess_signal_noise(finding: Finding, *, source_context: str | None = None) 
     context = source_context or finding.snippet or ""
     combined = f"{context}\n{message}"
 
+    cross_function_reentrancy = "reentrancy" in blob and any(
+        kw in blob for kw in ("cross-function", "cross function", "emergencywithdraw", "secondary function")
+    )
     if "reentrancy" in blob and _REENTRANCY_GUARD_RE.search(combined):
-        reasons.append("Protected by common reentrancy mitigation pattern")
-        score += 0.4
+        if cross_function_reentrancy:
+            reasons.append("Cross-function reentrancy should not be dismissed by a local guard snippet")
+        else:
+            reasons.append("Protected by common reentrancy mitigation pattern")
+            score += 0.4
+
+    if cross_function_reentrancy:
+        reasons.append("Cross-function reentrancy pattern")
+        score = max(0.0, score - 0.2)
 
     if any(kw in blob for kw in ("overflow", "underflow", "arithmetic")):
         if _SOLC_08_RE.search(combined) or _SAFE_MATH_RE.search(combined):

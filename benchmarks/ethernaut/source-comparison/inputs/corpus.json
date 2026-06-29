@@ -1,0 +1,181 @@
+{
+  "schema_version": "1.0",
+  "benchmark_id": "ethernaut-source-comparison",
+  "title": "Ethernaut source-tool comparison corpus",
+  "source_tool": "slither",
+  "cases": [
+    {
+      "id": "fallback-owner-check",
+      "name": "Fallback owner check",
+      "expected_visible": true,
+      "reason": "A privileged Ethernaut fallback should survive normalization and remain visible.",
+      "tool_outputs": {
+        "slither": {
+          "version": "2.1.0",
+          "runs": [
+            {
+              "tool": {
+                "driver": {
+                  "name": "slither"
+                }
+              },
+              "results": [
+                {
+                  "ruleId": "missing-onlyowner",
+                  "level": "warning",
+                  "message": {
+                    "text": "Missing onlyOwner on fallback"
+                  },
+                  "locations": [
+                    {
+                      "physicalLocation": {
+                        "artifactLocation": {
+                          "uri": "levels/Fallback.sol"
+                        },
+                        "region": {
+                          "startLine": 19,
+                          "snippet": {
+                            "text": "fallback() external { /* privileged */ }"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected_findings": [
+        "levels/Fallback.sol:19"
+      ],
+      "anchor_expected_visible": true,
+      "source_tool_expected_visible": true,
+      "source_tool_name": "slither",
+      "source_tool_findings": [
+        "levels/Fallback.sol:19"
+      ]
+    },
+    {
+      "id": "telephone-tx-origin",
+      "name": "Telephone tx.origin check",
+      "expected_visible": true,
+      "reason": "A public tx.origin misuse should stay visible in the benchmark.",
+      "tool_outputs": {
+        "slither": {
+          "version": "2.1.0",
+          "runs": [
+            {
+              "tool": {
+                "driver": {
+                  "name": "slither"
+                }
+              },
+              "results": [
+                {
+                  "ruleId": "tx-origin",
+                  "level": "warning",
+                  "message": {
+                    "text": "tx.origin used for authorization"
+                  },
+                  "locations": [
+                    {
+                      "physicalLocation": {
+                        "artifactLocation": {
+                          "uri": "levels/Telephone.sol"
+                        },
+                        "region": {
+                          "startLine": 22,
+                          "snippet": {
+                            "text": "require(tx.origin == owner);"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected_findings": [
+        "levels/Telephone.sol:22"
+      ],
+      "anchor_expected_visible": true,
+      "source_tool_expected_visible": true,
+      "source_tool_name": "slither",
+      "source_tool_findings": [
+        "levels/Telephone.sol:22"
+      ]
+    },
+    {
+      "id": "vault-storage-collision",
+      "name": "Vault storage collision",
+      "expected_visible": true,
+      "reason": "Ethernaut-style storage disclosure should stay visible even when the source baseline is quiet.",
+      "tool_outputs": {
+        "slither": {
+          "version": "2.1.0",
+          "runs": [
+            {
+              "tool": {
+                "driver": {
+                  "name": "slither"
+                }
+              },
+              "results": [
+                {
+                  "ruleId": "storage-collision",
+                  "level": "warning",
+                  "message": {
+                    "text": "Storage layout can be clobbered in upgrade path"
+                  },
+                  "locations": [
+                    {
+                      "physicalLocation": {
+                        "artifactLocation": {
+                          "uri": "levels/Vault.sol"
+                        },
+                        "region": {
+                          "startLine": 31,
+                          "snippet": {
+                            "text": "uint256 private password;"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected_findings": [
+        "levels/Vault.sol:31"
+      ],
+      "anchor_expected_visible": true,
+      "source_tool_expected_visible": false,
+      "source_tool_name": "slither",
+      "source_tool_findings": []
+    },
+    {
+      "id": "coin-flip-noise",
+      "name": "Coin Flip source-only noise",
+      "expected_visible": false,
+      "reason": "A noisy source-only case keeps the benchmark honest about suppression.",
+      "tool_outputs": {},
+      "expected_findings": [
+        "levels/CoinFlip.sol:27"
+      ],
+      "anchor_expected_visible": false,
+      "source_tool_expected_visible": true,
+      "source_tool_name": "slither",
+      "source_tool_findings": [
+        "levels/CoinFlip.sol:27"
+      ]
+    }
+  ]
+}

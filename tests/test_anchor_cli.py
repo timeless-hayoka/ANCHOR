@@ -18,6 +18,7 @@ def load_module(name: str, filename: str):
 anchor_cli = load_module("anchor_cli", "anchor_cli.py")
 anchor_scripts = load_module("anchor_scripts", "anchor_scripts.py")
 anchor_storage = load_module("anchor_storage", "anchor_storage.py")
+anchor_work_queue = load_module("anchor_work_queue", "anchor_work_queue.py")
 scabench_adapter = load_module("scabench_adapter", "scabench_adapter.py")
 
 
@@ -35,6 +36,39 @@ def test_parser_accepts_ethernaut_phase1():
     assert args.command == "benchmark"
     assert args.benchmark_command == "ethernaut"
     assert args.level == "phase1"
+
+
+def test_parser_accepts_ethernaut_source_comparison():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["benchmark", "ethernaut", "source-comparison"])
+    assert args.command == "benchmark"
+    assert args.benchmark_command == "ethernaut"
+    assert args.level == "source-comparison"
+
+
+def test_parser_accepts_sarif_known_findings():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["benchmark", "sarif", "known-findings"])
+    assert args.command == "benchmark"
+    assert args.benchmark_command == "sarif"
+    assert args.level == "known-findings"
+
+
+def test_parser_accepts_defihacklabs_source_comparison():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["benchmark", "defihacklabs", "source-comparison"])
+    assert args.command == "benchmark"
+    assert args.benchmark_command == "defihacklabs"
+    assert args.level == "source-comparison"
+
+
+def test_parser_accepts_benchmark_compare_source():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["benchmark", "compare-source", "run-a", "--json"])
+    assert args.command == "benchmark"
+    assert args.benchmark_command == "compare-source"
+    assert args.run_id == "run-a"
+    assert args.json is True
 
 
 def test_parser_accepts_benchmark_history():
@@ -76,6 +110,14 @@ def test_parser_accepts_strategy():
     args = parser.parse_args(["strategy", "--limit", "5", "--json"])
     assert args.command == "strategy"
     assert args.limit == 5
+    assert args.json is True
+
+
+def test_parser_accepts_work_queue():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["work", "queue", "--json"])
+    assert args.command == "work"
+    assert args.work_command == "queue"
     assert args.json is True
 
 
@@ -249,7 +291,42 @@ def test_render_benchmark_history_can_include_development():
     assert rendered.index("published-run") < rendered.index("development-run")
 
 
-def test_render_benchmark_compare_reports_deltas():
+def test_render_benchmark_compare_reports_deltas(monkeypatch):
+    def fake_metrics(entry):
+        if entry["id"] == "run-a":
+            return {
+                "schema_version": "1.0",
+                "benchmark": "sarif-known-findings",
+                "run_id": "run-a",
+                "source_commit": "aaa111",
+                "counts": {
+                    "true_positive": 3,
+                    "false_positive": 1,
+                    "false_negative": 0,
+                    "true_negative": 0,
+                    "duplicates_removed": 1,
+                },
+                "metrics": {"precision": 0.75, "recall": 1.0, "f1": 0.8571},
+                "runtime_seconds": 10,
+                "tool_versions": {},
+            }
+        return {
+            "schema_version": "1.0",
+            "benchmark": "sarif-known-findings",
+            "run_id": "run-b",
+            "source_commit": "bbb222",
+            "counts": {
+                "true_positive": 4,
+                "false_positive": 1,
+                "false_negative": 0,
+                "true_negative": 0,
+                "duplicates_removed": 1,
+            },
+            "metrics": {"precision": 0.8, "recall": 0.9, "f1": 0.8421},
+            "runtime_seconds": 12,
+            "tool_versions": {},
+        }
+    monkeypatch.setattr(anchor_cli, "load_benchmark_metrics", fake_metrics)
     rendered = anchor_cli.render_benchmark_compare(
         {
             "id": "run-a",
@@ -293,8 +370,65 @@ def test_render_benchmark_compare_reports_deltas():
         },
     )
     assert "Comparing `run-a` -> `run-b`" in rendered
-    assert "passed: 1 -> 2 (delta +1)" in rendered
-    assert "medium_high_target_relevant_findings: 22 -> 18 (delta -4)" in rendered
+    assert "Guardrail: FAIL" in rendered
+    assert "precision: 0.75 -> 0.8 (delta +0.05)" in rendered
+    assert "recall: 1.0 -> 0.9 (delta -0.1)" in rendered
+    assert "f1: 0.8571 -> 0.8421 (delta -0.015)" in rendered
+    assert "true_positive: +1" in rendered
+    assert "false_negative: +0" in rendered
+    assert "runtime_seconds: 10 -> 12 (delta +2)" in rendered
+
+
+
+
+def test_cmd_benchmark_compare_source_reports_source_delta(monkeypatch, capsys):
+    entries = [
+        {"id": "run-a", "target": "defihacklabs", "level": "Phase 3", "executed_at": "2026-06-29T18:46:05+00:00"},
+    ]
+    compare = {
+        "schema_version": "1.0",
+        "benchmark": "defihacklabs-source-comparison",
+        "run_id": "run-a",
+        "source_tool": "slither",
+        "comparison": {
+            "anchor_visible": 4,
+            "source_tool_visible": 4,
+            "shared_visible": 3,
+            "anchor_only": 1,
+            "source_only": 1,
+            "shared_hidden": 0,
+            "agreement": 3,
+            "visible_delta": 0,
+        },
+        "cases": [
+            {"id": "fallback-owner-check", "anchor_visible": True, "source_tool_visible": True, "comparison": "shared_visible", "anchor_classification": "TP"},
+        ],
+    }
+    monkeypatch.setattr(anchor_cli, "load_manifest", lambda: entries)
+    monkeypatch.setattr(anchor_cli, "find_entry", lambda entries_arg, run_id: next(item for item in entries_arg if item["id"] == run_id))
+    monkeypatch.setattr(anchor_cli, "load_source_tool_compare", lambda entry: compare)
+    rc = anchor_cli.cmd_benchmark_compare_source(type("Args", (), {"run_id": "run-a", "json": False}))
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "Source Tool Comparison" in captured.out
+    assert "source_tool: slither" in captured.out
+    assert "anchor_only: 1" in captured.out
+    assert "source_only: 1" in captured.out
+
+def test_cmd_benchmark_compare_fails_on_recall_drop(monkeypatch, capsys):
+    entries = [
+        {"id": "run-a", "target": "demo", "level": "Phase 1", "executed_at": "2026-06-27T00:10:52+00:00"},
+        {"id": "run-b", "target": "demo", "level": "Phase 1", "executed_at": "2026-06-27T00:23:21+00:00"},
+    ]
+    monkeypatch.setattr(anchor_cli, "load_manifest", lambda: entries)
+    monkeypatch.setattr(anchor_cli, "find_entry", lambda entries_arg, run_id: next(item for item in entries_arg if item["id"] == run_id))
+    monkeypatch.setattr(anchor_cli, "benchmark_compare_metrics", lambda a, b: {"status": "FAIL" if b["id"] == "run-b" else "PASS"})
+    monkeypatch.setattr(anchor_cli, "render_benchmark_compare", lambda a, b: "comparison output")
+
+    rc = anchor_cli.cmd_benchmark_compare(type("Args", (), {"run_a": "run-a", "run_b": "run-b"}))
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "comparison output" in captured.out
 
 
 
@@ -332,6 +466,7 @@ def test_render_benchmark_latest_includes_regression_and_artifacts():
         "published_record": "benchmarks/damn-vulnerable-defi/runs/new-published/PUBLISHED.md",
         "storage_manifest": "benchmarks/damn-vulnerable-defi/runs/new-published/storage.json",
         "artifact_json": "benchmarks/damn-vulnerable-defi/runs/new-published/benchmark.json",
+        "source_tool_compare_json": "benchmarks/damn-vulnerable-defi/runs/new-published/source_tool_compare.json",
     }
     baseline = {
         "id": "old-published",
@@ -374,8 +509,71 @@ def test_render_benchmark_latest_includes_regression_and_artifacts():
     assert "- resolved: 1" in rendered
     assert "- regressions: 0" in rendered
     assert "- environment_sensitive: 0" in rendered
+    assert "Source Tool Comparison" in rendered
+    assert "anchor_only" in rendered
     assert "benchmarks/damn-vulnerable-defi/runs/new-published/REGRESSION_REPORT.md" in rendered
     assert "benchmarks/damn-vulnerable-defi/runs/new-published/PUBLISHED.md" in rendered
+
+
+def test_render_benchmark_latest_includes_source_tool_comparison_summary():
+    current = {
+        "id": "new-source-comparison",
+        "target": "defihacklabs",
+        "level": "Phase 3",
+        "confidence": "measured",
+        "executed_at": "2026-06-29T18:46:05.000000+00:00",
+        "publication_tier": "published",
+        "results_summary": {"passed": 4, "failed": 1, "timed_out": 0, "detector_signals": 4, "medium_high_target_relevant_findings": 1},
+        "regression_report": "benchmarks/defihacklabs/source-comparison/runs/new-source-comparison/REGRESSION_REPORT.md",
+        "published_record": "benchmarks/defihacklabs/source-comparison/runs/new-source-comparison/PUBLISHED.md",
+        "storage_manifest": "benchmarks/defihacklabs/source-comparison/runs/new-source-comparison/storage.json",
+        "artifact_json": "benchmarks/defihacklabs/source-comparison/runs/new-source-comparison/benchmark.json",
+        "source_tool_compare_json": "benchmarks/defihacklabs/source-comparison/runs/new-source-comparison/source_tool_compare.json",
+    }
+    compare = {
+        "schema_version": "1.0",
+        "benchmark": "defihacklabs-source-comparison",
+        "run_id": "defihacklabs-source-comparison-new-source-comparison",
+        "source_tool": "slither",
+        "comparison": {
+            "anchor_visible": 4,
+            "source_tool_visible": 4,
+            "shared_visible": 3,
+            "anchor_only": 1,
+            "source_only": 1,
+            "shared_hidden": 0,
+            "agreement": 3,
+            "visible_delta": 0,
+        },
+        "cases": [
+            {"id": "fallback-owner-check", "anchor_visible": True, "source_tool_visible": True, "comparison": "shared_visible", "anchor_classification": "TP"},
+        ],
+    }
+    original_load_artifact = anchor_cli.load_benchmark_artifact
+    original_load_compare = anchor_cli.load_source_tool_compare
+    original_load_manifest = anchor_cli.load_manifest
+    original_load_outcomes = anchor_cli.load_outcome_entries
+    def fake_load_benchmark_artifact(entry):
+        if entry and entry.get("id") == current["id"]:
+            return {"summary": current["results_summary"], "results": []}
+        return {"summary": {}, "results": []}
+    anchor_cli.load_benchmark_artifact = fake_load_benchmark_artifact
+    anchor_cli.load_source_tool_compare = lambda entry: compare if entry and entry.get("id") == current["id"] else {}
+    anchor_cli.load_manifest = lambda: [current]
+    anchor_cli.load_outcome_entries = lambda: []
+    try:
+        rendered = anchor_cli.render_benchmark_latest(current, None)
+    finally:
+        anchor_cli.load_benchmark_artifact = original_load_artifact
+        anchor_cli.load_source_tool_compare = original_load_compare
+        anchor_cli.load_manifest = original_load_manifest
+        anchor_cli.load_outcome_entries = original_load_outcomes
+    assert "Source Tool Comparison" in rendered
+    assert "source_tool: slither" in rendered
+    assert "anchor_visible: 4" in rendered
+    assert "source_only: 1" in rendered
+    assert "compare_report: benchmarks/defihacklabs/source-comparison/runs/new-source-comparison/source_tool_compare.json" in rendered
+
 def test_render_benchmark_latest_includes_research_loop_summary():
     current = {
         "id": "new-published",
@@ -730,3 +928,28 @@ def test_scabench_adapter_scores_latest_benchmark():
     assert 0 <= score["score"] <= 100
     assert score["grade"] in {"A", "B", "C", "D", "E"}
     assert "ScaBench score" in score["summary"]
+
+
+def test_parser_accepts_knowledge_list():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["knowledge", "list"])
+    assert args.command == "knowledge"
+    assert args.knowledge_command == "list"
+
+
+def test_parser_accepts_knowledge_show():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["knowledge", "show", "sarif"])
+    assert args.command == "knowledge"
+    assert args.knowledge_command == "show"
+    assert args.slug == "sarif"
+
+
+def test_parser_accepts_knowledge_search():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["knowledge", "search", "promotion gate", "--limit", "3"])
+    assert args.command == "knowledge"
+    assert args.knowledge_command == "search"
+    assert args.query == "promotion gate"
+    assert args.limit == 3
+

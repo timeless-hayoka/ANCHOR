@@ -50,3 +50,7 @@ Store benchmark notes, level mappings, and reproduction artifacts here.
 
 - [run_phase1_benchmark.py](run_phase1_benchmark.py)
 - [index.json](index.json)
+
+## Comparative corpus
+
+- [source-comparison](source-comparison/README.md)

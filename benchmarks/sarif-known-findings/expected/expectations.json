@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "benchmark_id": "sarif-known-findings",
+  "expected_summary": {
+    "cases": 4,
+    "expected_visible_true": 3,
+    "expected_visible_false": 1,
+    "minimum_duplicates_removed": 1
+  },
+  "case_expectations": [
+    {
+      "id": "duplicate-owner-check",
+      "expected_visible": true
+    },
+    {
+      "id": "halmos-balance-invariant",
+      "expected_visible": true
+    },
+    {
+      "id": "generic-source-warning",
+      "expected_visible": false
+    },
+    {
+      "id": "reentrancy-benign-miss",
+      "expected_visible": true
+    }
+  ]
+}

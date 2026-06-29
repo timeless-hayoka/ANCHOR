@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "benchmark_id": "defihacklabs-source-comparison",
+  "expected_summary": {
+    "cases": 5,
+    "anchor_visible_true": 3,
+    "anchor_visible_false": 2,
+    "source_tool_visible_true": 4,
+    "source_tool_visible_false": 1,
+    "shared_visible": 3,
+    "anchor_only": 1,
+    "source_only": 1
+  },
+  "case_expectations": [
+    {
+      "id": "duplicate-owner-check",
+      "anchor_expected_visible": true,
+      "source_tool_expected_visible": true
+    },
+    {
+      "id": "halmos-balance-invariant",
+      "anchor_expected_visible": true,
+      "source_tool_expected_visible": true
+    },
+    {
+      "id": "generic-source-warning",
+      "anchor_expected_visible": false,
+      "source_tool_expected_visible": true
+    },
+    {
+      "id": "reentrancy-benign-miss",
+      "anchor_expected_visible": true,
+      "source_tool_expected_visible": false
+    },
+    {
+      "id": "source-tool-only-noise",
+      "anchor_expected_visible": false,
+      "source_tool_expected_visible": true
+    }
+  ]
+}

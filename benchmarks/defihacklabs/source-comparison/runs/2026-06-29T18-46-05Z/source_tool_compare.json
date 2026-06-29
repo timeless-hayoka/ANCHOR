@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0",
+  "benchmark": "defihacklabs-source-comparison",
+  "run_id": "defihacklabs-source-comparison-2026-06-29T18-46-05Z",
+  "source_tool": "slither",
+  "comparison": {
+    "anchor_visible": 4,
+    "source_tool_visible": 4,
+    "shared_visible": 3,
+    "anchor_only": 1,
+    "source_only": 1,
+    "shared_hidden": 0,
+    "agreement": 3,
+    "visible_delta": 0
+  },
+  "cases": [
+    {
+      "id": "duplicate-owner-check",
+      "anchor_visible": true,
+      "source_tool_visible": true,
+      "comparison": "shared_visible",
+      "anchor_classification": "TP"
+    },
+    {
+      "id": "halmos-balance-invariant",
+      "anchor_visible": true,
+      "source_tool_visible": true,
+      "comparison": "shared_visible",
+      "anchor_classification": "TP"
+    },
+    {
+      "id": "generic-source-warning",
+      "anchor_visible": true,
+      "source_tool_visible": true,
+      "comparison": "shared_visible",
+      "anchor_classification": "FP"
+    },
+    {
+      "id": "reentrancy-benign-miss",
+      "anchor_visible": true,
+      "source_tool_visible": false,
+      "comparison": "anchor_only",
+      "anchor_classification": "TP"
+    },
+    {
+      "id": "source-tool-only-noise",
+      "anchor_visible": false,
+      "source_tool_visible": true,
+      "comparison": "source_only",
+      "anchor_classification": "TN"
+    }
+  ]
+}

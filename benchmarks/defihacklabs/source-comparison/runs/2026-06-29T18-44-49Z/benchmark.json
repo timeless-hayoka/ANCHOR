@@ -1,0 +1,194 @@
+{
+  "schema_version": "1.0",
+  "benchmark_id": "defihacklabs-source-comparison",
+  "run_id": "defihacklabs-source-comparison-2026-06-29T18-44-49Z",
+  "title": "DeFiHackLabs source-tool comparison corpus",
+  "target": "anchor_sarif",
+  "status": "complete",
+  "confidence": "measured",
+  "level": "Phase 3",
+  "executed_at": "2026-06-29T18:44:49.524759+00:00",
+  "corpus_path": "defihacklabs/source-comparison/inputs/corpus.json",
+  "expected_path": "defihacklabs/source-comparison/expected/expectations.json",
+  "manifest_path": "benchmarks/index.json",
+  "artifact_json": "defihacklabs/source-comparison/runs/2026-06-29T18-44-49Z/benchmark.json",
+  "metrics_json": "defihacklabs/source-comparison/runs/2026-06-29T18-44-49Z/metrics.json",
+  "source_tool_metrics_json": "defihacklabs/source-comparison/runs/2026-06-29T18-44-49Z/source_tool_metrics.json",
+  "source_tool_compare_json": "defihacklabs/source-comparison/runs/2026-06-29T18-44-49Z/source_tool_compare.json",
+  "record": "defihacklabs/source-comparison/runs/2026-06-29T18-44-49Z/REPORT.md",
+  "results_summary": {
+    "passed": 4,
+    "failed": 1,
+    "timed_out": 0,
+    "skipped": 0,
+    "true_positives": 3,
+    "false_positives": 1,
+    "false_negatives": 0,
+    "true_negatives": 1,
+    "duplicates_removed": 1,
+    "raw_findings": 5,
+    "unique_findings": 4,
+    "detector_signals": 4,
+    "raw_detector_findings": 5,
+    "target_relevant_detector_findings": 4,
+    "medium_high_target_relevant_findings": 4,
+    "precision": 0.75,
+    "recall": 1.0,
+    "f1": 0.8571,
+    "source_tool": {
+      "name": "slither",
+      "visible_count": 4,
+      "hidden_count": 1,
+      "shared_visible": 3,
+      "anchor_only": 1,
+      "source_only": 1,
+      "shared_hidden": 0,
+      "agreement": 3,
+      "visible_delta": 0
+    },
+    "cases": 5
+  },
+  "results": [
+    {
+      "challenge": "duplicate-owner-check",
+      "name": "Duplicate owner check reported by two tools",
+      "status": "PASSED",
+      "anchor_classification": "TP",
+      "expected_visible": true,
+      "anchor_visible": true,
+      "source_tool_visible": true,
+      "comparison": "shared_visible",
+      "expected_findings": [
+        "src/OwnableVault.sol:42"
+      ],
+      "source_tool_findings": [
+        "src/OwnableVault.sol:42"
+      ],
+      "actual_findings": [
+        "slither:missing-onlyowner:src/OwnableVault.sol:42"
+      ],
+      "raw_findings": 2,
+      "unique_findings": 1,
+      "duplicates_removed": 1,
+      "signal_discarded": 0,
+      "signal_promoted": 1,
+      "signal_review": 0,
+      "visible_count": 1,
+      "note": "A real source finding should survive normalization and deduplication as one visible issue."
+    },
+    {
+      "challenge": "halmos-balance-invariant",
+      "name": "Halmos invariant violation",
+      "status": "PASSED",
+      "anchor_classification": "TP",
+      "expected_visible": true,
+      "anchor_visible": true,
+      "source_tool_visible": true,
+      "comparison": "shared_visible",
+      "expected_findings": [
+        "src/Bank.sol:12"
+      ],
+      "source_tool_findings": [
+        "src/Bank.sol:12"
+      ],
+      "actual_findings": [
+        "halmos:halmos-balanceConservation:src/Bank.sol:12"
+      ],
+      "raw_findings": 1,
+      "unique_findings": 1,
+      "duplicates_removed": 0,
+      "signal_discarded": 0,
+      "signal_promoted": 1,
+      "signal_review": 0,
+      "visible_count": 1,
+      "note": "Proof-gate findings should be promoted by the SARIF pipeline."
+    },
+    {
+      "challenge": "generic-source-warning",
+      "name": "Generic source warning that should still surface",
+      "status": "FAILED",
+      "anchor_classification": "FP",
+      "expected_visible": false,
+      "anchor_visible": true,
+      "source_tool_visible": true,
+      "comparison": "shared_visible",
+      "expected_findings": [
+        "src/Vault.sol:88"
+      ],
+      "source_tool_findings": [
+        "src/Vault.sol:88"
+      ],
+      "actual_findings": [
+        "slither:unchecked-call:src/Vault.sol:88"
+      ],
+      "raw_findings": 1,
+      "unique_findings": 1,
+      "duplicates_removed": 0,
+      "signal_discarded": 0,
+      "signal_promoted": 1,
+      "signal_review": 0,
+      "visible_count": 1,
+      "note": "A low-signal source finding should remain a visible false positive for the benchmark."
+    },
+    {
+      "challenge": "reentrancy-benign-miss",
+      "name": "Reentrancy rule suppressed by mitigation context",
+      "status": "PASSED",
+      "anchor_classification": "TP",
+      "expected_visible": true,
+      "anchor_visible": true,
+      "source_tool_visible": false,
+      "comparison": "anchor_only",
+      "expected_findings": [
+        "src/ProtectedVault.sol:101"
+      ],
+      "source_tool_findings": [],
+      "actual_findings": [
+        "slither:reentrancy-benign:src/ProtectedVault.sol:101"
+      ],
+      "raw_findings": 1,
+      "unique_findings": 1,
+      "duplicates_removed": 0,
+      "signal_discarded": 0,
+      "signal_promoted": 0,
+      "signal_review": 1,
+      "visible_count": 1,
+      "note": "A known issue in protected code should still be counted if the corpus expects it to stay visible."
+    },
+    {
+      "challenge": "source-tool-only-noise",
+      "name": "Source tool only baseline hit",
+      "status": "PASSED",
+      "anchor_classification": "TN",
+      "expected_visible": false,
+      "anchor_visible": false,
+      "source_tool_visible": true,
+      "comparison": "source_only",
+      "expected_findings": [
+        "src/Noisy.sol:13"
+      ],
+      "source_tool_findings": [
+        "src/Noisy.sol:13"
+      ],
+      "actual_findings": [],
+      "raw_findings": 0,
+      "unique_findings": 0,
+      "duplicates_removed": 0,
+      "signal_discarded": 0,
+      "signal_promoted": 0,
+      "signal_review": 0,
+      "visible_count": 0,
+      "note": "The source baseline records a visible issue, but ANCHOR suppresses the empty/noisy signal."
+    }
+  ],
+  "expected_summary": {
+    "cases": 5,
+    "anchor_visible_true": 3,
+    "anchor_visible_false": 2,
+    "source_tool_visible_true": 4,
+    "source_tool_visible_false": 1,
+    "shared_visible": 3,
+    "anchor_only": 1,
+    "source_only": 1
+  }
+}

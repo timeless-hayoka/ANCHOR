@@ -28,9 +28,11 @@ from anchor_scripts import allowed_script_names, load_script_registry, registry_
 from anchor_sarif import build_research_loop
 from anchor_sarif.parser import Finding
 from anchor_storage import build_storage_manifest, evidence_dir, storage_manifest_path, storage_summary, write_json
+from anchor_work_queue import load_work_queue, work_queue_summary
 from anchor_trends import compute_benchmark_trends
 from anchor_strategy import compute_strategy
 from scabench_adapter import adapt as adapt_scabench
+from knowledge_provider import KnowledgeProvider
 
 APP_VERSION = "1.0.0"
 ROOT = Path(__file__).resolve().parent
@@ -760,6 +762,7 @@ def _anchor_snapshot(limit: int = 8) -> dict[str, Any]:
         top_n=3,
     )
     research_loop = _research_loop_snapshot(latest, strategy, trends, limit=max(1, limit))
+    work_queue = work_queue_summary(load_work_queue())
     return {
         "identity": {"version": APP_VERSION, "service": "anchor", "release": f"ANCHOR {APP_VERSION}"},
         "history": {"runs": runs},
@@ -768,6 +771,7 @@ def _anchor_snapshot(limit: int = 8) -> dict[str, Any]:
         "benchmark_trends": trends,
         "benchmark_strategy": strategy,
         "research_loop": research_loop,
+        "work_queue": work_queue,
         "script_registry": registry_summary(),
         "scabench": adapt_scabench(latest),
     }
@@ -869,6 +873,44 @@ async def api_anchor_strategy(limit: int = 10, top: int = 5) -> dict[str, Any]:
         trends_limit=limit,
         top_n=top,
     )
+
+
+@app.get("/api/anchor/work-queue")
+async def api_anchor_work_queue() -> dict[str, Any]:
+    return work_queue_summary(load_work_queue())
+
+
+def _knowledge_provider() -> KnowledgeProvider:
+    return KnowledgeProvider(ROOT / "knowledge")
+
+
+@app.get("/api/knowledge")
+async def api_knowledge_list() -> dict[str, Any]:
+    provider = _knowledge_provider()
+    manifest = provider.manifest()
+    return {
+        "version": manifest.get("version", 0),
+        "description": manifest.get("description", ""),
+        "topics": [topic.to_dict() for topic in provider.list_topics()],
+    }
+
+
+@app.get("/api/knowledge/search")
+async def api_knowledge_search(q: str = "", limit: int = 5) -> dict[str, Any]:
+    provider = _knowledge_provider()
+    hits = provider.search(q, limit=limit)
+    return {"query": q, "hits": [hit.to_dict() for hit in hits]}
+
+
+@app.get("/api/knowledge/{slug}")
+async def api_knowledge_show(slug: str) -> dict[str, Any]:
+    provider = _knowledge_provider()
+    try:
+        return provider.get(slug)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown knowledge topic: {slug}") from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/api/trinity/paths")

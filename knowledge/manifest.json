@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "description": "Implementation-focused ANCHOR reference corpus (structured retrieval, not prompt stuffing).",
+  "topics": [
+    {
+      "slug": "cloud_architecture",
+      "title": "Cloud & Local Architecture",
+      "path": "cloud_architecture.md",
+      "subsystems": ["vault", "pipeline", "storage"],
+      "tags": ["local-first", "deployment", "modularity"]
+    },
+    {
+      "slug": "sarif",
+      "title": "SARIF Pipeline",
+      "path": "sarif.md",
+      "subsystems": ["sarif", "pipeline"],
+      "tags": ["sarif", "normalization", "dedup", "clustering"]
+    },
+    {
+      "slug": "evidence_models",
+      "title": "Evidence & Finding Models",
+      "path": "evidence_models.md",
+      "subsystems": ["ledger", "sarif", "vault"],
+      "tags": ["schema", "findings", "promotion", "ledger"]
+    },
+    {
+      "slug": "attack_graphs",
+      "title": "Investigation Graphs",
+      "path": "attack_graphs.md",
+      "subsystems": ["research", "sarif"],
+      "tags": ["graph", "investigation", "correlation"]
+    },
+    {
+      "slug": "visualization",
+      "title": "Visualization",
+      "path": "visualization.md",
+      "subsystems": ["dashboard", "sarif"],
+      "tags": ["umap", "clusters", "dashboard"]
+    },
+    {
+      "slug": "zero_trust",
+      "title": "Proof Gates & Zero-Trust Promotion",
+      "path": "zero_trust.md",
+      "subsystems": ["forge", "validator", "council"],
+      "tags": ["validation", "proof", "confidence"]
+    },
+    {
+      "slug": "ui_patterns",
+      "title": "CLI & Dashboard Patterns",
+      "path": "ui_patterns.md",
+      "subsystems": ["cli", "dashboard"],
+      "tags": ["operator", "ux", "work-queue"]
+    },
+    {
+      "slug": "development_backlog",
+      "title": "Prioritized Development Backlog",
+      "path": "development_backlog.md",
+      "subsystems": ["roadmap"],
+      "tags": ["backlog", "priorities"]
+    }
+  ]
+}

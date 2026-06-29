@@ -6,21 +6,110 @@
   "subset_name": "phase1-scaffold",
   "status": "scaffold",
   "levels": [
-    {"level_id": "fallback", "name": "Fallback", "status": "pending", "category": "access_control"},
-    {"level_id": "fallout", "name": "Fallout", "status": "pending", "category": "initialization"},
-    {"level_id": "coin-flip", "name": "Coin Flip", "status": "pending", "category": "randomness"},
-    {"level_id": "telephone", "name": "Telephone", "status": "pending", "category": "tx_origin"},
-    {"level_id": "token", "name": "Token", "status": "pending", "category": "erc20_logic"},
-    {"level_id": "delegation", "name": "Delegation", "status": "pending", "category": "delegatecall"},
-    {"level_id": "force", "name": "Force", "status": "pending", "category": "forced_ether"},
-    {"level_id": "vault", "name": "Vault", "status": "pending", "category": "storage_disclosure"},
-    {"level_id": "king", "name": "King", "status": "pending", "category": "griefing"},
-    {"level_id": "reentrancy", "name": "Reentrancy", "status": "pending", "category": "reentrancy"},
-    {"level_id": "elevator", "name": "Elevator", "status": "pending", "category": "logic_flaw"},
-    {"level_id": "privacy", "name": "Privacy", "status": "pending", "category": "storage_visibility"},
-    {"level_id": "gatekeeper-one", "name": "Gatekeeper One", "status": "pending", "category": "call_context"},
-    {"level_id": "gatekeeper-two", "name": "Gatekeeper Two", "status": "pending", "category": "bitwise_gate"},
-    {"level_id": "naught-coin", "name": "Naught Coin", "status": "pending", "category": "token_lock"},
-    {"level_id": "preservation", "name": "Preservation", "status": "pending", "category": "storage_collision"}
+    {
+      "level_id": "fallback",
+      "name": "Fallback",
+      "status": "pending",
+      "category": "access_control"
+    },
+    {
+      "level_id": "fallout",
+      "name": "Fallout",
+      "status": "pending",
+      "category": "initialization"
+    },
+    {
+      "level_id": "coin-flip",
+      "name": "Coin Flip",
+      "status": "pending",
+      "category": "randomness"
+    },
+    {
+      "level_id": "telephone",
+      "name": "Telephone",
+      "status": "pending",
+      "category": "tx_origin"
+    },
+    {
+      "level_id": "token",
+      "name": "Token",
+      "status": "pending",
+      "category": "erc20_logic"
+    },
+    {
+      "level_id": "delegation",
+      "name": "Delegation",
+      "status": "pending",
+      "category": "delegatecall"
+    },
+    {
+      "level_id": "force",
+      "name": "Force",
+      "status": "pending",
+      "category": "forced_ether"
+    },
+    {
+      "level_id": "vault",
+      "name": "Vault",
+      "status": "pending",
+      "category": "storage_disclosure"
+    },
+    {
+      "level_id": "king",
+      "name": "King",
+      "status": "pending",
+      "category": "griefing"
+    },
+    {
+      "level_id": "reentrancy",
+      "name": "Reentrancy",
+      "status": "pending",
+      "category": "reentrancy"
+    },
+    {
+      "level_id": "elevator",
+      "name": "Elevator",
+      "status": "pending",
+      "category": "logic_flaw"
+    },
+    {
+      "level_id": "privacy",
+      "name": "Privacy",
+      "status": "pending",
+      "category": "storage_visibility"
+    },
+    {
+      "level_id": "gatekeeper-one",
+      "name": "Gatekeeper One",
+      "status": "pending",
+      "category": "call_context"
+    },
+    {
+      "level_id": "gatekeeper-two",
+      "name": "Gatekeeper Two",
+      "status": "pending",
+      "category": "bitwise_gate"
+    },
+    {
+      "level_id": "naught-coin",
+      "name": "Naught Coin",
+      "status": "pending",
+      "category": "token_lock"
+    },
+    {
+      "level_id": "preservation",
+      "name": "Preservation",
+      "status": "pending",
+      "category": "storage_collision"
+    }
+  ],
+  "comparative_subsets": [
+    {
+      "id": "ethernaut-source-comparison",
+      "label": "Ethernaut source-tool comparison",
+      "status": "ready",
+      "note": "Small comparative corpus for source-tool versus ANCHOR laddering.",
+      "artifact": "benchmarks/ethernaut/source-comparison/README.md"
+    }
   ]
 }

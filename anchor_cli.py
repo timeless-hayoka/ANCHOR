@@ -24,7 +24,13 @@ from pathlib import Path
 from anchor_strategy import compute_strategy, render_strategy
 from anchor_sarif import build_research_loop, rewrite_finding, assess_economic_context
 from anchor_sarif.parser import Finding
+from anchor_work_queue import load_work_queue, render_work_queue, work_queue_summary
 from anchor_trends import compute_benchmark_trends, render_benchmark_trends
+from knowledge_provider import (
+    KnowledgeProvider,
+    render_search_results,
+    render_topic_list,
+)
 
 try:
     from anchor_sarif import (
@@ -63,6 +69,9 @@ LEGACY_STAGE_STATUS = {
 BENCHMARK_RUNNERS = {
     ("dvd", "phase1"): ROOT / "benchmarks" / "damn-vulnerable-defi" / "run_phase1_benchmark.py",
     ("ethernaut", "phase1"): ROOT / "benchmarks" / "ethernaut" / "run_phase1_benchmark.py",
+    ("ethernaut", "source-comparison"): ROOT / "benchmarks" / "ethernaut" / "source-comparison" / "run_source_tool_comparison.py",
+    ("sarif", "known-findings"): ROOT / "benchmarks" / "sarif-known-findings" / "run_known_findings_benchmark.py",
+    ("defihacklabs", "source-comparison"): ROOT / "benchmarks" / "defihacklabs" / "source-comparison" / "run_source_tool_comparison.py",
 }
 
 
@@ -99,6 +108,10 @@ def create_parser() -> argparse.ArgumentParser:
     benchmark_compare = benchmark_sub.add_parser("compare", help="Compare two benchmark runs by manifest run id")
     benchmark_compare.add_argument("run_a")
     benchmark_compare.add_argument("run_b")
+
+    benchmark_compare_source = benchmark_sub.add_parser("compare-source", help="Inspect a benchmark run's source-tool comparison")
+    benchmark_compare_source.add_argument("run_id")
+    benchmark_compare_source.add_argument("--json", action="store_true", help="Emit structured JSON instead of text")
 
     benchmark_latest = benchmark_sub.add_parser("latest", help="Show the latest published benchmark summary")
 
@@ -177,6 +190,22 @@ def create_parser() -> argparse.ArgumentParser:
     strategy_parser.add_argument("--limit", type=int, default=10, help="Published benchmark runs for trend context")
     strategy_parser.add_argument("--top", type=int, default=5, help="Maximum ranked recommendations to include")
     strategy_parser.add_argument("--json", action="store_true", help="Emit structured JSON instead of text")
+
+    work_parser = sub.add_parser("work", help="Inspect the canonical ANCHOR work queue")
+    work_sub = work_parser.add_subparsers(dest="work_command", required=True)
+    work_queue = work_sub.add_parser("queue", help="Render the repo-owned work queue document")
+    work_queue.add_argument("--json", action="store_true", help="Emit structured JSON instead of text")
+
+    knowledge_parser = sub.add_parser("knowledge", help="Browse structured ANCHOR reference documents")
+    knowledge_sub = knowledge_parser.add_subparsers(dest="knowledge_command", required=True)
+    knowledge_sub.add_parser("list", help="List registered knowledge topics")
+    knowledge_show = knowledge_sub.add_parser("show", help="Show one topic by slug")
+    knowledge_show.add_argument("slug", help="Topic slug (e.g. sarif, evidence_models)")
+    knowledge_search = knowledge_sub.add_parser("search", help="Search the knowledge corpus")
+    knowledge_search.add_argument("query", help="Search phrase")
+    knowledge_search.add_argument("--limit", type=int, default=5, help="Maximum matches to return")
+    knowledge_refs = knowledge_sub.add_parser("refs", help="Topics linked to a subsystem")
+    knowledge_refs.add_argument("--subsystem", required=True, help="Subsystem name from manifest.json")
 
     if HAS_SARIF:
         sarif_parser = sub.add_parser("sarif", help="Process and analyze SARIF output from security tools")
@@ -276,6 +305,16 @@ def format_delta(before: int | None, after: int | None) -> str:
     return str(delta)
 
 
+def format_float_delta(before: float | int | None, after: float | int | None, places: int = 4) -> str:
+    if before is None or after is None:
+        return "n/a"
+    delta = round(float(after) - float(before), places)
+    if abs(delta) < 10 ** (-places):
+        return "0"
+    formatted = f"{delta:+.{places}f}".rstrip("0").rstrip(".")
+    return formatted if formatted not in {"+0", "-0"} else "0"
+
+
 def render_benchmark_history(entries: list[dict], limit: int = 10, include_development: bool = False) -> str:
     rows = sorted_entries(entries)
     if not include_development:
@@ -315,6 +354,10 @@ def render_benchmark_history(entries: list[dict], limit: int = 10, include_devel
 
 
 def render_benchmark_compare(entry_a: dict, entry_b: dict) -> str:
+    compare = benchmark_compare_metrics(entry_a, entry_b)
+    metrics_a = compare["metrics_a"]
+    metrics_b = compare["metrics_b"]
+    count_deltas = compare["count_deltas"]
     lines = [
         f"Comparing `{entry_a.get('id')}` -> `{entry_b.get('id')}`",
         "",
@@ -323,9 +366,30 @@ def render_benchmark_compare(entry_a: dict, entry_b: dict) -> str:
         f"- level: {entry_a.get('level', 'unknown')} -> {entry_b.get('level', 'unknown')}",
         f"- tier: {benchmark_tier(entry_a)} -> {benchmark_tier(entry_b)}",
         f"- executed_at: {entry_a.get('executed_at', 'unknown')} -> {entry_b.get('executed_at', 'unknown')}",
+        f"- run_id: {metrics_a.get('run_id', entry_a.get('id', 'unknown'))} -> {metrics_b.get('run_id', entry_b.get('id', 'unknown'))}",
+        f"- source_commit: {metrics_a.get('source_commit', 'unknown')} -> {metrics_b.get('source_commit', 'unknown')}",
+        "",
+        f"Guardrail: {compare['status']}",
+    ]
+    if compare["warnings"]:
+        lines.append(f"- warnings: {', '.join(compare['warnings'])}")
+    lines.extend([
+        "",
+        "Metrics deltas",
+        f"- precision: {metrics_a.get('metrics', {}).get('precision', '—')} -> {metrics_b.get('metrics', {}).get('precision', '—')} (delta {format_float_delta(metrics_a.get('metrics', {}).get('precision'), metrics_b.get('metrics', {}).get('precision'))})",
+        f"- recall: {metrics_a.get('metrics', {}).get('recall', '—')} -> {metrics_b.get('metrics', {}).get('recall', '—')} (delta {format_float_delta(metrics_a.get('metrics', {}).get('recall'), metrics_b.get('metrics', {}).get('recall'))})",
+        f"- f1: {metrics_a.get('metrics', {}).get('f1', '—')} -> {metrics_b.get('metrics', {}).get('f1', '—')} (delta {format_float_delta(metrics_a.get('metrics', {}).get('f1'), metrics_b.get('metrics', {}).get('f1'))})",
+        f"- runtime_seconds: {metrics_a.get('runtime_seconds', '—')} -> {metrics_b.get('runtime_seconds', '—')} (delta {format_float_delta(metrics_a.get('runtime_seconds'), metrics_b.get('runtime_seconds'))})",
+        "",
+        "Count deltas",
+        f"- true_positive: {count_deltas['true_positive']:+d}",
+        f"- false_positive: {count_deltas['false_positive']:+d}",
+        f"- false_negative: {count_deltas['false_negative']:+d}",
+        f"- true_negative: {count_deltas['true_negative']:+d}",
+        f"- duplicates_removed: {count_deltas['duplicates_removed']:+d}",
         "",
         "Summary deltas",
-    ]
+    ])
     for key, label in [
         ("passed", "passed"),
         ("failed", "failed"),
@@ -413,6 +477,7 @@ def render_benchmark_latest(entry: dict | None, baseline: dict | None = None) ->
     )
     future_state = (strategy.get("next_hunt") or {}).get("label", "ePBS + inclusion lists")
     research_loop = build_research_loop([_benchmark_latest_finding(entry, strategy, summary)], future_state=future_state)
+    source_tool_compare = load_source_tool_compare(entry)
 
     lines = [
         "Latest Published Benchmark",
@@ -498,6 +563,155 @@ def load_benchmark_artifact(entry: dict | None) -> dict:
             except Exception:
                 continue
     return {"results": [], "summary": entry.get("results_summary", {}) or {}}
+
+
+def load_benchmark_metrics(entry: dict | None) -> dict:
+    if not entry:
+        return {
+            "schema_version": "1.0",
+            "benchmark": "unknown",
+            "run_id": "unknown",
+            "source_commit": "unknown",
+            "counts": {
+                "true_positive": 0,
+                "false_positive": 0,
+                "false_negative": 0,
+                "true_negative": 0,
+                "duplicates_removed": 0,
+            },
+            "metrics": {"precision": 0.0, "recall": 0.0, "f1": 0.0},
+            "runtime_seconds": 0,
+            "tool_versions": {},
+        }
+    candidates = []
+    value = entry.get("metrics_json")
+    if value:
+        candidates.append(ROOT / value)
+    run_dir = benchmark_run_dir(entry)
+    if run_dir is not None:
+        candidates.append(run_dir / "metrics.json")
+    for candidate in candidates:
+        if candidate.exists():
+            try:
+                payload = json.loads(candidate.read_text())
+                if isinstance(payload, dict):
+                    return payload
+            except Exception:
+                continue
+    summary = entry.get("results_summary", {}) or {}
+    return {
+        "schema_version": "1.0",
+        "benchmark": entry.get("target", "unknown"),
+        "run_id": entry.get("id", "unknown"),
+        "source_commit": entry.get("commit") or entry.get("source_commit") or "unknown",
+        "counts": {
+            "true_positive": summary.get("true_positives", 0),
+            "false_positive": summary.get("false_positives", 0),
+            "false_negative": summary.get("false_negatives", 0),
+            "true_negative": summary.get("true_negatives", 0),
+            "duplicates_removed": summary.get("duplicates_removed", 0),
+        },
+        "metrics": {
+            "precision": summary.get("precision", 0.0),
+            "recall": summary.get("recall", 0.0),
+            "f1": summary.get("f1", 0.0),
+        },
+        "runtime_seconds": summary.get("runtime_seconds", 0) or 0,
+        "tool_versions": {},
+    }
+
+
+def benchmark_compare_metrics(entry_a: dict, entry_b: dict) -> dict[str, object]:
+    metrics_a = load_benchmark_metrics(entry_a)
+    metrics_b = load_benchmark_metrics(entry_b)
+    counts_a = metrics_a.get("counts", {}) or {}
+    counts_b = metrics_b.get("counts", {}) or {}
+    metrics_delta = {
+        "precision": round(float(metrics_b.get("metrics", {}).get("precision", 0.0)) - float(metrics_a.get("metrics", {}).get("precision", 0.0)), 4),
+        "recall": round(float(metrics_b.get("metrics", {}).get("recall", 0.0)) - float(metrics_a.get("metrics", {}).get("recall", 0.0)), 4),
+        "f1": round(float(metrics_b.get("metrics", {}).get("f1", 0.0)) - float(metrics_a.get("metrics", {}).get("f1", 0.0)), 4),
+    }
+    count_keys = ["true_positive", "false_positive", "false_negative", "true_negative", "duplicates_removed"]
+    count_deltas = {
+        key: int(counts_b.get(key, 0)) - int(counts_a.get(key, 0))
+        for key in count_keys
+    }
+    runtime_delta = float(metrics_b.get("runtime_seconds", 0) or 0) - float(metrics_a.get("runtime_seconds", 0) or 0)
+    warnings = []
+    if metrics_delta["precision"] < 0:
+        warnings.append("precision dropped")
+    if metrics_delta["f1"] < 0:
+        warnings.append("f1 dropped")
+    status = "FAIL" if metrics_delta["recall"] < 0 else ("WARN" if warnings else "PASS")
+    return {
+        "status": status,
+        "warnings": warnings,
+        "metrics_a": metrics_a,
+        "metrics_b": metrics_b,
+        "metrics_delta": metrics_delta,
+        "count_deltas": count_deltas,
+        "runtime_delta": round(runtime_delta, 4),
+    }
+
+
+def load_source_tool_compare(entry: dict | None) -> dict:
+    if not entry:
+        return {}
+    candidates = []
+    value = entry.get("source_tool_compare_json")
+    if value:
+        candidates.append(ROOT / value)
+    run_dir = benchmark_run_dir(entry)
+    if run_dir is not None:
+        candidates.append(run_dir / "source_tool_compare.json")
+    for candidate in candidates:
+        if candidate.exists():
+            try:
+                payload = json.loads(candidate.read_text())
+                if isinstance(payload, dict):
+                    return payload
+            except Exception:
+                continue
+    return {}
+
+
+def render_benchmark_source_tool_compare(compare: dict | None) -> str:
+    if not compare:
+        return "No source-tool comparison data available yet."
+    comparison = compare.get("comparison", {}) or {}
+    cases = compare.get("cases", []) or []
+    lines = [
+        "Source Tool Comparison",
+        "",
+        f"Run: {compare.get('run_id', 'unknown')}",
+        f"Benchmark: {compare.get('benchmark', 'unknown')}",
+        f"Source tool: {compare.get('source_tool', 'unknown')}",
+        "",
+        "Summary",
+        f"- anchor_visible: {comparison.get('anchor_visible', '—')}",
+        f"- source_tool_visible: {comparison.get('source_tool_visible', '—')}",
+        f"- shared_visible: {comparison.get('shared_visible', '—')}",
+        f"- anchor_only: {comparison.get('anchor_only', '—')}",
+        f"- source_only: {comparison.get('source_only', '—')}",
+        f"- shared_hidden: {comparison.get('shared_hidden', '—')}",
+        f"- agreement: {comparison.get('agreement', '—')}",
+        f"- visible_delta: {comparison.get('visible_delta', '—')}",
+        "",
+        "Cases",
+    ]
+    for case in cases:
+        lines.extend([
+            "",
+            f"### {case.get('id', 'case')}",
+            f"- anchor_visible: `{case.get('anchor_visible', '—')}`",
+            f"- source_tool_visible: `{case.get('source_tool_visible', '—')}`",
+            f"- comparison: `{case.get('comparison', '—')}`",
+        ])
+        if case.get('anchor_classification'):
+            lines.append(f"- anchor_classification: `{case.get('anchor_classification')}`")
+    return "
+".join(lines) + "
+"
 
 
 def benchmark_result_index(entry: dict | None) -> dict[str, dict]:
@@ -926,8 +1140,9 @@ def cmd_benchmark_compare(args: argparse.Namespace) -> int:
     except KeyError as exc:
         print(f"Unknown run id: {exc.args[0]}", file=sys.stderr)
         return 1
+    compare = benchmark_compare_metrics(entry_a, entry_b)
     print(render_benchmark_compare(entry_a, entry_b))
-    return 0
+    return 1 if compare["status"] == "FAIL" else 0
 
 
 def cmd_benchmark_latest(args: argparse.Namespace) -> int:
@@ -957,6 +1172,92 @@ def cmd_strategy(args: argparse.Namespace) -> int:
         print(json.dumps(payload, indent=2))
     else:
         print(render_strategy(payload))
+    return 0
+
+
+def cmd_work_queue(args: argparse.Namespace) -> int:
+    queue = load_work_queue()
+    if args.json:
+        print(json.dumps(work_queue_summary(queue), indent=2))
+    else:
+        print(render_work_queue(queue))
+    return 0
+
+
+def _knowledge_provider() -> KnowledgeProvider:
+    return KnowledgeProvider(ROOT / "knowledge")
+
+
+def cmd_knowledge_list(args: argparse.Namespace) -> int:
+    provider = _knowledge_provider()
+    topics = [topic.to_dict() for topic in provider.list_topics()]
+    if getattr(args, "json", False):
+        print(json.dumps({"topics": topics}, indent=2))
+    else:
+        print(render_topic_list(provider))
+    return 0
+
+
+def cmd_knowledge_show(args: argparse.Namespace) -> int:
+    provider = _knowledge_provider()
+    try:
+        payload = provider.get(args.slug)
+    except KeyError:
+        print(f"Unknown knowledge topic: {args.slug}", file=sys.stderr)
+        return 1
+    except FileNotFoundError as exc:
+        print(f"Knowledge file missing: {exc}", file=sys.stderr)
+        return 1
+    if getattr(args, "json", False):
+        print(json.dumps(payload, indent=2))
+    else:
+        topic = payload["topic"]
+        print(f"# {topic['title']} ({topic['slug']})")
+        print()
+        print(payload["content"])
+    return 0
+
+
+def cmd_knowledge_search(args: argparse.Namespace) -> int:
+    provider = _knowledge_provider()
+    hits = provider.search(args.query, limit=args.limit)
+    if getattr(args, "json", False):
+        print(json.dumps({"query": args.query, "hits": [hit.to_dict() for hit in hits]}, indent=2))
+    else:
+        print(render_search_results(hits))
+    return 0
+
+
+def cmd_knowledge_refs(args: argparse.Namespace) -> int:
+    provider = _knowledge_provider()
+    topics = provider.refs_for_subsystem(args.subsystem)
+    if getattr(args, "json", False):
+        print(json.dumps({"subsystem": args.subsystem, "topics": [topic.to_dict() for topic in topics]}, indent=2))
+    else:
+        if not topics:
+            print(f"No knowledge topics for subsystem: {args.subsystem}")
+        else:
+            print(f"Knowledge refs for subsystem: {args.subsystem}")
+            for topic in topics:
+                print(f"- {topic.slug}: {topic.title}")
+    return 0
+
+
+def cmd_benchmark_compare_source(args: argparse.Namespace) -> int:
+    entries = load_manifest()
+    try:
+        entry = find_entry(entries, args.run_id)
+    except KeyError as exc:
+        print(f"Unknown run id: {exc.args[0]}", file=sys.stderr)
+        return 1
+    compare = load_source_tool_compare(entry)
+    if not compare:
+        print(f"No source-tool comparison data for run id: {args.run_id}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(compare, indent=2))
+    else:
+        print(render_benchmark_source_tool_compare(compare))
     return 0
 
 
@@ -1165,12 +1466,24 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_benchmark_history(args)
     if args.command == "benchmark" and args.benchmark_command == "compare":
         return cmd_benchmark_compare(args)
+    if args.command == "benchmark" and args.benchmark_command == "compare-source":
+        return cmd_benchmark_compare_source(args)
     if args.command == "benchmark" and args.benchmark_command == "latest":
         return cmd_benchmark_latest(args)
     if args.command == "benchmark" and args.benchmark_command == "trends":
         return cmd_benchmark_trends(args)
     if args.command == "strategy":
         return cmd_strategy(args)
+    if args.command == "work" and args.work_command == "queue":
+        return cmd_work_queue(args)
+    if args.command == "knowledge" and args.knowledge_command == "list":
+        return cmd_knowledge_list(args)
+    if args.command == "knowledge" and args.knowledge_command == "show":
+        return cmd_knowledge_show(args)
+    if args.command == "knowledge" and args.knowledge_command == "search":
+        return cmd_knowledge_search(args)
+    if args.command == "knowledge" and args.knowledge_command == "refs":
+        return cmd_knowledge_refs(args)
     if args.command == "benchmark" and args.benchmark_command == "publish":
         return cmd_benchmark_publish(args)
     if args.command == "benchmark":

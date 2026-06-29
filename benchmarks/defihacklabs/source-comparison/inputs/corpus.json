@@ -1,0 +1,235 @@
+{
+  "schema_version": "1.0",
+  "benchmark_id": "defihacklabs-source-comparison",
+  "title": "DeFiHackLabs source-tool comparison corpus",
+  "source_tool": "slither",
+  "cases": [
+    {
+      "id": "duplicate-owner-check",
+      "name": "Duplicate owner check reported by two tools",
+      "expected_visible": true,
+      "reason": "A real source finding should survive normalization and deduplication as one visible issue.",
+      "tool_outputs": {
+        "slither": {
+          "version": "2.1.0",
+          "runs": [
+            {
+              "tool": {
+                "driver": {
+                  "name": "slither"
+                }
+              },
+              "results": [
+                {
+                  "ruleId": "missing-onlyowner",
+                  "level": "warning",
+                  "message": {
+                    "text": "Missing onlyOwner on privileged function"
+                  },
+                  "locations": [
+                    {
+                      "physicalLocation": {
+                        "artifactLocation": {
+                          "uri": "src/OwnableVault.sol"
+                        },
+                        "region": {
+                          "startLine": 42,
+                          "snippet": {
+                            "text": "function sweep() external { /* privileged action */ }"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "ruleId": "missing-onlyowner",
+                  "level": "warning",
+                  "message": {
+                    "text": "Missing onlyOwner on privileged function"
+                  },
+                  "locations": [
+                    {
+                      "physicalLocation": {
+                        "artifactLocation": {
+                          "uri": "src/OwnableVault.sol"
+                        },
+                        "region": {
+                          "startLine": 42,
+                          "snippet": {
+                            "text": "function sweep() external { /* privileged action */ }"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected_findings": [
+        "src/OwnableVault.sol:42"
+      ],
+      "anchor_expected_visible": true,
+      "source_tool_expected_visible": true,
+      "source_tool_name": "slither",
+      "source_tool_findings": [
+        "src/OwnableVault.sol:42"
+      ]
+    },
+    {
+      "id": "halmos-balance-invariant",
+      "name": "Halmos invariant violation",
+      "expected_visible": true,
+      "reason": "Proof-gate findings should be promoted by the SARIF pipeline.",
+      "tool_outputs": {
+        "halmos": {
+          "results": [
+            {
+              "name": "balanceConservation",
+              "status": "failed",
+              "filename": "src/Bank.sol",
+              "line": 12
+            }
+          ]
+        }
+      },
+      "expected_findings": [
+        "src/Bank.sol:12"
+      ],
+      "anchor_expected_visible": true,
+      "source_tool_expected_visible": true,
+      "source_tool_name": "slither",
+      "source_tool_findings": [
+        "src/Bank.sol:12"
+      ]
+    },
+    {
+      "id": "generic-source-warning",
+      "name": "Generic source warning that should still surface",
+      "expected_visible": false,
+      "reason": "A low-signal source finding should remain a visible false positive for the benchmark.",
+      "tool_outputs": {
+        "slither": {
+          "version": "2.1.0",
+          "runs": [
+            {
+              "tool": {
+                "driver": {
+                  "name": "slither"
+                }
+              },
+              "results": [
+                {
+                  "ruleId": "unchecked-call",
+                  "level": "warning",
+                  "message": {
+                    "text": "Low-level call may be unsafe"
+                  },
+                  "locations": [
+                    {
+                      "physicalLocation": {
+                        "artifactLocation": {
+                          "uri": "src/Vault.sol"
+                        },
+                        "region": {
+                          "startLine": 88,
+                          "snippet": {
+                            "text": "ok = payable(msg.sender).call{value: amount}(\"\");"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected_findings": [
+        "src/Vault.sol:88"
+      ],
+      "regression_kind": "known_false_positive",
+      "regression_reason": "Generic low-level-call warning on a source contract. The pipeline should not promote it without stronger exploit context.",
+      "anchor_expected_visible": false,
+      "source_tool_expected_visible": true,
+      "source_tool_name": "slither",
+      "source_tool_findings": [
+        "src/Vault.sol:88"
+      ]
+    },
+    {
+      "id": "reentrancy-benign-miss",
+      "name": "Reentrancy rule suppressed by mitigation context",
+      "expected_visible": true,
+      "reason": "A known issue in protected code should still be counted if the corpus expects it to stay visible.",
+      "tool_outputs": {
+        "slither": {
+          "version": "2.1.0",
+          "runs": [
+            {
+              "tool": {
+                "driver": {
+                  "name": "slither"
+                }
+              },
+              "results": [
+                {
+                  "ruleId": "reentrancy-benign",
+                  "level": "note",
+                  "message": {
+                    "text": "Cross-function reentrancy reachable via emergencyWithdraw"
+                  },
+                  "locations": [
+                    {
+                      "physicalLocation": {
+                        "artifactLocation": {
+                          "uri": "src/ProtectedVault.sol"
+                        },
+                        "region": {
+                          "startLine": 101,
+                          "snippet": {
+                            "text": "function withdraw(uint256 amount) external nonReentrant { /* ReentrancyGuard */ }"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected_findings": [
+        "src/ProtectedVault.sol:101"
+      ],
+      "regression_kind": "known_false_negative",
+      "regression_reason": "Cross-function reentrancy was suppressed by the mitigation shortcut because the snippet mentioned ReentrancyGuard.",
+      "fix_hint": "Promote cross-function reentrancy messages even when a guard pattern appears in the snippet.",
+      "anchor_expected_visible": true,
+      "source_tool_expected_visible": false,
+      "source_tool_name": "slither",
+      "source_tool_findings": []
+    },
+    {
+      "id": "source-tool-only-noise",
+      "name": "Source tool only baseline hit",
+      "expected_visible": false,
+      "reason": "The source baseline records a visible issue, but ANCHOR suppresses the empty/noisy signal.",
+      "tool_outputs": {},
+      "expected_findings": [
+        "src/Noisy.sol:13"
+      ],
+      "anchor_expected_visible": false,
+      "source_tool_expected_visible": true,
+      "source_tool_name": "slither",
+      "source_tool_findings": [
+        "src/Noisy.sol:13"
+      ]
+    }
+  ]
+}

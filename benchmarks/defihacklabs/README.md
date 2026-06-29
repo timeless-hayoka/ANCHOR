@@ -48,6 +48,6 @@ Capture only verified incidents and mark anything speculative as unconfirmed.
 
 Store subset notes, source references, and reproduction links here.
 
-## Subset index
+## Runnable benchmark
 
-- [index.json](index.json)
+- [source-comparison](source-comparison/README.md)

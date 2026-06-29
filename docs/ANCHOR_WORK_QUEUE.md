@@ -1,43 +1,105 @@
 # ANCHOR Work Queue
 
-This queue keeps the current implementation work visible and easy to track.
+> Only work that can be executed, tested, and evidenced belongs here.
 
-## In progress now
+## Active
 
-- [x] Wire dashboard fields into the live ANCHOR UI
-- [x] Scaffold the script registry JSON and loader
-- [x] Add the evidence-storage interface to the benchmark runner
-- [x] Record the work in the repo as durable docs
+### A-001 — Benchmark the SARIF pipeline against known findings
 
-## Follow-up tasks
+**Status:** READY
 
-- [ ] Add a live script-registry endpoint to the dashboard sidebar
-- [ ] Promote benchmark storage metadata into the published manifest
-- [ ] Add a small report view for latest evidence bundles
-- [ ] Convert the highest-value backlog items into GitHub issues
-- [ ] Ingest the top 3 repo notes into the ANCHOR vault
+**Goal**
+Run ANCHOR's SARIF ingest, normalization, deduplication, validation, and reporting flow against a known benchmark corpus.
 
-## Suggested issue titles
+**Why it matters**
+ANCHOR is only useful if its findings can be measured for signal quality, reproducibility, and analyst usefulness.
 
-- `ANCHOR: wire benchmark overview into dashboard`
-- `ANCHOR: add shared evidence storage manifest`
-- `ANCHOR: expose guarded script registry`
-- `ANCHOR: import AI-Forge-Protocol proof-gate lessons`
-- `ANCHOR: import bounty-bot outcome workflow lessons`
-- `ANCHOR: import apex-mothership dashboard lessons`
+**Acceptance criteria**
 
-## Definition of done
+* [ ] At least one benchmark corpus is selected and documented.
+* [ ] SARIF artifacts are ingested through the normal CLI or server path.
+* [ ] A benchmark run writes results under `benchmarks/<name>/runs/`.
+* [ ] Results record true positives, false positives, false negatives, and duplicates removed.
+* [ ] Runtime and environment details are captured.
+* [ ] A summary report is written to `benchmarks/<name>/REPORT.md`.
+* [ ] Tests still pass using:
 
-- benchmark runs show the latest storage and evidence paths
-- the dashboard can explain what is running without opening the terminal
-- the script registry is loaded from a JSON source, not hardcoded
-- the vault has short notes from the top 3 source repos
-- future benchmark work can be added without changing the core wiring again
+  ```bash
+  python3 -m pytest -q tests/test_anchor_cli.py tests/test_anchor_server.py tests/test_anchor_sarif.py
+  ```
 
-## GitHub issues
+**Evidence required**
 
-- #1 - ANCHOR: add ScaBench scored report to benchmark overview
-- #2 - ANCHOR: expose guarded script registry from the dashboard sidebar
-- #3 - ANCHOR: promote benchmark storage metadata into the published manifest
-- #4 - ANCHOR: add a latest evidence bundle report view
-- #5 - ANCHOR: ingest source repo notes into the vault
+* Input SARIF files or reproducible download instructions
+* Raw run output
+* Final benchmark report
+* Test output
+* Git commit hash
+
+**Next smallest action**
+Choose one small, public benchmark corpus with known expected findings and create:
+
+```text
+benchmarks/<benchmark_name>/
+├── README.md
+├── inputs/
+├── expected/
+└── REPORT.md
+```
+
+**Blocked by**
+
+* None
+
+---
+
+## Ready
+
+### A-002 — Make benchmark results machine-readable
+
+**Status:** QUEUED
+
+**Goal**
+Export benchmark metrics as JSON so regressions can be compared automatically.
+
+**Acceptance criteria**
+
+* [ ] Produce `metrics.json` per benchmark run.
+* [ ] Include TP, FP, FN, TN, precision, recall, F1, runtime, and tool versions.
+* [ ] Add a test validating the schema.
+
+---
+
+### A-003 — Add regression comparison
+
+**Status:** QUEUED
+
+**Goal**
+Compare a new benchmark run against a baseline and flag meaningful degradation.
+
+**Acceptance criteria**
+
+* [ ] Baseline metrics can be stored.
+* [ ] CLI reports metric deltas.
+* [ ] Configurable threshold fails the run when precision or recall drops.
+
+---
+
+## Blocked
+
+*None.*
+
+---
+
+## Completed
+
+### A-000 — SARIF pipeline and benchmark workspace
+
+**Status:** COMPLETE
+
+**Evidence**
+
+* Commit: `e1af9f1`
+* Tests: `44 passed, 1 skipped`
+* Verified via `python3 -m pytest`
+* Generated benchmark runs and Chroma data ignored

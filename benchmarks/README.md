@@ -35,6 +35,7 @@ Every benchmark record should include:
 - [ethernaut](ethernaut/README.md)
 - [openzeppelin](openzeppelin/README.md)
 - [custom](custom/README.md)
+- [sarif-known-findings](sarif-known-findings/README.md)
 
 ## Interpretation rule
 

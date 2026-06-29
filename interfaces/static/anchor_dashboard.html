@@ -615,6 +615,24 @@
           <div id="strategyRecommendations"></div>
         </div>
 
+        <div class="block" id="work-queue">
+          <h3>Work Queue</h3>
+          <div class="rows metrics-grid">
+            <div class="kv"><span>Active</span><strong id="workQueueActive">…</strong></div>
+            <div class="kv"><span>Ready</span><strong id="workQueueReady">…</strong></div>
+            <div class="kv"><span>Blocked</span><strong id="workQueueBlocked">…</strong></div>
+            <div class="kv"><span>Completed</span><strong id="workQueueCompleted">…</strong></div>
+          </div>
+          <div class="rows">
+            <div class="kv"><span>Top item</span><strong id="workQueueTopItem">…</strong></div>
+            <div class="kv"><span>Next action</span><strong id="workQueueNextAction">…</strong></div>
+            <div class="kv"><span>Source</span><strong id="workQueueSource">…</strong></div>
+          </div>
+          <div class="panel-note loading" id="workQueueStatus">Loading work queue…</div>
+          <div class="detail" id="workQueueSummary">Repo-owned queue items will appear here from docs/ANCHOR_WORK_QUEUE.md.</div>
+          <div id="workQueueSections"></div>
+        </div>
+
         <div class="block" id="research-loop">
           <h3>Research Loop</h3>
           <div class="rows metrics-grid">
@@ -771,6 +789,16 @@ const strategyReason = document.getElementById('strategyReason');
 const strategyExpectedGain = document.getElementById('strategyExpectedGain');
 const strategyStatus = document.getElementById('strategyStatus');
 const strategyRecommendations = document.getElementById('strategyRecommendations');
+const workQueueActive = document.getElementById('workQueueActive');
+const workQueueReady = document.getElementById('workQueueReady');
+const workQueueBlocked = document.getElementById('workQueueBlocked');
+const workQueueCompleted = document.getElementById('workQueueCompleted');
+const workQueueTopItem = document.getElementById('workQueueTopItem');
+const workQueueNextAction = document.getElementById('workQueueNextAction');
+const workQueueSource = document.getElementById('workQueueSource');
+const workQueueStatus = document.getElementById('workQueueStatus');
+const workQueueSummary = document.getElementById('workQueueSummary');
+const workQueueSections = document.getElementById('workQueueSections');
 const researchLoopSummary = document.getElementById('researchLoopSummary');
 const researchLoopQueueDepth = document.getElementById('researchLoopQueueDepth');
 const researchLoopAssumptions = document.getElementById('researchLoopAssumptions');
@@ -1330,6 +1358,42 @@ function renderBenchmarkStrategyPanel(strategy) {
   setPanelNotice(strategyStatus, 'ready', 'Hunt strategy loaded from snapshot (consumes trends).');
 }
 
+function renderWorkQueuePanel(queue) {
+  if (!queue) {
+    workQueueActive.textContent = '0';
+    workQueueReady.textContent = '0';
+    workQueueBlocked.textContent = '0';
+    workQueueCompleted.textContent = '0';
+    workQueueTopItem.textContent = '—';
+    workQueueNextAction.textContent = '—';
+    workQueueSource.textContent = 'docs/ANCHOR_WORK_QUEUE.md';
+    workQueueSummary.textContent = 'No work queue data loaded yet.';
+    workQueueSections.innerHTML = '';
+    setPanelNotice(workQueueStatus, 'optional', 'Work queue idle until the backend snapshot exposes it.');
+    return;
+  }
+
+  const counts = queue.counts || {};
+  workQueueActive.textContent = String(counts.active ?? 0);
+  workQueueReady.textContent = String(counts.ready ?? 0);
+  workQueueBlocked.textContent = String(counts.blocked ?? 0);
+  workQueueCompleted.textContent = String(counts.completed ?? 0);
+  workQueueTopItem.textContent = queue.top_item ? `${queue.top_item.id} · ${queue.top_item.title}` : '—';
+  workQueueNextAction.textContent = queue.next_action ? queue.next_action.replace(/\s+/g, ' ').slice(0, 140) : '—';
+  workQueueSource.textContent = queue.queue_path || 'docs/ANCHOR_WORK_QUEUE.md';
+  workQueueSummary.textContent = queue.summary || 'Canonical repo work queue loaded from docs/ANCHOR_WORK_QUEUE.md.';
+  workQueueSections.innerHTML = '';
+  (queue.sections || []).forEach((section) => {
+    const box = document.createElement('div');
+    box.className = 'detail';
+    const items = (section.items || []).map((item) => `${item.id} [${item.status || section.name || 'UNKNOWN'}] ${item.title}`).join(' · ') || 'No items';
+    const nextAction = (section.items || [])[0]?.next_smallest_action;
+    box.textContent = `${section.name || 'Section'} (${(section.items || []).length}): ${items}${nextAction ? ` | Next: ${String(nextAction).replace(/\s+/g, ' ').slice(0, 120)}` : ''}`;
+    workQueueSections.appendChild(box);
+  });
+  setPanelNotice(workQueueStatus, 'ready', 'Work queue loaded from docs/ANCHOR_WORK_QUEUE.md.');
+}
+
 function renderResearchLoopPanel(loop) {
   if (!loop) {
     researchLoopSummary.textContent = 'No research-loop summary yet.';
@@ -1477,6 +1541,7 @@ function applyAnchorSnapshot(snapshot) {
 
   renderBenchmarkTrendsPanel(snapshot.benchmark_trends || null);
   renderBenchmarkStrategyPanel(snapshot.benchmark_strategy || null);
+  renderWorkQueuePanel(snapshot.work_queue || null);
   renderResearchLoopPanel(snapshot.research_loop || null);
 
   vaultNewsBriefs.textContent = String(vault.news_briefs ?? 0);

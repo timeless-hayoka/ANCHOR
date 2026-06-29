@@ -1,15 +1,16 @@
 {
+  "schema_version": "1.0",
   "family": "defihacklabs",
   "title": "DeFiHackLabs curated subset index",
   "scope": "curated benchmark notes only",
-  "status": "scaffold",
+  "status": "ready",
   "entries": [
     {
-      "id": "defihacklabs-2025-subset-scaffold",
-      "label": "DeFiHackLabs 2025 subset",
-      "status": "pending",
-      "note": "Populate with verified incidents only after source notes are ingested into the vault.",
-      "artifact": "benchmarks/defihacklabs/README.md"
+      "id": "defihacklabs-source-comparison",
+      "label": "DeFiHackLabs source-tool comparison",
+      "status": "ready",
+      "note": "Curated subset comparing ANCHOR against slither reference labels.",
+      "artifact": "benchmarks/defihacklabs/source-comparison/README.md"
     }
   ]
 }

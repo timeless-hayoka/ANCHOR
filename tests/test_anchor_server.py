@@ -71,6 +71,8 @@ def test_anchor_snapshot_prefers_published_benchmark(monkeypatch: pytest.MonkeyP
         assert snap["benchmark_overview"]["regression_report"] == ""
         assert snap["research_loop"]["benchmark_id"] == "pub-run"
         assert snap["research_loop"]["queue_depth"] >= 1
+        assert snap["work_queue"]["counts"]["active"] == 1
+        assert snap["work_queue"]["top_item"]["id"] == "A-001"
         assert snap["benchmarks"][0]["id"] == "pub-run"
         service = client.get("/api/service")
         assert service.status_code == 200
@@ -150,3 +152,28 @@ def test_anchor_server_replays_after_cursor_and_ingests_events(monkeypatch: pyte
         case = client.get("/cases/case_live")
         assert case.status_code == 200
         assert case.json()["case_id"] == "case_live"
+
+
+def test_knowledge_api_list_show_and_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    server = load_server(monkeypatch, tmp_path)
+
+    with TestClient(server.app) as client:
+        listing = client.get("/api/knowledge")
+        assert listing.status_code == 200
+        body = listing.json()
+        assert body["version"] == 1
+        slugs = {row["slug"] for row in body["topics"]}
+        assert "sarif" in slugs
+
+        doc = client.get("/api/knowledge/sarif")
+        assert doc.status_code == 200
+        assert doc.json()["topic"]["slug"] == "sarif"
+        assert doc.json()["content"]
+
+        search = client.get("/api/knowledge/search", params={"q": "confidence", "limit": 3})
+        assert search.status_code == 200
+        assert search.json()["hits"]
+
+        missing = client.get("/api/knowledge/not-a-topic")
+        assert missing.status_code == 404
+

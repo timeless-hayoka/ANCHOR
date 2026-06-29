@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "benchmark_id": "ethernaut-source-comparison",
+  "expected_summary": {
+    "cases": 4,
+    "anchor_visible_true": 3,
+    "anchor_visible_false": 1,
+    "source_tool_visible_true": 3,
+    "source_tool_visible_false": 1,
+    "shared_visible": 2,
+    "anchor_only": 1,
+    "source_only": 1
+  },
+  "case_expectations": [
+    {
+      "id": "fallback-owner-check",
+      "anchor_expected_visible": true,
+      "source_tool_expected_visible": true
+    },
+    {
+      "id": "telephone-tx-origin",
+      "anchor_expected_visible": true,
+      "source_tool_expected_visible": true
+    },
+    {
+      "id": "vault-storage-collision",
+      "anchor_expected_visible": true,
+      "source_tool_expected_visible": false
+    },
+    {
+      "id": "coin-flip-noise",
+      "anchor_expected_visible": false,
+      "source_tool_expected_visible": true
+    }
+  ]
+}
