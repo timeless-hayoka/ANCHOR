@@ -6,15 +6,29 @@ import datetime as dt
 import json
 import re
 import runpy
-import subprocess
 import sys
+import subprocess
 from collections import Counter
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from github_discovery import (
+    copy_selection,
+    check_selected_repo_scope,
+    run_selected_repo_hunt_plan,
+    find_candidate,
+    load_bundle,
+    render_summary as render_github_discovery_summary,
+    run_github_discovery,
+    select_repo_from_latest_bundle,
+)
+from hunt_planner import build_hunt_plan, render_hunt_plan
 from anchor_strategy import compute_strategy, render_strategy
 from anchor_trends import compute_benchmark_trends, render_benchmark_trends
 
-ROOT = Path(__file__).resolve().parent
 MANIFEST_PATH = ROOT / "benchmarks" / "index.json"
 OUTCOMES_DIR = ROOT / "outcomes"
 OUTCOME_LEDGER_PATH = OUTCOMES_DIR / "ledger.jsonl"
@@ -154,6 +168,46 @@ def create_parser() -> argparse.ArgumentParser:
     strategy_parser.add_argument("--limit", type=int, default=10, help="Published benchmark runs for trend context")
     strategy_parser.add_argument("--top", type=int, default=5, help="Maximum ranked recommendations to include")
     strategy_parser.add_argument("--json", action="store_true", help="Emit structured JSON instead of text")
+
+    hunt_parser = sub.add_parser("hunt", help="Build or inspect a structured hunt plan")
+    hunt_sub = hunt_parser.add_subparsers(dest="hunt_command", required=True)
+    hunt_plan = hunt_sub.add_parser("plan", help="Build a falsifiable hunt plan from a target note")
+    hunt_plan.add_argument("--target", required=True, help="Target note or markdown file inside the project root")
+    hunt_plan.add_argument("--program", default="", help="Optional program or ecosystem label")
+    hunt_plan.add_argument("--contract", default="", help="Optional contract or component name")
+    hunt_plan.add_argument("--level", default="", help="Optional benchmark or scope level")
+    hunt_plan.add_argument("--limit", type=int, default=5, help="Maximum strategy recommendations to consider")
+    hunt_plan.add_argument("--json", action="store_true", help="Emit structured JSON instead of text")
+
+    test_parser = sub.add_parser("test", help="Run the project test suite")
+    test_parser.add_argument("pytest_args", nargs=argparse.REMAINDER, help="Optional arguments forwarded to pytest")
+
+    github_parser = sub.add_parser("github", help="Discover and curate GitHub repositories")
+    github_sub = github_parser.add_subparsers(dest="github_command", required=True)
+    github_crawl = github_sub.add_parser("crawl", help="Search GitHub and write a curated discovery bundle")
+    github_crawl.add_argument("--query", action="append", default=[], help="GitHub search query. Repeatable. Defaults to the smart-contract security lane when omitted.")
+    github_crawl.add_argument("--limit", type=int, default=12, help="Maximum number of repositories to keep in the bundle")
+    github_crawl.add_argument("--per-query", type=int, default=25, help="Maximum search hits to inspect for each query")
+    github_crawl.add_argument("--include-forks", action="store_true", help="Include forked repositories in the discovery pass")
+    github_crawl.add_argument("--include-archived", action="store_true", help="Include archived repositories in the discovery pass")
+    github_crawl.add_argument("--no-readmes", action="store_true", help="Skip README fetching and only use repository metadata")
+    github_crawl.add_argument("--output-root", default=str(ROOT / "discoveries" / "github"), help="Folder where discovery bundles are written")
+    github_crawl.add_argument("--json", action="store_true", help="Emit the bundle as JSON instead of text")
+    github_select = github_sub.add_parser("select", help="Copy a discovered repo into the human-approved queue")
+    github_select.add_argument("repo", help="Repository full name to select, for example perimetersec/fuzzlib")
+    github_select.add_argument("--output-root", default=str(ROOT / "discoveries" / "github"), help="Folder containing discovery bundles")
+    github_select.add_argument("--run-id", default="", help="Optional discovery run id; newest run is used when omitted")
+    github_select.add_argument("--json", action="store_true", help="Emit the selection record as JSON instead of text")
+    github_plan = github_sub.add_parser("plan", help="Generate a constrained hunt plan for a selected repo")
+    github_plan.add_argument("repo", help="Repository full name to plan for, for example perimetersec/fuzzlib")
+    github_plan.add_argument("--output-root", default=str(ROOT / "discoveries" / "github"), help="Folder containing discovery bundles")
+    github_plan.add_argument("--run-id", default="", help="Optional discovery run id; newest matching selection is used when omitted")
+    github_plan.add_argument("--json", action="store_true", help="Emit the plan as JSON instead of text")
+    github_scope = github_sub.add_parser("scope-check", help="Read scope_confirmation.md and block non-planning actions unless authorized")
+    github_scope.add_argument("repo", help="Repository full name to check, for example perimetersec/fuzzlib")
+    github_scope.add_argument("--output-root", default=str(ROOT / "discoveries" / "github"), help="Folder containing discovery bundles")
+    github_scope.add_argument("--run-id", default="", help="Optional discovery run id; newest matching selection is used when omitted")
+    github_scope.add_argument("--json", action="store_true", help="Emit the scope status as JSON instead of text")
 
     return parser
 
@@ -356,6 +410,8 @@ def render_benchmark_latest(entry: dict | None, baseline: dict | None = None) ->
     summary = entry.get("results_summary", {}) or {}
     regression = benchmark_regression_summary(entry, baseline)
     regression_report = entry.get("regression_report", "")
+    confidence = entry.get("confidence", "—")
+    dash = "—"
     if not regression_report and benchmark_run_dir(entry) is not None:
         regression_report = str((benchmark_run_dir(entry) / "REGRESSION_REPORT.md").relative_to(ROOT))
 
@@ -367,21 +423,21 @@ def render_benchmark_latest(entry: dict | None, baseline: dict | None = None) ->
         f"Level: {entry.get('level', 'unknown')}",
         f"Target: {entry.get('target', 'unknown')}",
         f"Executed At: {entry.get('executed_at', 'unknown')}",
-        f"Confidence: {entry.get('confidence', '\u2014')}",
+        f"Confidence: {confidence}",
         "",
         "Summary",
-        f"- passed: {summary.get('passed', '\u2014')}",
-        f"- failed: {summary.get('failed', '\u2014')}",
-        f"- timed_out: {summary.get('timed_out', '\u2014')}",
-        f"- detector_signals: {summary.get('detector_signals', '\u2014')}",
-        f"- medium_high_target_relevant_findings: {summary.get('medium_high_target_relevant_findings', '\u2014')}",
+        f"- passed: {summary.get('passed', dash)}",
+        f"- failed: {summary.get('failed', dash)}",
+        f"- timed_out: {summary.get('timed_out', dash)}",
+        f"- detector_signals: {summary.get('detector_signals', dash)}",
+        f"- medium_high_target_relevant_findings: {summary.get('medium_high_target_relevant_findings', dash)}",
         "",
         "Regression",
         f"- resolved: {regression['resolved']}",
         f"- regressions: {regression['regressions']}",
         f"- environment_sensitive: {regression['environment_sensitive']}",
         f"- stable: {regression['stable']}",
-        f"- report: {regression_report or '\u2014'}",
+        f"- report: {regression_report or dash}",
     ]
 
     published_record = entry.get("published_record", "")
@@ -391,9 +447,9 @@ def render_benchmark_latest(entry: dict | None, baseline: dict | None = None) ->
         lines.extend([
             "",
             "Artifacts",
-            f"- published_record: {published_record or '\u2014'}",
-            f"- storage_manifest: {storage_manifest or '\u2014'}",
-            f"- artifact_json: {artifact_json or '\u2014'}",
+            f"- published_record: {published_record or dash}",
+            f"- storage_manifest: {storage_manifest or dash}",
+            f"- artifact_json: {artifact_json or dash}",
         ])
 
     lines.extend([
@@ -879,6 +935,142 @@ def cmd_strategy(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_hunt_plan(args: argparse.Namespace) -> int:
+    target_path = _resolve_project_path(args.target, must_exist=True, label="target note")
+    assert target_path is not None
+    payload = build_hunt_plan(
+        target_path=target_path,
+        root=ROOT,
+        benchmark_entries=load_manifest(),
+        outcome_entries=load_outcome_entries(),
+        program=args.program or None,
+        contract=args.contract or None,
+        level=args.level or None,
+        top_n=args.limit,
+    )
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        print(render_hunt_plan(payload))
+    return 0
+
+
+def cmd_test(args: argparse.Namespace) -> int:
+    pytest_args = args.pytest_args or []
+    if pytest_args and pytest_args[0] == "--":
+        pytest_args = pytest_args[1:]
+    command = [sys.executable, "-m", "pytest", "-q", *pytest_args]
+    try:
+        completed = subprocess.run(command, cwd=ROOT)
+    except FileNotFoundError:
+        print("Python runtime not found.", file=sys.stderr)
+        return 1
+    if completed.returncode != 0:
+        print("pytest is not installed or the test run failed. Install dev deps with: python3 -m pip install -r requirements-dev.txt", file=sys.stderr)
+    return completed.returncode
+
+
+def cmd_github_crawl(args: argparse.Namespace) -> int:
+    try:
+        bundle, run_dir = run_github_discovery(
+            args.query,
+            limit=args.limit,
+            per_query=args.per_query,
+            include_forks=args.include_forks,
+            include_archived=args.include_archived,
+            fetch_readmes=not args.no_readmes,
+            output_root=Path(args.output_root),
+        )
+    except Exception as exc:
+        print(f"GitHub discovery failed: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(bundle, indent=2))
+    else:
+        print(render_github_discovery_summary(bundle, run_dir=run_dir))
+        print(f"\nDiscovery bundle written to: {run_dir}")
+    return 0
+
+
+def cmd_github_select(args: argparse.Namespace) -> int:
+    output_root = Path(args.output_root)
+    try:
+        if args.run_id:
+            run_dir = output_root / args.run_id
+            if not run_dir.exists():
+                print(f"Discovery run not found: {run_dir}", file=sys.stderr)
+                return 1
+            bundle = load_bundle(run_dir)
+            candidate = find_candidate(bundle, args.repo)
+            selected_dir = copy_selection(candidate, run_dir, run_dir / "selected")
+        else:
+            run_dir, selected_dir = select_repo_from_latest_bundle(args.repo, output_root=output_root)
+    except Exception as exc:
+        print(f"GitHub selection failed: {exc}", file=sys.stderr)
+        return 1
+
+    selection_record = json.loads((selected_dir / "selection.json").read_text(encoding="utf-8"))
+    if args.json:
+        print(json.dumps(selection_record, indent=2))
+    else:
+        print(f"Selected {args.repo} from {run_dir.name}")
+        print(f"Queue directory: {selected_dir}")
+        print(f"Approval record: {selected_dir / 'selection.json'}")
+    return 0
+
+
+def cmd_github_plan(args: argparse.Namespace) -> int:
+    output_root = Path(args.output_root)
+    try:
+        payload, run_dir, selected_dir = run_selected_repo_hunt_plan(
+            args.repo,
+            output_root=output_root,
+            run_id=args.run_id or None,
+        )
+    except Exception as exc:
+        print(f"GitHub hunt plan generation failed: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        print(f"Generated constrained hunt plan for {args.repo}")
+        print(f"Discovery run: {run_dir.name}")
+        print("Selected layout:")
+        rel_selected = str(selected_dir.relative_to(ROOT)) if selected_dir.is_relative_to(ROOT) else str(selected_dir)
+        print(f"- {rel_selected}/")
+        print("  - candidate.json")
+        print("  - summary.md")
+        print("  - selection.json")
+        print("  - scope_confirmation.md")
+        print("  - hunt_plan.md")
+    return 0
+
+
+def cmd_github_scope_check(args: argparse.Namespace) -> int:
+    output_root = Path(args.output_root)
+    try:
+        run_dir, selected_dir, scope = check_selected_repo_scope(
+            args.repo,
+            output_root=output_root,
+            run_id=args.run_id or None,
+        )
+    except Exception as exc:
+        print(f"GitHub scope check failed: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(scope, indent=2))
+    else:
+        print(f"Scope status: {scope['scope_status']}")
+        print(f"Reason: {scope['reason']}")
+        print(f"Allowed actions: {scope['allowed_actions']}")
+        print(f"Scope file: {selected_dir / 'scope_confirmation.md'}")
+        print(f"Discovery run: {run_dir.name}")
+    return 0
+
+
 def cmd_benchmark_publish(args: argparse.Namespace) -> int:
     payload = load_manifest_payload()
     entries = payload.get("benchmarks", [])
@@ -1018,6 +1210,18 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_benchmark_trends(args)
     if args.command == "strategy":
         return cmd_strategy(args)
+    if args.command == "hunt" and args.hunt_command == "plan":
+        return cmd_hunt_plan(args)
+    if args.command == "test":
+        return cmd_test(args)
+    if args.command == "github" and args.github_command == "crawl":
+        return cmd_github_crawl(args)
+    if args.command == "github" and args.github_command == "select":
+        return cmd_github_select(args)
+    if args.command == "github" and args.github_command == "plan":
+        return cmd_github_plan(args)
+    if args.command == "github" and args.github_command == "scope-check":
+        return cmd_github_scope_check(args)
     if args.command == "benchmark" and args.benchmark_command == "publish":
         return cmd_benchmark_publish(args)
     if args.command == "benchmark":
