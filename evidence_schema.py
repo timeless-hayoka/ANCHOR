@@ -69,6 +69,17 @@ class EvidenceRecord:
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> EvidenceRecord:
+        """
+        Build an EvidenceRecord from a payload dictionary.
+        
+        Prefers a non-empty ``target`` value and falls back to ``evidence_target``. Copies ``metrics``, ``links``, and ``source`` only when they are dictionaries, and normalizes the status field.
+        
+        Parameters:
+        	payload (dict[str, Any]): Source payload.
+        
+        Returns:
+        	EvidenceRecord: The constructed record.
+        """
         metrics = payload.get("metrics")
         links = payload.get("links")
         source = payload.get("source")
@@ -102,6 +113,12 @@ def normalize_evidence_status(value: str) -> str:
 
 
 def is_canonical_evidence(payload: dict[str, Any]) -> bool:
+    """
+    Determines whether a payload matches the canonical evidence schema.
+    
+    Returns:
+    	True if the payload includes the required canonical fields, uses the expected schema version, has a valid kind, contains dict values for metrics, links, and source, provides a non-empty target or evidence_target, and has a recognized status; False otherwise.
+    """
     if not isinstance(payload, dict):
         return False
     if str(payload.get("schema_version")) != EVIDENCE_SCHEMA_VERSION:
@@ -218,7 +235,12 @@ def insight_label_for_record(record: dict[str, Any]) -> str:
 
 
 def insight_record_from_canonical(payload: dict[str, Any]) -> dict[str, Any]:
-    """Map canonical artifact JSON to outcome-insights view model."""
+    """
+    Convert a canonical evidence payload into an outcome-insights record.
+    
+    Returns:
+        dict[str, Any]: A canonical evidence record with an added ``label`` field.
+    """
     record = EvidenceRecord.from_dict(payload)
     row = record.to_dict()
     row["label"] = insight_label_for_record(row)
@@ -226,6 +248,16 @@ def insight_record_from_canonical(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
+    """
+    Convert a value to an integer with a fallback.
+    
+    Parameters:
+    	value (Any): The value to convert.
+    	default (int): The value to return when conversion fails or the input is empty.
+    
+    Returns:
+    	int: The converted integer, or `default` when conversion is not possible.
+    """
     try:
         if value is None or value == "":
             return default
@@ -235,10 +267,28 @@ def _safe_int(value: Any, default: int = 0) -> int:
 
 
 def _coerce_summary_dict(raw: Any) -> dict[str, Any]:
+    """
+    Return a dictionary summary when the input is a mapping.
+    
+    Parameters:
+    	raw (Any): Raw summary value.
+    
+    Returns:
+    	dict[str, Any]: The input dictionary, or an empty dictionary when the input is not a dictionary.
+    """
     return raw if isinstance(raw, dict) else {}
 
 
 def _reproduction_rate(summary: dict[str, Any]) -> float | None:
+    """
+    Compute the fraction of cases that passed in a summary.
+    
+    Parameters:
+    	summary (dict[str, Any]): Summary data containing case counts.
+    
+    Returns:
+    	float | None: The passed-case rate, or None when the summary has no cases.
+    """
     passed = _safe_int(summary.get("passed"))
     failed = _safe_int(summary.get("failed"))
     timed_out = _safe_int(summary.get("timed_out"))
@@ -250,6 +300,15 @@ def _reproduction_rate(summary: dict[str, Any]) -> float | None:
 
 
 def benchmark_target_slug(payload: dict[str, Any]) -> str:
+    """
+    Derive a benchmark target slug from the payload.
+    
+    Parameters:
+    	payload (dict[str, Any]): Benchmark artifact payload.
+    
+    Returns:
+    	str: A target identifier from the payload, or "benchmark" if none is available.
+    """
     target = payload.get("target")
     if isinstance(target, str) and target.strip():
         return target.strip()
@@ -271,6 +330,16 @@ def benchmark_target_slug(payload: dict[str, Any]) -> str:
 
 
 def benchmark_evidence_status(*, raw_status: str, metrics: dict[str, Any]) -> str:
+    """
+    Determine the canonical evidence status for a benchmark result.
+    
+    Parameters:
+    	raw_status (str): The raw benchmark status.
+    	metrics (dict[str, Any]): Benchmark metrics used to check failure and timeout counts.
+    
+    Returns:
+    	str: "published" when the raw status indicates completion and there are no failures or timeouts, "rejected" for failed benchmark outcomes, or "unknown" when the status cannot be classified.
+    """
     status = str(raw_status or "").strip().lower()
     failed = _safe_int(metrics.get("failed"))
     timed_out = _safe_int(metrics.get("timed_out"))
@@ -284,6 +353,15 @@ def benchmark_evidence_status(*, raw_status: str, metrics: dict[str, Any]) -> st
 
 
 def hunt_analysis_evidence_status(final_status: str) -> str:
+    """
+    Classifies a hunt analysis result into a canonical evidence status.
+    
+    Parameters:
+    	final_status (str): The final outcome reported by the analysis.
+    
+    Returns:
+    	str: "published" for a passing result, "rejected" for a failed or blocked result, or "unknown" for any other value.
+    """
     status = str(final_status or "").strip().upper()
     if status == "PASS":
         return "published"
@@ -293,7 +371,16 @@ def hunt_analysis_evidence_status(final_status: str) -> str:
 
 
 def merge_canonical_evidence(canonical: dict[str, Any], legacy: dict[str, Any]) -> dict[str, Any]:
-    """Overlay canonical evidence fields while preserving conflicting legacy keys."""
+    """
+    Overlay canonical evidence fields onto a legacy payload while preserving conflicting legacy values.
+    
+    Parameters:
+    	canonical (dict[str, Any]): The canonical evidence record.
+    	legacy (dict[str, Any]): The legacy payload to merge into.
+    
+    Returns:
+    	dict[str, Any]: The merged payload with canonical required fields applied and selected legacy conflicts preserved under legacy-specific keys.
+    """
     merged = dict(legacy)
     legacy_schema = legacy.get("schema_version")
     if legacy_schema is not None and legacy_schema != canonical.get("schema_version"):
@@ -327,6 +414,16 @@ def build_benchmark_evidence_record(
     artifact_path: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
+    """
+    Build a canonical benchmark evidence record from a benchmark artifact payload.
+    
+    Parameters:
+    	artifact_path (str): Path to the benchmark artifact.
+    	payload (dict[str, Any]): Raw benchmark payload.
+    
+    Returns:
+    	dict[str, Any]: Canonical evidence record serialized as a dictionary.
+    """
     summary = _coerce_summary_dict(payload.get("results_summary") or payload.get("summary"))
     passed = _safe_int(summary.get("passed"))
     failed = _safe_int(summary.get("failed"))
@@ -374,7 +471,12 @@ def build_benchmark_evidence_record(
 
 
 def enrich_benchmark_artifact(payload: dict[str, Any], *, artifact_path: str) -> dict[str, Any]:
-    """Attach canonical evidence fields to a benchmark.json payload at write time."""
+    """
+    Attach canonical benchmark evidence fields to a payload.
+    
+    Returns:
+    	(dict[str, Any]): The original payload merged with canonical benchmark evidence fields.
+    """
     canonical = build_benchmark_evidence_record(artifact_path=artifact_path, payload=payload)
     return merge_canonical_evidence(canonical, payload)
 
@@ -384,6 +486,16 @@ def build_hunt_analysis_evidence_record(
     artifact_path: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
+    """
+    Build canonical hunt analysis evidence from a payload.
+    
+    Parameters:
+    	artifact_path (str): Path to the source artifact.
+    	payload (dict[str, Any]): Raw hunt analysis data.
+    
+    Returns:
+    	dict[str, Any]: Canonical evidence record for the hunt analysis artifact.
+    """
     target_block = payload.get("analysis_target") if isinstance(payload.get("analysis_target"), dict) else payload.get("target")
     target_id = ""
     if isinstance(target_block, dict):
@@ -417,6 +529,15 @@ def build_hunt_analysis_evidence_record(
 
 
 def enrich_hunt_analysis_artifact(payload: dict[str, Any], *, artifact_path: str) -> dict[str, Any]:
-    """Attach canonical evidence fields to a hunt analysis archive at write time."""
+    """
+    Attach canonical hunt analysis evidence fields to a payload.
+    
+    Parameters:
+    	payload (dict[str, Any]): The original hunt analysis payload.
+    	artifact_path (str): Path to the artifact being written.
+    
+    Returns:
+    	dict[str, Any]: The payload merged with canonical evidence fields.
+    """
     canonical = build_hunt_analysis_evidence_record(artifact_path=artifact_path, payload=payload)
     return merge_canonical_evidence(canonical, payload)

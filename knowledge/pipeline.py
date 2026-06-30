@@ -123,7 +123,15 @@ class KnowledgeWriter:
             return ArchiveResult(success=False, error=msg)
 
     def write_analysis_run(self, run_data: dict[str, Any]) -> ArchiveResult:
-        """Write an immutable protected analysis run record."""
+        """
+        Archive an analysis run record in the knowledge corpus.
+        
+        Parameters:
+            run_data (dict[str, Any]): Analysis run data to archive.
+        
+        Returns:
+            ArchiveResult: Success details including the written path, or an error message on failure.
+        """
         try:
             analysis_id = run_data.get("analysis_id")
             if isinstance(analysis_id, str) and analysis_id.strip():

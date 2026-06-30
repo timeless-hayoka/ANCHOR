@@ -302,6 +302,14 @@ def update_manifest(entry: dict) -> dict:
 
 
 def main() -> int:
+    """
+    Run the Phase 1 scaffold benchmark for Damn Vulnerable DeFi and write the run artifacts.
+    
+    Creates a timestamped run directory, executes each expected challenge test, records detector provenance and per-challenge logs, writes the benchmark artifact and storage manifest, updates the local benchmark index, and prints the generated paths.
+    
+    Returns:
+    	int: Exit code `0` when the run completes successfully.
+    """
     if not DVD_ROOT.exists():
         raise SystemExit(f"DVD root not found: {DVD_ROOT}")
 

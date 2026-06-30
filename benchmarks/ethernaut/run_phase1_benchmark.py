@@ -55,6 +55,14 @@ def update_manifest(entry: dict) -> dict:
 
 
 def main() -> int:
+    """
+    Create a scaffold Ethernaut benchmark run and update the benchmarks index.
+    
+    Writes the run's benchmark artifact, storage manifest, evidence directory, and README, then records the run in the persistent benchmarks manifest.
+    
+    Returns:
+        int: `0` when the run is created successfully.
+    """
     now = dt.datetime.now(dt.timezone.utc)
     stamp = now.strftime("%Y-%m-%dT%H-%M-%SZ")
     run_dir = RUNS_ROOT / stamp

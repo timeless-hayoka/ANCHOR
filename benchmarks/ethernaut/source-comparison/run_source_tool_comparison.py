@@ -330,6 +330,15 @@ def write_root_report(latest_payload: dict[str, Any]) -> None:
 
 
 def run_benchmark(*, now: dt.datetime | None = None) -> dict[str, Any]:
+    """
+    Run the Ethernaut source-tool comparison benchmark and write its artifacts.
+    
+    Parameters:
+    	now (datetime.datetime | None): The execution time to use for the run. When omitted, uses the current UTC time.
+    
+    Returns:
+    	dict[str, Any]: The benchmark payload containing run metadata, case results, summary metrics, and artifact references.
+    """
     current = now or dt.datetime.now(dt.timezone.utc)
     stamp = current.strftime("%Y-%m-%dT%H-%M-%SZ")
     run_id = f"{BENCHMARK_ID}-{stamp}"

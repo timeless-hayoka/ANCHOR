@@ -330,6 +330,15 @@ def write_root_report(latest_payload: dict[str, Any]) -> None:
 
 
 def run_benchmark(*, now: dt.datetime | None = None) -> dict[str, Any]:
+    """
+    Run the DeFiHackLabs source-tool comparison benchmark and write its artifacts.
+    
+    Parameters:
+    	now (datetime.datetime | None): The run timestamp to use.
+    
+    Returns:
+    	dict[str, Any]: The enriched benchmark payload for the completed run.
+    """
     current = now or dt.datetime.now(dt.timezone.utc)
     stamp = current.strftime("%Y-%m-%dT%H-%M-%SZ")
     run_id = f"{BENCHMARK_ID}-{stamp}"

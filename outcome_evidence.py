@@ -137,6 +137,16 @@ def normalize_benchmark_evidence(
     manifest_entry: dict[str, Any],
     anchor_root: Path,
 ) -> dict[str, Any] | None:
+    """
+    Normalize a benchmark evidence artifact into an insight record.
+    
+    Parameters:
+    	manifest_entry (dict[str, Any]): Manifest data that points to the benchmark artifact.
+    	anchor_root (Path): Root directory used to resolve artifact paths.
+    
+    Returns:
+    	dict[str, Any] | None: The normalized evidence record, or None when no artifact reference is present.
+    """
     artifact_path = manifest_entry.get("artifact_json") or manifest_entry.get("record")
     if not artifact_path:
         return None
@@ -202,6 +212,17 @@ def normalize_benchmark_evidence(
 
 
 def normalize_hunt_analysis_evidence(*, path: Path, payload: dict[str, Any], anchor_root: Path) -> dict[str, Any]:
+    """
+    Normalize a hunt analysis artifact into an insight record.
+    
+    Parameters:
+    	path (Path): The artifact file path.
+    	payload (dict[str, Any]): The loaded artifact JSON.
+    	anchor_root (Path): The root used to compute a relative artifact path.
+    
+    Returns:
+    	dict[str, Any]: The normalized insight record.
+    """
     if is_canonical_evidence(payload) and payload.get("kind") == "hunt_analysis":
         row = insight_record_from_canonical(payload)
         if not row.get("artifact_path"):
