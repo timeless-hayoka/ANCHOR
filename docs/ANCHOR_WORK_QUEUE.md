@@ -6,7 +6,7 @@
 
 ### A-001 — Benchmark the SARIF pipeline against known findings
 
-**Status:** READY
+**Status:** IN PROGRESS (post-v1.0.0)
 
 **Goal**
 Run ANCHOR's SARIF ingest, normalization, deduplication, validation, and reporting flow against a known benchmark corpus.
@@ -14,19 +14,28 @@ Run ANCHOR's SARIF ingest, normalization, deduplication, validation, and reporti
 **Why it matters**
 ANCHOR is only useful if its findings can be measured for signal quality, reproducibility, and analyst usefulness.
 
+**Progress (2026-06-30)**
+
+- Corpus: `benchmarks/sarif-known-findings/` (4 labeled cases)
+- CLI path: `./anchor benchmark sarif known-findings`
+- Latest run: `sarif-known-findings-2026-06-30T19-17-27Z`
+- Measured: TP=3, FP=1, FN=0, dedup=1, precision=0.75, recall=1.0
+- Open: suppress `generic-source-warning` false positive (filter tuning)
+
 **Acceptance criteria**
 
-* [ ] At least one benchmark corpus is selected and documented.
-* [ ] SARIF artifacts are ingested through the normal CLI or server path.
-* [ ] A benchmark run writes results under `benchmarks/<name>/runs/`.
-* [ ] Results record true positives, false positives, false negatives, and duplicates removed.
-* [ ] Runtime and environment details are captured.
-* [ ] A summary report is written to `benchmarks/<name>/REPORT.md`.
-* [ ] Tests still pass using:
+* [x] At least one benchmark corpus is selected and documented.
+* [x] SARIF artifacts are ingested through the normal CLI or server path.
+* [x] A benchmark run writes results under `benchmarks/<name>/runs/`.
+* [x] Results record true positives, false positives, false negatives, and duplicates removed.
+* [x] Runtime and environment details are captured.
+* [x] A summary report is written to `benchmarks/<name>/REPORT.md`.
+* [x] Tests still pass using:
 
   ```bash
   python3 -m pytest -q tests/test_anchor_cli.py tests/test_anchor_server.py tests/test_anchor_sarif.py
   ```
+* [ ] Publish a baseline run to `published` tier after FP regression is addressed or documented as known gap.
 
 **Evidence required**
 

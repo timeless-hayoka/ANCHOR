@@ -20,34 +20,59 @@ Use ANCHOR to:
 
 ## Tooling
 
-- anchor_sarif pipeline
+- `anchor_sarif` pipeline
 - slither-compatible SARIF payloads
 - aderyn adapter inputs
 - mythril adapter inputs
 - halmos invariant inputs
 
-## Detection results
+## Run command
 
-Pending benchmark record population.
+```bash
+./anchor benchmark sarif known-findings
+```
 
-## Reproduction results
+Optional publish after review:
 
-Pending benchmark record population.
+```bash
+./anchor benchmark publish sarif-known-findings-2026-06-30T19-17-27Z
+```
 
-## False positives
+## Latest measured results
 
-Pending benchmark record population.
+**Run:** `sarif-known-findings-2026-06-30T19-17-27Z` (post-v1.0 A-001 baseline)
 
-## False negatives
+| Metric | Value |
+|--------|-------|
+| Cases | 4 |
+| Passed | 3 |
+| Failed | 1 |
+| True positives | 3 |
+| False positives | 1 |
+| False negatives | 0 |
+| Duplicates removed | 1 |
+| Precision | 0.75 |
+| Recall | 1.0 |
+| F1 | 0.8571 |
 
-Pending benchmark record population.
+### Case outcomes
+
+| Case | Result | Notes |
+|------|--------|-------|
+| `duplicate-owner-check` | TP | Dedup collapsed two tool reports to one visible finding |
+| `halmos-balance-invariant` | TP | Halmos invariant surfaced correctly |
+| `generic-source-warning` | FP | Known false positive — unchecked-call promoted without exploit context |
+| `reentrancy-benign-miss` | TP | Cross-function reentrancy visible despite guard snippet (tracked regression) |
 
 ## Lessons learned
 
-Use this benchmark to measure whether ANCHOR keeps the findings we want and filters the noise we do not.
+- Dedup and normalization behave on multi-tool duplicate owner checks.
+- **Open gap:** generic Slither warnings still promote as visible (`generic-source-warning` FP) — filter tuning is the next A-001 iteration.
+- Cross-function reentrancy case documents a prior FN regression with fix hint in run report.
 
 ## Evidence artifacts
 
 - [inputs/corpus.json](inputs/corpus.json)
 - [expected/expectations.json](expected/expectations.json)
 - [REPORT.md](REPORT.md)
+- Latest run: [runs/2026-06-30T19-17-27Z/REPORT.md](runs/2026-06-30T19-17-27Z/REPORT.md)

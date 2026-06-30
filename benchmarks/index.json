@@ -921,6 +921,48 @@
         "comparative_data": "high"
       },
       "verified": true
+    },
+    {
+      "id": "sarif-known-findings-2026-06-30T19-17-27Z",
+      "target": "anchor_sarif",
+      "title": "SARIF known findings benchmark run",
+      "status": "complete",
+      "level": "Phase 1",
+      "executed_at": "2026-06-30T19:17:27.785176+00:00",
+      "confidence": "measured",
+      "publication_tier": "development",
+      "record": "benchmarks/sarif-known-findings/runs/2026-06-30T19-17-27Z/REPORT.md",
+      "artifact_json": "benchmarks/sarif-known-findings/runs/2026-06-30T19-17-27Z/benchmark.json",
+      "metrics_json": "benchmarks/sarif-known-findings/runs/2026-06-30T19-17-27Z/metrics.json",
+      "results_summary": {
+        "passed": 3,
+        "failed": 1,
+        "timed_out": 0,
+        "skipped": 0,
+        "true_positives": 3,
+        "false_positives": 1,
+        "false_negatives": 0,
+        "true_negatives": 0,
+        "duplicates_removed": 1,
+        "raw_findings": 5,
+        "unique_findings": 4,
+        "detector_signals": 4,
+        "raw_detector_findings": 5,
+        "target_relevant_detector_findings": 4,
+        "medium_high_target_relevant_findings": 4,
+        "precision": 0.75,
+        "recall": 1.0,
+        "f1": 0.8571,
+        "cases": 4
+      },
+      "confidence_ladder": {
+        "methodology": "high",
+        "environment": "high",
+        "detection": "high",
+        "reproduction": "high",
+        "comparative_data": "partial"
+      },
+      "verified": true
     }
   ],
   "history_policy": {

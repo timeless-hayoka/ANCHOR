@@ -1,7 +1,7 @@
 # SARIF Known Findings
 
-- Latest run: `sarif-known-findings-2026-06-29T05-37-25Z`
-- Executed at: `2026-06-29T05:37:25.632699+00:00`
+- Latest run: `sarif-known-findings-2026-06-30T19-17-27Z`
+- Executed at: `2026-06-30T19:17:27.785176+00:00`
 - Cases: `4`
 - Passed: `3`
 - Failed: `1`
@@ -15,6 +15,6 @@
 - F1: `0.8571`
 
 ## Report
-- [Latest run report](benchmarks/sarif-known-findings/runs/2026-06-29T05-37-25Z/REPORT.md)
-- [Benchmark JSON](benchmarks/sarif-known-findings/runs/2026-06-29T05-37-25Z/benchmark.json)
-- [Metrics JSON](benchmarks/sarif-known-findings/runs/2026-06-29T05-37-25Z/metrics.json)
+- [Latest run report](benchmarks/sarif-known-findings/runs/2026-06-30T19-17-27Z/REPORT.md)
+- [Benchmark JSON](benchmarks/sarif-known-findings/runs/2026-06-30T19-17-27Z/benchmark.json)
+- [Metrics JSON](benchmarks/sarif-known-findings/runs/2026-06-30T19-17-27Z/metrics.json)
