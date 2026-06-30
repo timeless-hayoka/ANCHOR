@@ -26,6 +26,7 @@ from anchor_sarif import build_research_loop, rewrite_finding, assess_economic_c
 from anchor_sarif.parser import Finding
 from anchor_work_queue import load_work_queue, render_work_queue, work_queue_summary
 from anchor_trends import compute_benchmark_trends, render_benchmark_trends
+from bugbot.trainer import BugBotTrainer
 from knowledge_provider import (
     KnowledgeProvider,
     render_search_results,
@@ -206,6 +207,20 @@ def create_parser() -> argparse.ArgumentParser:
     knowledge_search.add_argument("--limit", type=int, default=5, help="Maximum matches to return")
     knowledge_refs = knowledge_sub.add_parser("refs", help="Topics linked to a subsystem")
     knowledge_refs.add_argument("--subsystem", required=True, help="Subsystem name from manifest.json")
+
+    bugbot_parser = sub.add_parser("bugbot", help="BugBot training workflows")
+    bugbot_sub = bugbot_parser.add_subparsers(dest="bugbot_command", required=True)
+    bugbot_train = bugbot_sub.add_parser("train", help="Run a training session from a scenario file")
+    bugbot_train.add_argument(
+        "--scenario",
+        required=True,
+        help="Path to a scenario JSON file (e.g. scenarios/uups_initializer_takeover.json)",
+    )
+    bugbot_train.add_argument(
+        "--strict-archive",
+        action="store_true",
+        help="Exit nonzero when knowledge archival fails (default: archival is non-fatal)",
+    )
 
     if HAS_SARIF:
         sarif_parser = sub.add_parser("sarif", help="Process and analyze SARIF output from security tools")
@@ -478,6 +493,7 @@ def render_benchmark_latest(entry: dict | None, baseline: dict | None = None) ->
     future_state = (strategy.get("next_hunt") or {}).get("label", "ePBS + inclusion lists")
     research_loop = build_research_loop([_benchmark_latest_finding(entry, strategy, summary)], future_state=future_state)
     source_tool_compare = load_source_tool_compare(entry)
+    source_tool_compare_report = source_tool_compare_report_path(entry)
 
     lines = [
         "Latest Published Benchmark",
@@ -487,21 +503,30 @@ def render_benchmark_latest(entry: dict | None, baseline: dict | None = None) ->
         f"Level: {entry.get('level', 'unknown')}",
         f"Target: {entry.get('target', 'unknown')}",
         f"Executed At: {entry.get('executed_at', 'unknown')}",
-        f"Confidence: {entry.get('confidence', '\u2014')}",
+        f"Confidence: {entry.get('confidence', '—')}",
         "",
         "Summary",
-        f"- passed: {summary.get('passed', '\u2014')}",
-        f"- failed: {summary.get('failed', '\u2014')}",
-        f"- timed_out: {summary.get('timed_out', '\u2014')}",
-        f"- detector_signals: {summary.get('detector_signals', '\u2014')}",
-        f"- medium_high_target_relevant_findings: {summary.get('medium_high_target_relevant_findings', '\u2014')}",
+        f"- passed: {summary.get('passed', '—')}",
+        f"- failed: {summary.get('failed', '—')}",
+        f"- timed_out: {summary.get('timed_out', '—')}",
+        f"- detector_signals: {summary.get('detector_signals', '—')}",
+        f"- medium_high_target_relevant_findings: {summary.get('medium_high_target_relevant_findings', '—')}",
+        "",
+        "Source Tool Comparison",
+        f"- source_tool: {source_tool_compare.get('source_tool', '—') if source_tool_compare else '—'}",
+        f"- anchor_visible: {source_tool_compare.get('comparison', {}).get('anchor_visible', '—') if source_tool_compare else '—'}",
+        f"- source_tool_visible: {source_tool_compare.get('comparison', {}).get('source_tool_visible', '—') if source_tool_compare else '—'}",
+        f"- shared_visible: {source_tool_compare.get('comparison', {}).get('shared_visible', '—') if source_tool_compare else '—'}",
+        f"- anchor_only: {source_tool_compare.get('comparison', {}).get('anchor_only', '—') if source_tool_compare else '—'}",
+        f"- source_only: {source_tool_compare.get('comparison', {}).get('source_only', '—') if source_tool_compare else '—'}",
+        f"- compare_report: {source_tool_compare_report or '—'}",
         "",
         "Regression",
         f"- resolved: {regression['resolved']}",
         f"- regressions: {regression['regressions']}",
         f"- environment_sensitive: {regression['environment_sensitive']}",
         f"- stable: {regression['stable']}",
-        f"- report: {regression_report or '\u2014'}",
+        f"- report: {regression_report or '—'}",
         "",
         "Research Loop",
         f"- queue_depth: {len(research_loop.queue)}",
@@ -509,7 +534,7 @@ def render_benchmark_latest(entry: dict | None, baseline: dict | None = None) ->
         f"- universes: {len(research_loop.universe_report)}",
         f"- incentive_surface: {len(research_loop.incentive_surface)}",
         f"- mev_models: {len(research_loop.mev_reports)}",
-        f"- top_queue: {research_loop.queue[0].title if research_loop.queue else '\u2014'}",
+        f"- top_queue: {research_loop.queue[0].title if research_loop.queue else '—'}",
     ]
 
     published_record = entry.get("published_record", "")
@@ -519,9 +544,9 @@ def render_benchmark_latest(entry: dict | None, baseline: dict | None = None) ->
         lines.extend([
             "",
             "Artifacts",
-            f"- published_record: {published_record or '\u2014'}",
-            f"- storage_manifest: {storage_manifest or '\u2014'}",
-            f"- artifact_json: {artifact_json or '\u2014'}",
+            f"- published_record: {published_record or '—'}",
+            f"- storage_manifest: {storage_manifest or '—'}",
+            f"- artifact_json: {artifact_json or '—'}",
         ])
 
     lines.extend([
@@ -529,7 +554,6 @@ def render_benchmark_latest(entry: dict | None, baseline: dict | None = None) ->
         "Use `anchor benchmark history` to compare this run against the published ledger.",
     ])
     return "\n".join(lines)
-
 
 def parse_iso_timestamp(value: str) -> dt.datetime | None:
     if not value or value in {"unknown", ""}:
@@ -675,6 +699,18 @@ def load_source_tool_compare(entry: dict | None) -> dict:
     return {}
 
 
+def source_tool_compare_report_path(entry: dict | None) -> str:
+    if not entry:
+        return ""
+    value = entry.get("source_tool_compare_json")
+    if value:
+        return str(value)
+    run_dir = benchmark_run_dir(entry)
+    if run_dir is not None:
+        return str((run_dir / "source_tool_compare.json").relative_to(ROOT))
+    return ""
+
+
 def render_benchmark_source_tool_compare(compare: dict | None) -> str:
     if not compare:
         return "No source-tool comparison data available yet."
@@ -685,7 +721,7 @@ def render_benchmark_source_tool_compare(compare: dict | None) -> str:
         "",
         f"Run: {compare.get('run_id', 'unknown')}",
         f"Benchmark: {compare.get('benchmark', 'unknown')}",
-        f"Source tool: {compare.get('source_tool', 'unknown')}",
+        f"source_tool: {compare.get('source_tool', 'unknown')}",
         "",
         "Summary",
         f"- anchor_visible: {comparison.get('anchor_visible', '—')}",
@@ -707,12 +743,9 @@ def render_benchmark_source_tool_compare(compare: dict | None) -> str:
             f"- source_tool_visible: `{case.get('source_tool_visible', '—')}`",
             f"- comparison: `{case.get('comparison', '—')}`",
         ])
-        if case.get('anchor_classification'):
+        if case.get("anchor_classification"):
             lines.append(f"- anchor_classification: `{case.get('anchor_classification')}`")
-    return "
-".join(lines) + "
-"
-
+    return "\n".join(lines) + "\n"
 
 def benchmark_result_index(entry: dict | None) -> dict[str, dict]:
     payload = load_benchmark_artifact(entry)
@@ -1188,6 +1221,75 @@ def _knowledge_provider() -> KnowledgeProvider:
     return KnowledgeProvider(ROOT / "knowledge")
 
 
+def load_training_scenarios(scenario_path: Path) -> list[dict]:
+    """Load one or more scenario dicts from a JSON file."""
+    payload = json.loads(scenario_path.read_text(encoding="utf-8"))
+    if isinstance(payload, list):
+        if not payload:
+            raise ValueError("scenario file contains an empty list")
+        return payload
+    if isinstance(payload, dict):
+        nested = payload.get("scenarios")
+        if nested is not None:
+            if not isinstance(nested, list) or not nested:
+                raise ValueError("scenario file 'scenarios' must be a non-empty list")
+            return nested
+        if payload.get("id"):
+            return [payload]
+    raise ValueError("scenario file must be a scenario object, a list, or {\"scenarios\": [...]}")
+
+
+def cmd_bugbot_train(args: argparse.Namespace) -> int:
+    scenario_path = Path(args.scenario)
+    if not scenario_path.is_absolute():
+        scenario_path = (ROOT / scenario_path).resolve()
+    if not scenario_path.is_file():
+        print(f"Scenario file not found: {scenario_path}", file=sys.stderr)
+        return 1
+
+    try:
+        scenarios = load_training_scenarios(scenario_path)
+    except (json.JSONDecodeError, ValueError, OSError) as exc:
+        print(f"Failed to load scenario: {exc}", file=sys.stderr)
+        return 1
+
+    trainer = BugBotTrainer(strict_archive=args.strict_archive)
+    try:
+        result = trainer.train(scenarios)
+    except RuntimeError as exc:
+        print(f"Training: FAIL", file=sys.stderr)
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    status = "PASS" if result.success else "FAIL"
+    print(f"Training: {status}")
+    print(f"Scenarios: {result.scenarios_passed}/{result.scenarios_processed} passed")
+    if result.error:
+        print(f"Error: {result.error}", file=sys.stderr)
+
+    archive = result.archive
+    if archive is None:
+        print("Archive: skipped")
+    elif archive.success:
+        rel = archive.path
+        if rel is not None:
+            try:
+                rel = rel.relative_to(ROOT)
+            except ValueError:
+                pass
+            print(f"Archive: {rel}")
+        else:
+            print("Archive: ok")
+    else:
+        print(f"Archive: FAILED ({archive.error})", file=sys.stderr)
+
+    if not result.success:
+        return 1
+    if args.strict_archive and archive is not None and not archive.success:
+        return 1
+    return 0
+
+
 def cmd_knowledge_list(args: argparse.Namespace) -> int:
     provider = _knowledge_provider()
     topics = [topic.to_dict() for topic in provider.list_topics()]
@@ -1484,6 +1586,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_knowledge_search(args)
     if args.command == "knowledge" and args.knowledge_command == "refs":
         return cmd_knowledge_refs(args)
+    if args.command == "bugbot" and args.bugbot_command == "train":
+        return cmd_bugbot_train(args)
     if args.command == "benchmark" and args.benchmark_command == "publish":
         return cmd_benchmark_publish(args)
     if args.command == "benchmark":

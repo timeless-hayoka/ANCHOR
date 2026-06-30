@@ -1,0 +1,8 @@
+{
+  "id": "uups_initializer_takeover",
+  "title": "UUPS initializer takeover",
+  "description": "Pedagogical scenario stub for BugBot training operator surface. Real execution logic is not wired yet.",
+  "target": "damn-vulnerable-defi",
+  "expected_outcome": "pass",
+  "tags": ["uups", "proxy", "initializer"]
+}

@@ -10,6 +10,7 @@ Ordered for evidence-first ANCHOR evolution. Revisit after each published benchm
 - [x] Wire Trinity/Drift MCP tools (`anchor_knowledge_*`) to call `KnowledgeProvider`
 - [x] `knowledge/pipeline.py` archival sidecar (training / detectors / scenarios)
 - [x] `bugbot/trainer.py` — non-fatal archive after training run
+- [x] `anchor bugbot train --scenario …` operator surface
 
 ## P1 — Graph & timeline
 

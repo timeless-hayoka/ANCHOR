@@ -953,3 +953,86 @@ def test_parser_accepts_knowledge_search():
     assert args.query == "promotion gate"
     assert args.limit == 3
 
+
+def test_parser_accepts_bugbot_train():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args([
+        "bugbot", "train",
+        "--scenario", "scenarios/uups_initializer_takeover.json",
+        "--strict-archive",
+    ])
+    assert args.command == "bugbot"
+    assert args.bugbot_command == "train"
+    assert args.scenario == "scenarios/uups_initializer_takeover.json"
+    assert args.strict_archive is True
+
+
+def test_load_training_scenarios_accepts_single_object(tmp_path: Path) -> None:
+    path = tmp_path / "one.json"
+    path.write_text('{"id": "s1", "pass": true}', encoding="utf-8")
+    loaded = anchor_cli.load_training_scenarios(path)
+    assert loaded == [{"id": "s1", "pass": True}]
+
+
+def test_cmd_bugbot_train_success(tmp_path: Path, monkeypatch, capsys) -> None:
+    scenario = tmp_path / "scenario.json"
+    scenario.write_text('{"id": "demo", "pass": true}', encoding="utf-8")
+    knowledge_root = tmp_path / "knowledge"
+    monkeypatch.setattr(anchor_cli, "ROOT", tmp_path)
+
+    rc = anchor_cli.cmd_bugbot_train(type("Args", (), {
+        "scenario": str(scenario),
+        "strict_archive": False,
+    }))
+    out = capsys.readouterr()
+    assert rc == 0
+    assert "Training: PASS" in out.out
+    assert "Scenarios: 1/1 passed" in out.out
+    assert "Archive:" in out.out
+
+
+def test_cmd_bugbot_train_exit_zero_when_archive_fails(tmp_path: Path, monkeypatch, capsys) -> None:
+    from unittest.mock import MagicMock
+
+    from knowledge.pipeline import ArchiveResult
+
+    scenario = tmp_path / "scenario.json"
+    scenario.write_text('{"id": "demo", "pass": true}', encoding="utf-8")
+    pipeline = MagicMock()
+    pipeline.archive_training_run.return_value = ArchiveResult(success=False, error="disk full")
+    trainer = anchor_cli.BugBotTrainer(pipeline=pipeline)
+    monkeypatch.setattr(anchor_cli, "BugBotTrainer", lambda **kwargs: trainer)
+    monkeypatch.setattr(anchor_cli, "ROOT", tmp_path)
+
+    rc = anchor_cli.cmd_bugbot_train(type("Args", (), {
+        "scenario": str(scenario),
+        "strict_archive": False,
+    }))
+    out = capsys.readouterr()
+    assert rc == 0
+    assert "Training: PASS" in out.out
+    assert "Archive: FAILED (disk full)" in out.err
+
+
+def test_cmd_bugbot_train_strict_archive_failure(tmp_path: Path, monkeypatch, capsys) -> None:
+    from unittest.mock import MagicMock
+
+    from knowledge.pipeline import ArchiveResult
+
+    scenario = tmp_path / "scenario.json"
+    scenario.write_text('{"id": "demo", "pass": true}', encoding="utf-8")
+    pipeline = MagicMock()
+    pipeline.archive_training_run.return_value = ArchiveResult(success=False, error="disk full")
+    trainer = anchor_cli.BugBotTrainer(pipeline=pipeline, strict_archive=True)
+    monkeypatch.setattr(anchor_cli, "BugBotTrainer", lambda **kwargs: trainer)
+    monkeypatch.setattr(anchor_cli, "ROOT", tmp_path)
+
+    rc = anchor_cli.cmd_bugbot_train(type("Args", (), {
+        "scenario": str(scenario),
+        "strict_archive": True,
+    }))
+    out = capsys.readouterr()
+    assert rc == 1
+    assert "Training: FAIL" in out.err
+    assert "archival failed" in out.err.lower()
+
