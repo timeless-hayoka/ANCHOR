@@ -17,6 +17,12 @@ anchor outcome summary --limit 5
 anchor outcome insights --limit 50 --top 5
 ```
 
+`anchor outcome insights` merges the append-only ledger with structured evidence artifacts:
+
+- benchmark run JSON under `benchmarks/**/runs/**/benchmark.json` (via manifest)
+- BugBot training JSON under `outcomes/training/`
+- hunt analysis archive JSON under `knowledge/analysis/`
+
 ## Structured fields
 
 Each entry can track:
