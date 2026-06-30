@@ -557,6 +557,10 @@
           </div>
           <div class="panel-note loading" id="evidenceStatus">Loading evidence metrics…</div>
           <div class="detail" id="evidenceSummary">Verified findings and benchmark signals will appear here.</div>
+          <div class="detail" id="evidenceSourcesTitle" style="margin-top:12px;font-weight:600">Evidence Sources</div>
+          <div class="record-list" id="evidenceSourcesList"></div>
+          <div class="detail" id="evidenceLatestTitle" style="margin-top:12px;font-weight:600">Latest Evidence</div>
+          <div class="record-list" id="evidenceLatestList"></div>
         </div>
 
         <div class="block" id="vault">
@@ -670,6 +674,8 @@ const evidenceAccepted = document.getElementById('evidenceAccepted');
 const evidenceRejected = document.getElementById('evidenceRejected');
 const evidenceRate = document.getElementById('evidenceRate');
 const evidenceSummary = document.getElementById('evidenceSummary');
+const evidenceSourcesList = document.getElementById('evidenceSourcesList');
+const evidenceLatestList = document.getElementById('evidenceLatestList');
 const latestCase = document.getElementById('latestCase');
 const latestCaseStatus = document.getElementById('latestCaseStatus');
 const historyList = document.getElementById('historyList');
@@ -1145,6 +1151,40 @@ async function loadContributions() {
 }
 
 
+function renderEvidenceSummaryPanel(summary) {
+  if (!evidenceSourcesList || !evidenceLatestList) return;
+  const sources = summary?.sources || {};
+  const latest = summary?.latest || [];
+  evidenceSourcesList.innerHTML = '';
+  Object.entries(sources).forEach(([label, count]) => {
+    const row = document.createElement('div');
+    row.className = 'record';
+    row.innerHTML = `<span><strong>${escapeHtml(label)}</strong></span><span class="meta">${escapeHtml(String(count ?? 0))}</span>`;
+    evidenceSourcesList.appendChild(row);
+  });
+  if (!Object.keys(sources).length) {
+    evidenceSourcesList.innerHTML = '<div class="detail">No evidence sources indexed yet.</div>';
+  }
+  evidenceLatestList.innerHTML = '';
+  if (!latest.length) {
+    evidenceLatestList.innerHTML = '<div class="detail">No structured evidence artifacts found yet.</div>';
+    return;
+  }
+  latest.forEach((row) => {
+    const item = document.createElement('div');
+    item.className = 'record';
+    item.innerHTML = `
+      <span>
+        <strong>${escapeHtml(row.kind || 'unknown')}</strong><br>
+        <span class="meta">${escapeHtml(row.target || '—')} · ${escapeHtml(row.status || 'unknown')}</span>
+      </span>
+      <span class="meta">${escapeHtml(row.timestamp || 'unknown')}</span>
+    `;
+    evidenceLatestList.appendChild(item);
+  });
+}
+
+
 function applyAnchorSnapshot(snapshot) {
   if (!snapshot) return;
   const release = snapshot.identity || snapshot.release || {};
@@ -1234,6 +1274,7 @@ function applyAnchorSnapshot(snapshot) {
     metrics.latest_benchmark?.reproduction_success != null ? `Latest benchmark reproduction: ${Number(metrics.latest_benchmark.reproduction_success || 0).toFixed(2)}` : null,
   ].filter(Boolean).join(' · ');
   setPanelNotice(evidenceStatus, 'ready', `Loaded ${metrics.claims_generated ?? 0} generated claim${(metrics.claims_generated ?? 0) === 1 ? '' : 's'}.`);
+  renderEvidenceSummaryPanel(snapshot.evidence_summary || null);
 
   vaultNewsBriefs.textContent = String(vault.news_briefs ?? 0);
   vaultLatestBrief.textContent = vault.last_daily_brief || 'none';
