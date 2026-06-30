@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from evidence_schema import build_bugbot_training_record
+
 
 @dataclass(frozen=True)
 class ScenarioPackSummary:
@@ -142,8 +144,10 @@ def build_scenario_pack_artifact(
     run: ScenarioPackRunResult,
     timestamp: str,
     scenario_pack: str,
+    run_id: str,
+    artifact_path: str,
 ) -> dict[str, Any]:
-    """Canonical structured artifact for dashboards, diffs, and outcome insights."""
+    """Canonical EvidenceRecord JSON plus legacy BugBot fields for compatibility."""
     proofs: list[dict[str, Any]] = []
     for row in run.summary.scenario_rows:
         proof: dict[str, Any] = {
@@ -154,15 +158,16 @@ def build_scenario_pack_artifact(
             proof["score"] = row["detector_score"]
         proofs.append(proof)
 
-    return {
-        "runner": "bugbot",
-        "scenario_pack": scenario_pack,
-        "timestamp": timestamp,
-        "total": run.summary.scenarios,
-        "passed": run.summary.passed,
-        "failed": run.summary.failed,
-        "proofs": proofs,
-    }
+    return build_bugbot_training_record(
+        artifact_path=artifact_path,
+        timestamp=timestamp,
+        run_id=run_id,
+        scenario_pack=scenario_pack,
+        total=run.summary.scenarios,
+        passed=run.summary.passed,
+        failed=run.summary.failed,
+        proofs=proofs,
+    )
 
 
 def write_scenario_pack_artifact(
@@ -176,11 +181,15 @@ def write_scenario_pack_artifact(
     training_dir.mkdir(parents=True, exist_ok=True)
     timestamp = utcnow_iso()
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    artifact = training_dir / f"bugbot-scenarios-{stamp}.json"
+    run_id = f"bugbot-scenarios-{stamp}"
+    artifact = training_dir / f"{run_id}.json"
+    artifact_path = str(artifact.relative_to(anchor_root.resolve()))
     payload = build_scenario_pack_artifact(
         run=run,
         timestamp=timestamp,
         scenario_pack=load_scenario_pack_label(bounty_bot_dir=run.bounty_bot_dir),
+        run_id=run_id,
+        artifact_path=artifact_path,
     )
     artifact.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return artifact
