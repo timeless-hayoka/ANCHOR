@@ -44,6 +44,12 @@ from anchor_trends import compute_benchmark_trends, render_benchmark_trends
 from bugbot.analysis import AnalysisConfig, render_analysis_report, run_target_analysis
 from bugbot.scope import ANALYSIS, ScopeNotAuthorizedError, issue_scope_grant_from_confirmation, require_authorized_scope
 from bugbot.trainer import BugBotTrainer
+from bugbot.scenario_bridge import (
+    archive_scenario_pack_run,
+    build_scenario_pack_artifact,
+    resolve_bounty_bot_dir,
+    run_scenario_pack,
+)
 from knowledge_provider import (
     KnowledgeProvider,
     render_search_results,
@@ -319,6 +325,25 @@ def create_parser() -> argparse.ArgumentParser:
     bugbot_analyze.add_argument(
         "--workspace",
         help="Existing local workspace path (defaults to scope/analysis/<target-id>)",
+    )
+    bugbot_scenarios = bugbot_sub.add_parser(
+        "scenarios",
+        help="Run proof-backed BugBot curriculum in bounty-bot (requires Foundry)",
+    )
+    bugbot_scenarios.add_argument(
+        "--all",
+        action="store_true",
+        help="Run all proof-ready scenarios via bounty-bot smoke",
+    )
+    bugbot_scenarios.add_argument(
+        "--record",
+        action="store_true",
+        help="Append an outcome ledger entry for this run",
+    )
+    bugbot_scenarios.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the structured training artifact JSON to stdout",
     )
 
     if HAS_SARIF:
@@ -1423,6 +1448,44 @@ def cmd_bugbot_analyze(args: argparse.Namespace) -> int:
     return 0 if result.success else 1
 
 
+def cmd_bugbot_scenarios(args: argparse.Namespace) -> int:
+    if not args.all:
+        print("Specify --all to run the proof-backed BugBot scenario pack.", file=sys.stderr)
+        return 2
+
+    try:
+        bounty_bot_dir = resolve_bounty_bot_dir(anchor_root=ROOT)
+    except FileNotFoundError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    try:
+        result = run_scenario_pack(bounty_bot_dir=bounty_bot_dir)
+    except FileNotFoundError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    if result.output:
+        print(result.output)
+    elif result.exit_code != 0:
+        print("BugBot scenario pack failed with no output.", file=sys.stderr)
+
+    artifact = archive_scenario_pack_run(
+        anchor_root=ROOT,
+        run=result,
+        record_outcome=bool(args.record),
+        append_outcome=append_outcome_entry,
+        utcnow_iso=utcnow_iso,
+        make_outcome_id=make_outcome_id,
+    )
+    print(f"Artifact: {artifact.relative_to(ROOT)}")
+
+    if args.json:
+        print(json.dumps(json.loads(artifact.read_text(encoding="utf-8")), indent=2))
+
+    return result.exit_code
+
+
 def cmd_bugbot_train(args: argparse.Namespace) -> int:
     scenario_path = Path(args.scenario)
     if not scenario_path.is_absolute():
@@ -1955,6 +2018,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_bugbot_scope_check(args)
     if args.command == "bugbot" and args.bugbot_command == "analyze":
         return cmd_bugbot_analyze(args)
+    if args.command == "bugbot" and args.bugbot_command == "scenarios":
+        return cmd_bugbot_scenarios(args)
     if args.command == "hunt" and args.hunt_command == "plan":
         return cmd_hunt_plan(args)
     if args.command == "test":

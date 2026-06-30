@@ -267,6 +267,15 @@ The benchmark command writes a fresh benchmark artifact under `benchmarks/damn-v
 
 External repos require `identity_status: verified_repo` and `target_repo_url` in scope confirmation; local lab fixtures use `identity_status: local_fixture_unpinned`.
 
+**BugBot scenario pack** (curriculum proofs live in sibling `bounty-bot`; requires Foundry only for this command):
+
+```bash
+./anchor bugbot scenarios --all
+./anchor bugbot scenarios --all --record
+```
+
+ANCHOR resolves `bounty-bot` from `BOUNTY_BOT_DIR` or `../bounty-bot`, runs `scripts/bugbot_smoke.sh`, and writes a structured JSON artifact under `outcomes/training/` on every run. Use `--record` to append an outcome ledger entry; use `--json` to print the artifact to stdout.
+
 **Codex MCP** (read-only repo state for Codex):
 
 ```bash
