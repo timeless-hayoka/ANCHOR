@@ -26,6 +26,7 @@ from anchor_sarif import build_research_loop, rewrite_finding, assess_economic_c
 from anchor_sarif.parser import Finding
 from anchor_work_queue import load_work_queue, render_work_queue, work_queue_summary
 from anchor_trends import compute_benchmark_trends, render_benchmark_trends
+from bugbot.analysis import AnalysisConfig, render_analysis_report, run_target_analysis
 from bugbot.scope import ANALYSIS, ScopeNotAuthorizedError, issue_scope_grant_from_confirmation, require_authorized_scope
 from bugbot.trainer import BugBotTrainer
 from knowledge_provider import (
@@ -209,6 +210,14 @@ def create_parser() -> argparse.ArgumentParser:
     knowledge_refs = knowledge_sub.add_parser("refs", help="Topics linked to a subsystem")
     knowledge_refs.add_argument("--subsystem", required=True, help="Subsystem name from manifest.json")
 
+    codex_parser = sub.add_parser("codex", help="Codex integration helpers")
+    codex_sub = codex_parser.add_subparsers(dest="codex_command", required=True)
+    codex_mcp = codex_sub.add_parser("mcp", help="Run or register the local ANCHOR Codex MCP server")
+    codex_group = codex_mcp.add_mutually_exclusive_group()
+    codex_group.add_argument("--print-config", action="store_true", help="Print the Codex MCP registration JSON")
+    codex_group.add_argument("--register", action="store_true", help="Run codex mcp add for the local ANCHOR server")
+    codex_group.add_argument("--run", action="store_true", help="Run the ANCHOR MCP server directly")
+
     bugbot_parser = sub.add_parser("bugbot", help="BugBot training workflows")
     bugbot_sub = bugbot_parser.add_subparsers(dest="bugbot_command", required=True)
     bugbot_train = bugbot_sub.add_parser("train", help="Run a training session from a scenario file")
@@ -237,6 +246,14 @@ def create_parser() -> argparse.ArgumentParser:
     )
     bugbot_analyze.add_argument("--target-id", required=True, help="Selected target identifier")
     bugbot_analyze.add_argument("--target-ref", required=True, help="Exact repo commit or ref")
+    bugbot_analyze.add_argument(
+        "--repo-url",
+        help="Git remote to clone when the analysis workspace does not exist yet",
+    )
+    bugbot_analyze.add_argument(
+        "--workspace",
+        help="Existing local workspace path (defaults to scope/analysis/<target-id>)",
+    )
 
     if HAS_SARIF:
         sarif_parser = sub.add_parser("sarif", help="Process and analyze SARIF output from security tools")
@@ -1275,10 +1292,17 @@ def cmd_bugbot_analyze(args: argparse.Namespace) -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
-    print("Analysis entrypoint: authorized (target-code activity not implemented yet)")
-    print(f"Target: {args.target_id}")
-    print(f"Target ref: {args.target_ref}")
-    return 0
+    workspace = Path(args.workspace).resolve() if args.workspace else None
+    result = run_target_analysis(
+        AnalysisConfig(
+            target_id=args.target_id,
+            target_ref=args.target_ref,
+            repo_url=args.repo_url,
+            workspace=workspace,
+        )
+    )
+    print(render_analysis_report(result))
+    return 0 if result.success else 1
 
 
 def cmd_bugbot_train(args: argparse.Namespace) -> int:
@@ -1600,6 +1624,23 @@ def cmd_sarif_research(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_codex_mcp(args: argparse.Namespace) -> int:
+    launcher = ROOT / "scripts" / "codex_mcp_launcher.py"
+    cmd = [sys.executable, str(launcher)]
+    if args.print_config:
+        cmd.append("--print-config")
+    elif args.register:
+        cmd.append("--register")
+    elif args.run:
+        cmd.append("--run")
+    proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, check=False)
+    if proc.stdout:
+        sys.stdout.write(proc.stdout)
+    if proc.stderr:
+        sys.stderr.write(proc.stderr)
+    return proc.returncode
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = create_parser()
     args = parser.parse_args(argv)
@@ -1628,6 +1669,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_knowledge_search(args)
     if args.command == "knowledge" and args.knowledge_command == "refs":
         return cmd_knowledge_refs(args)
+    if args.command == "codex" and args.codex_command == "mcp":
+        return cmd_codex_mcp(args)
     if args.command == "bugbot" and args.bugbot_command == "train":
         return cmd_bugbot_train(args)
     if args.command == "bugbot" and args.bugbot_command == "scope-check":

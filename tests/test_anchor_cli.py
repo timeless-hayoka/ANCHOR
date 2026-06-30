@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,6 +71,14 @@ def test_parser_accepts_benchmark_compare_source():
     assert args.benchmark_command == "compare-source"
     assert args.run_id == "run-a"
     assert args.json is True
+
+
+def test_parser_accepts_codex_mcp():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["codex", "mcp", "--print-config"])
+    assert args.command == "codex"
+    assert args.codex_command == "mcp"
+    assert args.print_config is True
 
 
 def test_parser_accepts_benchmark_history():
@@ -1083,8 +1093,68 @@ def test_cmd_bugbot_analyze_denies_without_grant(tmp_path: Path, monkeypatch, ca
     rc = anchor_cli.cmd_bugbot_analyze(type("Args", (), {
         "target_id": "dvd-local-lab",
         "target_ref": "abc123",
+        "repo_url": None,
+        "workspace": None,
     }))
     out = capsys.readouterr()
     assert rc == 1
     assert "NOT AUTHORIZED" in out.err
 
+
+def test_cmd_bugbot_analyze_runs_stages_with_grant(tmp_path: Path, monkeypatch, capsys) -> None:
+    anchor = tmp_path
+    evidence = anchor / "evidence.md"
+    evidence.write_text("evidence", encoding="utf-8")
+    confirmation = anchor / "confirmation.md"
+    fixtures = Path(__file__).resolve().parent / "fixtures"
+    confirmation.write_text(
+        fixtures.joinpath("scope_confirmation_valid.md").read_text(encoding="utf-8").replace(
+            "tests/fixtures/scope_evidence.md",
+            "evidence.md",
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ANCHOR_ROOT", str(anchor))
+    assert anchor_cli.cmd_bugbot_scope_check(type("Args", (), {"confirmation": str(confirmation)})) == 0
+
+    workspace = anchor / "lab"
+    workspace.mkdir()
+    (workspace / "foundry.toml").write_text("[profile.default]\n", encoding="utf-8")
+    (workspace / "src").mkdir()
+    (workspace / "src" / "Token.sol").write_text("// sol", encoding="utf-8")
+
+    rc = anchor_cli.cmd_bugbot_analyze(type("Args", (), {
+        "target_id": "dvd-local-lab",
+        "target_ref": "abc123def4567890abcdef1234567890abcdef12",
+        "repo_url": None,
+        "workspace": str(workspace),
+    }))
+    out = capsys.readouterr()
+    assert rc == 0
+    assert "Analysis: PASS" in out.out
+    assert "INSPECT: PASS" in out.out
+
+
+
+def test_anchor_codex_mcp_print_config_matches_launcher():
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(ROOT)
+    anchor_proc = subprocess.run(
+        [str(ROOT / "anchor"), "codex", "mcp", "--print-config"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        env=env,
+        check=False,
+    )
+    launcher_proc = subprocess.run(
+        [env.get("PYTHON", "python3"), "scripts/codex_mcp_launcher.py", "--print-config"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        env=env,
+        check=False,
+    )
+    assert anchor_proc.returncode == 0
+    assert launcher_proc.returncode == 0
+    assert json.loads(anchor_proc.stdout) == json.loads(launcher_proc.stdout)

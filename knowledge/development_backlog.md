@@ -15,23 +15,14 @@ Ordered for evidence-first ANCHOR evolution. Revisit after each published benchm
 
 **BugBot / GitHub selected-repo workflow status:**
 
-> Fail-closed authorization primitive and evidence-backed scope-check writer complete; protected analysis execution pending.
+> Protected analysis execution complete for local workspaces; GitHub selected-repo flow and per-target fuzz profiles pending.
 
 - [x] `require_authorized_scope(...)` with canonical `ANALYSIS = "analysis"`
 - [x] `ScopeGrant` derived from validated `scope_confirmation.md` / JSON (not self-granted)
 - [x] `anchor bugbot scope-check --confirmation …` writes atomic active grant
-- [x] `anchor bugbot analyze` gated entrypoint (no target-code activity yet)
-- [ ] Analysis execution (clone, inspect, test, fuzz) below the gate
-
-## P0.5 — BugBot hunt pipeline (paused)
-
-Workflow: `crawl → select → plan → scope-check → analysis`
-
-- [x] Scope grant producer (`scope-check`) from documented evidence
-- [x] Protected analysis entrypoint stub (`bugbot analyze`)
-- [ ] `crawl`, `select`, `plan` commands (planning-only)
+- [x] Protected analysis body: clone → inspect → test → fuzz (test/fuzz skip gracefully)
 - [ ] GitHub selected-repo flow wiring
-- [ ] Target-code analysis implementation below the gate
+- [ ] Per-target fuzz profiles and analysis archival
 
 ## P1 — Graph & timeline
 - [ ] Timeline view: signal → cluster → repro → outcome per case_id
