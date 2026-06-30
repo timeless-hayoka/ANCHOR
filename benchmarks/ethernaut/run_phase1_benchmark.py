@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from anchor_storage import build_storage_manifest, evidence_dir, storage_manifest_path, storage_summary, write_json
+from evidence_schema import enrich_benchmark_artifact
 
 ANCHOR_ROOT = Path(__file__).resolve().parents[2]
 BENCHMARKS_ROOT = ANCHOR_ROOT / "benchmarks"
@@ -105,6 +106,7 @@ def main() -> int:
     }
 
     json_path = run_dir / "benchmark.json"
+    payload = enrich_benchmark_artifact(payload, artifact_path=rel_to_anchor(json_path))
     json_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     storage_json_path = storage_manifest_path(run_dir)
