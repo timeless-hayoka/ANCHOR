@@ -10,6 +10,7 @@ prohibited_actions:
 disclosure_channel: local-lab-only
 reviewer_decision: authorized
 reviewed_at: 2026-06-30T12:00:00+00:00
+identity_status: local_fixture_unpinned
 expires_at: 2027-06-30T12:00:00+00:00
 evidence_url: https://example.com/evidence/dvd-local-lab
 evidence_path: tests/fixtures/scope_evidence.md

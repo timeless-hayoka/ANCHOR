@@ -9,6 +9,8 @@ from typing import Any
 from urllib.parse import urlparse
 
 from bugbot.scope import (
+    IDENTITY_LOCAL_FIXTURE_UNPINNED,
+    IDENTITY_VERIFIED_REPO,
     REVIEWER_DECISION_AUTHORIZED,
     ScopeGrant,
     parse_utc_datetime,
@@ -92,6 +94,18 @@ def _normalize_confirmation_payload(payload: dict[str, Any]) -> dict[str, Any]:
     expires_raw = payload.get("expires_at")
     expires_at = parse_utc_datetime(str(expires_raw)) if expires_raw not in (None, "") else None
 
+    identity_status = str(payload.get("identity_status", IDENTITY_VERIFIED_REPO)).strip()
+    if identity_status not in {IDENTITY_VERIFIED_REPO, IDENTITY_LOCAL_FIXTURE_UNPINNED}:
+        raise ValueError(
+            "identity_status must be "
+            f"{IDENTITY_VERIFIED_REPO!r} or {IDENTITY_LOCAL_FIXTURE_UNPINNED!r}"
+        )
+
+    target_repo_url_raw = payload.get("target_repo_url")
+    target_repo_url = str(target_repo_url_raw).strip() if target_repo_url_raw not in (None, "") else None
+    if identity_status == IDENTITY_VERIFIED_REPO and not target_repo_url:
+        raise ValueError("target_repo_url is required when identity_status is verified_repo")
+
     return {
         "schema_version": str(payload["schema_version"]).strip(),
         "target_id": str(payload["target_id"]).strip(),
@@ -103,6 +117,8 @@ def _normalize_confirmation_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "reviewer_decision": reviewer,
         "reviewed_at": reviewed_at,
         "expires_at": expires_at,
+        "identity_status": identity_status,
+        "target_repo_url": target_repo_url,
         "evidence_url": _validate_url(str(payload["evidence_url"]), "evidence_url"),
         "evidence_path": str(payload["evidence_path"]).strip(),
         "granted_by": str(payload.get("granted_by", "user")).strip() or "user",
@@ -158,6 +174,8 @@ def build_scope_grant_from_confirmation(
         evidence_path=str(evidence_path),
         reviewer_decision=normalized["reviewer_decision"],
         reviewed_at=normalized["reviewed_at"],
+        identity_status=normalized["identity_status"],
+        target_repo_url=normalized["target_repo_url"],
         expires_at=normalized["expires_at"],
         granted_by=normalized["granted_by"],
         confirmation_source=str(confirmation_path.resolve()),

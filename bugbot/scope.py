@@ -28,6 +28,9 @@ GRANT_SCHEMA_VERSION = "1.0"
 PLANNING = "planning"
 ANALYSIS = "analysis"
 
+IDENTITY_LOCAL_FIXTURE_UNPINNED = "local_fixture_unpinned"
+IDENTITY_VERIFIED_REPO = "verified_repo"
+
 NOT_AUTHORIZED_BANNER = (
     f"Scope status: {SCOPE_STATUS_NOT_AUTHORIZED}\n"
     f"Allowed actions: {ALLOWED_ACTIONS_PLANNING_ONLY}"
@@ -66,6 +69,8 @@ class ScopeGrant:
     evidence_path: str
     reviewer_decision: str
     reviewed_at: datetime
+    identity_status: str = IDENTITY_VERIFIED_REPO
+    target_repo_url: str | None = None
     expires_at: datetime | None = None
     granted_by: str = "user"
     confirmation_source: str | None = None
@@ -154,6 +159,10 @@ def _deserialize_grant(payload: dict[str, Any]) -> ScopeGrant:
         evidence_path=str(payload["evidence_path"]),
         reviewer_decision=str(payload["reviewer_decision"]).strip().lower(),
         reviewed_at=parse_utc_datetime(str(payload["reviewed_at"])),
+        identity_status=str(payload.get("identity_status", IDENTITY_VERIFIED_REPO)).strip(),
+        target_repo_url=str(payload["target_repo_url"]).strip()
+        if payload.get("target_repo_url")
+        else None,
         expires_at=parse_utc_datetime(str(expires_raw)) if expires_raw else None,
         granted_by=str(payload.get("granted_by", "user")),
         confirmation_source=str(payload["confirmation_source"])

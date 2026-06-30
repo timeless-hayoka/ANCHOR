@@ -257,6 +257,23 @@ For a structured hunt plan from a target note:
 
 The benchmark command writes a fresh benchmark artifact under `benchmarks/damn-vulnerable-defi/runs/` and updates `benchmarks/index.json` so the latest summary shows up in the demo surfaces. The hunt plan command turns a target note into a structured, falsifiable queue.
 
+**BugBot scope and analysis** (authorized targets only):
+
+```bash
+./anchor bugbot scope-check --confirmation scope/confirmations/example.md
+./anchor bugbot analyze --target-id … --target-ref … [--workspace …] [--repo-url …]
+```
+
+External repos require `identity_status: verified_repo` and `target_repo_url` in scope confirmation; local lab fixtures use `identity_status: local_fixture_unpinned`.
+
+**Codex MCP** (read-only repo state for Codex):
+
+```bash
+./anchor codex mcp --print-config
+```
+
+See [docs/CODEX_MCP.md](docs/CODEX_MCP.md).
+
 ## Connect the console
 
 Open the console, set the server URL to `http://127.0.0.1:8000`, and connect the Live Run tab. The event stream should climb through `run.started -> case.started -> stage.started -> finding.detected -> finding.correlated -> poc.result -> case.completed -> run.completed`.

@@ -1283,7 +1283,7 @@ def cmd_bugbot_scope_check(args: argparse.Namespace) -> int:
 
 def cmd_bugbot_analyze(args: argparse.Namespace) -> int:
     try:
-        require_authorized_scope(
+        grant = require_authorized_scope(
             target_id=args.target_id,
             target_ref=args.target_ref,
             action=ANALYSIS,
@@ -1297,8 +1297,10 @@ def cmd_bugbot_analyze(args: argparse.Namespace) -> int:
         AnalysisConfig(
             target_id=args.target_id,
             target_ref=args.target_ref,
+            grant=grant,
             repo_url=args.repo_url,
             workspace=workspace,
+            anchor_root=ROOT,
         )
     )
     print(render_analysis_report(result))

@@ -8,6 +8,7 @@ import pytest
 
 from bugbot.scope import (
     ANALYSIS,
+    IDENTITY_LOCAL_FIXTURE_UNPINNED,
     REVIEWER_DECISION_AUTHORIZED,
     SCOPE_STATUS_NOT_AUTHORIZED,
     ScopeDenialReason,
@@ -42,6 +43,7 @@ def _sample_grant(**overrides) -> ScopeGrant:
         "evidence_path": str(FIXTURES / "scope_evidence.md"),
         "reviewer_decision": REVIEWER_DECISION_AUTHORIZED,
         "reviewed_at": datetime(2026, 6, 30, 12, 0, tzinfo=timezone.utc),
+        "identity_status": IDENTITY_LOCAL_FIXTURE_UNPINNED,
         "expires_at": datetime(2027, 6, 30, 12, 0, tzinfo=timezone.utc),
         "confirmation_source": str(VALID_CONFIRMATION),
     }
@@ -71,7 +73,26 @@ def test_build_scope_grant_from_valid_confirmation(tmp_path: Path) -> None:
     assert reason is None
     assert grant is not None
     assert grant.target_id == "dvd-local-lab"
+    assert grant.identity_status == IDENTITY_LOCAL_FIXTURE_UNPINNED
     assert ANALYSIS in grant.permitted_actions
+
+
+def test_build_scope_grant_requires_target_repo_url_for_verified_repo(tmp_path: Path) -> None:
+    anchor = tmp_path
+    evidence = anchor / "evidence.md"
+    evidence.write_text("evidence", encoding="utf-8")
+    confirmation = anchor / "confirmation.md"
+    confirmation.write_text(
+        FIXTURES.joinpath("scope_confirmation_valid.md")
+        .read_text(encoding="utf-8")
+        .replace("identity_status: local_fixture_unpinned", "identity_status: verified_repo")
+        .replace("tests/fixtures/scope_evidence.md", "evidence.md"),
+        encoding="utf-8",
+    )
+    grant, reason = build_scope_grant_from_confirmation(confirmation, anchor_root=anchor)
+    assert grant is None
+    assert reason is not None
+    assert "target_repo_url" in reason
 
 
 def test_build_scope_grant_rejects_unauthorized_reviewer(tmp_path: Path) -> None:

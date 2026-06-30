@@ -15,12 +15,14 @@ Ordered for evidence-first ANCHOR evolution. Revisit after each published benchm
 
 **BugBot / GitHub selected-repo workflow status:**
 
-> Protected analysis execution complete for local workspaces; GitHub selected-repo flow and per-target fuzz profiles pending.
+> Protected analysis requires authorized scope + verified code identity + isolated execution for external repos. GitHub selected-repo automation and per-target fuzz profiles pending.
 
 - [x] `require_authorized_scope(...)` with canonical `ANALYSIS = "analysis"`
 - [x] `ScopeGrant` derived from validated `scope_confirmation.md` / JSON (not self-granted)
 - [x] `anchor bugbot scope-check --confirmation …` writes atomic active grant
-- [x] Protected analysis body: clone → inspect → test → fuzz (test/fuzz skip gracefully)
+- [x] Protected analysis body: clone → identity → inspect → test → fuzz
+- [x] Target identity verification (`local_fixture_unpinned` vs `verified_repo`)
+- [x] Isolated execution guard for verified_repo test/fuzz under `scope/analysis/`
 - [ ] GitHub selected-repo flow wiring
 - [ ] Per-target fuzz profiles and analysis archival
 
