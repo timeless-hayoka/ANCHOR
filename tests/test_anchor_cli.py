@@ -1036,3 +1036,55 @@ def test_cmd_bugbot_train_strict_archive_failure(tmp_path: Path, monkeypatch, ca
     assert "Training: FAIL" in out.err
     assert "archival failed" in out.err.lower()
 
+
+def test_parser_accepts_bugbot_scope_check_and_analyze() -> None:
+    parser = anchor_cli.create_parser()
+    scope_args = parser.parse_args([
+        "bugbot", "scope-check",
+        "--confirmation", "scope/confirmations/example.md",
+    ])
+    assert scope_args.bugbot_command == "scope-check"
+    assert scope_args.confirmation == "scope/confirmations/example.md"
+
+    analyze_args = parser.parse_args([
+        "bugbot", "analyze",
+        "--target-id", "dvd-local-lab",
+        "--target-ref", "abc123",
+    ])
+    assert analyze_args.bugbot_command == "analyze"
+    assert analyze_args.target_id == "dvd-local-lab"
+    assert analyze_args.target_ref == "abc123"
+
+
+def test_cmd_bugbot_scope_check_issues_grant(tmp_path: Path, monkeypatch, capsys) -> None:
+    anchor = tmp_path
+    evidence = anchor / "evidence.md"
+    evidence.write_text("evidence", encoding="utf-8")
+    confirmation = anchor / "confirmation.md"
+    fixtures = Path(__file__).resolve().parent / "fixtures"
+    confirmation.write_text(
+        fixtures.joinpath("scope_confirmation_valid.md").read_text(encoding="utf-8").replace(
+            "tests/fixtures/scope_evidence.md",
+            "evidence.md",
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(anchor_cli, "ROOT", anchor)
+    monkeypatch.setenv("ANCHOR_ROOT", str(anchor))
+
+    rc = anchor_cli.cmd_bugbot_scope_check(type("Args", (), {"confirmation": str(confirmation)}))
+    out = capsys.readouterr()
+    assert rc == 0
+    assert "Scope grant active:" in out.out
+
+
+def test_cmd_bugbot_analyze_denies_without_grant(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.setenv("ANCHOR_ROOT", str(tmp_path))
+    rc = anchor_cli.cmd_bugbot_analyze(type("Args", (), {
+        "target_id": "dvd-local-lab",
+        "target_ref": "abc123",
+    }))
+    out = capsys.readouterr()
+    assert rc == 1
+    assert "NOT AUTHORIZED" in out.err
+

@@ -13,32 +13,25 @@ Ordered for evidence-first ANCHOR evolution. Revisit after each published benchm
 - [x] `anchor bugbot train --scenario …` operator surface
 - [x] `require_authorized_scope(...)` gate in `bugbot/scope.py` (default: planning only)
 
-**BugBot / GitHub selected-repo workflow status (checkpoint `25bab55`):**
+**BugBot / GitHub selected-repo workflow status:**
 
-> Planning and fail-closed authorization primitive complete; scope-confirmation writer and protected analysis entrypoint pending.
+> Fail-closed authorization primitive and evidence-backed scope-check writer complete; protected analysis execution pending.
 
-What this means:
-
-- The gate lives in `bugbot/scope.py` and is **not** wired into ANCHOR’s GitHub selected-repo flow yet.
-- It protects **future** BugBot analysis commands (`require_authorized_scope` as line 1).
-- It does **not yet prove** the full path enforces `crawl → select → plan → scope-check → analysis`.
-- Safe default today: **no grant exists → deny analysis** (planning only).
-
-Resume order when un-paused:
-
-1. **scope-check / scope grant** — writes verifiable authorization record; binds `target_id` + permitted actions
-2. **`require_authorized_scope` validates** that record
-3. **`cmd_bugbot_analyze(...)`** — only after the gate: clone, inspect, test, fuzz, or analyze
+- [x] `require_authorized_scope(...)` with canonical `ANALYSIS = "analysis"`
+- [x] `ScopeGrant` derived from validated `scope_confirmation.md` / JSON (not self-granted)
+- [x] `anchor bugbot scope-check --confirmation …` writes atomic active grant
+- [x] `anchor bugbot analyze` gated entrypoint (no target-code activity yet)
+- [ ] Analysis execution (clone, inspect, test, fuzz) below the gate
 
 ## P0.5 — BugBot hunt pipeline (paused)
 
 Workflow: `crawl → select → plan → scope-check → analysis`
 
-- [ ] Scope grant / scope-check command (authorization record writer)
-- [ ] `current_scope_state()` reads and validates grant records
-- [ ] Protected analysis entrypoint (`cmd_bugbot_analyze` + gate as first line)
-- [ ] Wire gate into any other target-touching commands as they ship
-- [ ] `crawl`, `select`, `plan` remain planning-only until scope-check passes
+- [x] Scope grant producer (`scope-check`) from documented evidence
+- [x] Protected analysis entrypoint stub (`bugbot analyze`)
+- [ ] `crawl`, `select`, `plan` commands (planning-only)
+- [ ] GitHub selected-repo flow wiring
+- [ ] Target-code analysis implementation below the gate
 
 ## P1 — Graph & timeline
 - [ ] Timeline view: signal → cluster → repro → outcome per case_id

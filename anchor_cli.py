@@ -26,6 +26,7 @@ from anchor_sarif import build_research_loop, rewrite_finding, assess_economic_c
 from anchor_sarif.parser import Finding
 from anchor_work_queue import load_work_queue, render_work_queue, work_queue_summary
 from anchor_trends import compute_benchmark_trends, render_benchmark_trends
+from bugbot.scope import ANALYSIS, ScopeNotAuthorizedError, issue_scope_grant_from_confirmation, require_authorized_scope
 from bugbot.trainer import BugBotTrainer
 from knowledge_provider import (
     KnowledgeProvider,
@@ -221,6 +222,21 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Exit nonzero when knowledge archival fails (default: archival is non-fatal)",
     )
+    bugbot_scope_check = bugbot_sub.add_parser(
+        "scope-check",
+        help="Validate scope confirmation evidence and write the active grant",
+    )
+    bugbot_scope_check.add_argument(
+        "--confirmation",
+        required=True,
+        help="Path to scope_confirmation.md or .json with documented scope evidence",
+    )
+    bugbot_analyze = bugbot_sub.add_parser(
+        "analyze",
+        help="Run gated target analysis (requires active scope grant)",
+    )
+    bugbot_analyze.add_argument("--target-id", required=True, help="Selected target identifier")
+    bugbot_analyze.add_argument("--target-ref", required=True, help="Exact repo commit or ref")
 
     if HAS_SARIF:
         sarif_parser = sub.add_parser("sarif", help="Process and analyze SARIF output from security tools")
@@ -1239,6 +1255,32 @@ def load_training_scenarios(scenario_path: Path) -> list[dict]:
     raise ValueError("scenario file must be a scenario object, a list, or {\"scenarios\": [...]}")
 
 
+def cmd_bugbot_scope_check(args: argparse.Namespace) -> int:
+    result = issue_scope_grant_from_confirmation(Path(args.confirmation))
+    if result.success:
+        print(f"Scope grant active: {result.grant_path}")
+        return 0
+    print(f"Scope check failed: {result.reason}", file=sys.stderr)
+    return 1
+
+
+def cmd_bugbot_analyze(args: argparse.Namespace) -> int:
+    try:
+        require_authorized_scope(
+            target_id=args.target_id,
+            target_ref=args.target_ref,
+            action=ANALYSIS,
+        )
+    except ScopeNotAuthorizedError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    print("Analysis entrypoint: authorized (target-code activity not implemented yet)")
+    print(f"Target: {args.target_id}")
+    print(f"Target ref: {args.target_ref}")
+    return 0
+
+
 def cmd_bugbot_train(args: argparse.Namespace) -> int:
     scenario_path = Path(args.scenario)
     if not scenario_path.is_absolute():
@@ -1588,6 +1630,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_knowledge_refs(args)
     if args.command == "bugbot" and args.bugbot_command == "train":
         return cmd_bugbot_train(args)
+    if args.command == "bugbot" and args.bugbot_command == "scope-check":
+        return cmd_bugbot_scope_check(args)
+    if args.command == "bugbot" and args.bugbot_command == "analyze":
+        return cmd_bugbot_analyze(args)
     if args.command == "benchmark" and args.benchmark_command == "publish":
         return cmd_benchmark_publish(args)
     if args.command == "benchmark":
