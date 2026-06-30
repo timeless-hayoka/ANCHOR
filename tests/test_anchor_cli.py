@@ -1266,6 +1266,8 @@ def test_cmd_bugbot_analyze_runs_stages_with_grant(tmp_path: Path, monkeypatch, 
 def test_anchor_codex_mcp_print_config_matches_launcher():
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT)
+    venv_python = ROOT / ".venv" / "bin" / "python"
+    python = str(venv_python) if venv_python.is_file() else env.get("PYTHON", "python3")
     anchor_proc = subprocess.run(
         [str(ROOT / "anchor"), "codex", "mcp", "--print-config"],
         cwd=ROOT,
@@ -1275,7 +1277,7 @@ def test_anchor_codex_mcp_print_config_matches_launcher():
         check=False,
     )
     launcher_proc = subprocess.run(
-        [env.get("PYTHON", "python3"), "scripts/codex_mcp_launcher.py", "--print-config"],
+        [python, "scripts/codex_mcp_launcher.py", "--print-config"],
         cwd=ROOT,
         text=True,
         capture_output=True,

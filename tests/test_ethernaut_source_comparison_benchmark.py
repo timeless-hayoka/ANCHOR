@@ -54,8 +54,9 @@ def test_run_benchmark_writes_ethernaut_compare_artifacts(tmp_path: Path, monkey
 
     assert payload["results_summary"]["cases"] == 4
     assert payload["results_summary"]["true_positives"] == 3
-    assert payload["results_summary"]["false_positives"] == 1
+    assert payload["results_summary"]["false_positives"] == 0
     assert payload["results_summary"]["false_negatives"] == 0
+    assert payload["results_summary"]["true_negatives"] == 1
     assert payload["results_summary"]["source_tool"]["visible_count"] == 3
     assert payload["results_summary"]["source_tool"]["shared_visible"] == 2
     assert payload["results_summary"]["source_tool"]["anchor_only"] == 1
@@ -67,4 +68,4 @@ def test_run_benchmark_writes_ethernaut_compare_artifacts(tmp_path: Path, monkey
     assert compare_json["comparison"]["anchor_only"] == 1
     assert compare_json["comparison"]["source_only"] == 1
     assert "Ethernaut Source-Tool Comparison Report" in report
-    assert "Source Tool Comparison" in root_report
+    assert "Ethernaut Source-Tool Comparison" in root_report
