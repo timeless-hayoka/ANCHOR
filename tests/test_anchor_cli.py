@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,15 +14,18 @@ def load_module(name: str, filename: str):
     spec = importlib.util.spec_from_file_location(name, ROOT / filename)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
 
 anchor_cli = load_module("anchor_cli", "anchor_cli.py")
 anchor_scripts = load_module("anchor_scripts", "anchor_scripts.py")
+hunt_planner = load_module("hunt_planner", "hunt_planner.py")
 anchor_storage = load_module("anchor_storage", "anchor_storage.py")
 anchor_work_queue = load_module("anchor_work_queue", "anchor_work_queue.py")
 scabench_adapter = load_module("scabench_adapter", "scabench_adapter.py")
+github_discovery = load_module("github_discovery", "github_discovery.py")
 
 
 def test_parser_accepts_benchmark_phase1():
@@ -128,6 +132,68 @@ def test_parser_accepts_work_queue():
     args = parser.parse_args(["work", "queue", "--json"])
     assert args.command == "work"
     assert args.work_command == "queue"
+    assert args.json is True
+
+
+def test_parser_accepts_hunt_plan():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["hunt", "plan", "--target", "targets/enzyme-blue.md", "--json"])
+    assert args.command == "hunt"
+    assert args.hunt_command == "plan"
+    assert args.target == "targets/enzyme-blue.md"
+    assert args.json is True
+
+
+def test_parser_accepts_github_crawl():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["github", "crawl", "--query", "solidity fuzzing", "--limit", "8", "--no-readmes"])
+    assert args.command == "github"
+    assert args.github_command == "crawl"
+    assert args.query == ["solidity fuzzing"]
+    assert args.limit == 8
+    assert args.no_readmes is True
+
+
+def test_parser_accepts_github_profile_crawls():
+    parser = anchor_cli.create_parser()
+    cases = [
+        (["github", "crawl-auth", "--limit", "7"], "crawl-auth"),
+        (["github", "crawl-upgrade", "--limit", "7"], "crawl-upgrade"),
+        (["github", "crawl-accounting", "--limit", "7"], "crawl-accounting"),
+        (["github", "crawl-oracle", "--limit", "7"], "crawl-oracle"),
+        (["github", "crawl-external", "--limit", "7"], "crawl-external"),
+    ]
+    for argv, command in cases:
+        args = parser.parse_args(argv)
+        assert args.command == "github"
+        assert args.github_command == command
+        assert args.limit == 7
+
+
+def test_parser_accepts_github_select():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["github", "select", "perimetersec/fuzzlib"])
+    assert args.command == "github"
+    assert args.github_command == "select"
+    assert args.repo == "perimetersec/fuzzlib"
+
+
+def test_parser_accepts_github_plan():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["github", "plan", "perimetersec/fuzzlib", "--run-id", "2026-06-29", "--json"])
+    assert args.command == "github"
+    assert args.github_command == "plan"
+    assert args.repo == "perimetersec/fuzzlib"
+    assert args.run_id == "2026-06-29"
+    assert args.json is True
+
+
+def test_parser_accepts_github_scope_check():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["github", "scope-check", "perimetersec/fuzzlib", "--json"])
+    assert args.command == "github"
+    assert args.github_command == "scope-check"
+    assert args.repo == "perimetersec/fuzzlib"
     assert args.json is True
 
 
@@ -441,6 +507,36 @@ def test_cmd_benchmark_compare_fails_on_recall_drop(monkeypatch, capsys):
     assert "comparison output" in captured.out
 
 
+def test_github_discovery_summary_renders_clean_table(tmp_path):
+    bundle = {
+        "generated_at": "2026-06-29T00:00:00+00:00",
+        "queries": ["solidity fuzzing"],
+        "summary": {"selected": 1, "join": 1, "watch": 0, "skip": 0},
+        "candidates": [
+            {
+                "full_name": "crytic/echidna",
+                "score": 11,
+                "recommendation": "join",
+                "stars": 3400,
+                "open_issues": 63,
+                "language": "Haskell",
+                "topics": ["solidity", "fuzzing", "invariants"],
+                "readme_excerpt": "Echidna is a smart-contract fuzzer.",
+                "reasons": ["README present", "recently updated"],
+                "signals": [{"name": "docs", "value": "README present", "weight": 2}],
+                "issue_angles": ["testing/invariants", "docs/workflow clarity", "regression harness or machine-readable output"],
+            }
+        ],
+    }
+    run_dir = tmp_path / "bundle"
+    run_dir.mkdir()
+    rendered = github_discovery.render_summary(bundle, run_dir=run_dir)
+    assert "GitHub Discovery Bundle" in rendered
+    assert "crytic/echidna" in rendered
+    assert "join" in rendered
+    assert "bundle.json" in rendered
+
+
 
 def test_find_latest_published_benchmark_prefers_newest_published_run():
     latest = anchor_cli.find_latest_published_benchmark([
@@ -751,6 +847,36 @@ def test_render_outcome_insights_highlights_top_lessons():
     assert "Missing reproduction evidence (2)" in rendered
     assert "enzyme: 2" in rendered
     assert "Lessons learned (grouped)" in rendered
+
+
+def test_hunt_planner_builds_target_specific_plan(tmp_path):
+    target_path = tmp_path / "targets" / "enzyme-blue.md"
+    target_path.parent.mkdir(parents=True)
+    target_path.write_text(
+        "# Enzyme Blue Hunt Plan\n\n"
+        "## Chosen target\n\n"
+        "`UnpermissionedActionsWrapper`\n\n"
+        "## Why this is the solid win\n\n"
+        "- Authorization flaws tend to have a clean reproduction path.\n"
+    )
+
+    payload = hunt_planner.build_hunt_plan(
+        target_path=target_path,
+        root=tmp_path,
+        benchmark_entries=[],
+        outcome_entries=[],
+        program="Enzyme",
+        contract="UnpermissionedActionsWrapper",
+    )
+
+    assert payload["target"]["contract"] == "UnpermissionedActionsWrapper"
+    assert "Authorization Boundary Review" in payload["hunt_for"][0]
+    assert payload["hypothesis_templates"][0]["claim"]
+    rendered = hunt_planner.render_hunt_plan(payload)
+    assert "Hunt Plan" in rendered
+    assert "What to hunt for" in rendered
+    assert "How to hunt" in rendered
+    assert "Evidence requirements" in rendered
 
 
 def test_cmd_benchmark_publish_updates_manifest_and_ledger(tmp_path, monkeypatch, capsys):

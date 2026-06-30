@@ -207,7 +207,8 @@ Set `ANCHOR_ROOT=/path/to/ANCHOR` if the repos are not siblings.
 
 ```bash
 ./anchor env init
-./.venv/bin/pip install -r requirements.txt
+./.venv/bin/pip install -r requirements-dev.txt
+./anchor test
 uvicorn anchor_server:app --host 127.0.0.1 --port 8000
 ```
 
@@ -273,6 +274,40 @@ External repos require `identity_status: verified_repo` and `target_repo_url` in
 ```
 
 See [docs/CODEX_MCP.md](docs/CODEX_MCP.md).
+
+For passive GitHub repository intelligence and attack-surface triage:
+
+```bash
+./anchor github crawl --query "smart contract security fuzzing" --query "solidity foundry echidna"
+```
+
+That command writes a clean discovery bundle under `discoveries/github/` with one folder per candidate repo, a compact pre-hunt brief, and machine-readable JSON you can sort through before turning anything into a hunt, issue, or PR. It stays on public metadata and public code signals, so it can rank repos, explain why they look interesting, and record the authorization posture without moving into exploitation.
+
+The supported default command is `./anchor github crawl`.
+
+To approve a repo into the human queue without mutating the discovery evidence:
+
+```bash
+./anchor github select perimetersec/fuzzlib
+```
+
+To generate the constrained hunt plan for a selected repo:
+
+```bash
+./anchor github plan perimetersec/fuzzlib
+```
+
+The plan command reads `selected/<repo>/selection.json` and `candidate.json`, then writes `hunt_plan.json` and `hunt_plan.md` next to the selected repo. It does not clone, scan, open issues, or contact maintainers.
+
+It also creates `scope_confirmation.md` as a human-filled gate. Until that file says `authorized`, the selected repo remains plan-only.
+
+To check the scope gate:
+
+```bash
+./anchor github scope-check perimetersec/fuzzlib
+```
+
+That command should report `Scope status: NOT AUTHORIZED` until `scope_confirmation.md` is filled in and the reviewer decision is `authorized`.
 
 ## Connect the console
 
