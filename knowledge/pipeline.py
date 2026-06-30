@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from evidence_schema import enrich_hunt_analysis_artifact
+
 logger = logging.getLogger(__name__)
 
 _SCENARIO_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
@@ -135,6 +137,12 @@ class KnowledgeWriter:
             artifact_paths = dict(payload.get("artifact_paths") or {})
             artifact_paths["archive_record"] = str(path)
             payload["artifact_paths"] = artifact_paths
+            anchor_root = self.knowledge_root.parent
+            try:
+                rel_artifact_path = str(path.resolve().relative_to(anchor_root.resolve()))
+            except ValueError:
+                rel_artifact_path = str(path)
+            payload = enrich_hunt_analysis_artifact(payload, artifact_path=rel_artifact_path)
             path.write_text(
                 json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
                 encoding="utf-8",

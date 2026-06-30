@@ -13,6 +13,7 @@ if str(ANCHOR_ROOT) not in sys.path:
     sys.path.insert(0, str(ANCHOR_ROOT))
 
 from anchor_sarif.pipeline import SARIFProcessingPipeline
+from evidence_schema import enrich_benchmark_artifact
 
 FAMILY_DIR = Path(__file__).resolve().parent
 RUNS_ROOT = FAMILY_DIR / "runs"
@@ -370,6 +371,7 @@ def run_benchmark(*, now: dt.datetime | None = None) -> dict[str, Any]:
         "results": results,
         "expected_summary": expected_summary,
     }
+    payload = enrich_benchmark_artifact(payload, artifact_path=rel_to_anchor(benchmark_json_path))
     benchmark_json_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     metrics_payload = {

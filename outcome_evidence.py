@@ -13,7 +13,10 @@ from typing import Any
 from anchor_trends import load_benchmark_artifact, parse_iso_timestamp, reproduction_rate, summary_for_entry
 from evidence_schema import (
     EVIDENCE_SCHEMA_VERSION,
+    benchmark_evidence_status,
+    benchmark_target_slug,
     bugbot_proof_gate_status,
+    hunt_analysis_evidence_status,
     insight_record_from_canonical,
     is_canonical_evidence,
     normalize_evidence_status,
@@ -141,6 +144,12 @@ def normalize_benchmark_evidence(
     payload = load_benchmark_artifact(manifest_entry, anchor_root)
     if not isinstance(payload, dict):
         payload = {}
+    if is_canonical_evidence(payload) and payload.get("kind") == "benchmark":
+        row = insight_record_from_canonical(payload)
+        if not row.get("artifact_path"):
+            row["artifact_path"] = _rel_path(path, anchor_root)
+        return row
+
     summary = _coerce_summary(summary_for_entry(manifest_entry, anchor_root))
     if not summary:
         summary = _coerce_summary(payload.get("results_summary") or payload.get("summary"))
@@ -155,14 +164,28 @@ def normalize_benchmark_evidence(
         or payload.get("executed_at")
         or ""
     )
-    target = str(manifest_entry.get("target") or payload.get("target") or run_id)
-    status = str(manifest_entry.get("status") or payload.get("status") or "unknown")
+    target_source = dict(payload)
+    if manifest_entry.get("target"):
+        target_source["target"] = manifest_entry.get("target")
+    target = benchmark_target_slug(target_source)
+    raw_status = str(manifest_entry.get("status") or payload.get("benchmark_status") or payload.get("status") or "unknown")
     passed = _safe_int(summary.get("passed"))
     failed = _safe_int(summary.get("failed"))
     timed_out = _safe_int(summary.get("timed_out"))
     skipped = _safe_int(summary.get("skipped"))
     total = _safe_int(summary.get("cases")) or (passed + failed + timed_out + skipped)
     artifact = path if path.suffix == ".json" else path.parent / "benchmark.json"
+    metrics = {
+        "total": total,
+        "passed": passed,
+        "failed": failed,
+        "timed_out": timed_out,
+        "skipped": skipped,
+        "reproduction_rate": rate,
+        "precision": summary.get("precision"),
+        "recall": summary.get("recall"),
+    }
+    status = benchmark_evidence_status(raw_status=raw_status, metrics=metrics)
     return {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
         "kind": "benchmark",
@@ -171,29 +194,29 @@ def normalize_benchmark_evidence(
         "target": target,
         "run_id": run_id,
         "status": status,
-        "metrics": {
-            "total": total,
-            "passed": passed,
-            "failed": failed,
-            "timed_out": timed_out,
-            "skipped": skipped,
-            "reproduction_rate": rate,
-            "precision": summary.get("precision"),
-            "recall": summary.get("recall"),
-        },
+        "metrics": metrics,
+        "links": {},
+        "source": {"benchmark_status": raw_status},
         "label": f"{run_id}: benchmark {status}",
     }
 
 
 def normalize_hunt_analysis_evidence(*, path: Path, payload: dict[str, Any], anchor_root: Path) -> dict[str, Any]:
-    target_block = payload.get("target") if isinstance(payload.get("target"), dict) else {}
-    target_id = str(target_block.get("target_id") or path.stem)
+    if is_canonical_evidence(payload) and payload.get("kind") == "hunt_analysis":
+        row = insight_record_from_canonical(payload)
+        if not row.get("artifact_path"):
+            row["artifact_path"] = _rel_path(path, anchor_root)
+        return row
+
+    target_block = payload.get("analysis_target") if isinstance(payload.get("analysis_target"), dict) else payload.get("target")
+    target_id = str(target_block.get("target_id") or path.stem) if isinstance(target_block, dict) else path.stem
     timestamp = str(payload.get("completed_at") or payload.get("started_at") or "")
     final_status = str(payload.get("final_status") or "unknown")
     stages = payload.get("stages") if isinstance(payload.get("stages"), list) else []
     passed = sum(1 for stage in stages if isinstance(stage, dict) and stage.get("outcome") == "PASS")
     failed = sum(1 for stage in stages if isinstance(stage, dict) and stage.get("outcome") == "FAIL")
     skipped = sum(1 for stage in stages if isinstance(stage, dict) and stage.get("outcome") == "SKIP")
+    status = hunt_analysis_evidence_status(final_status)
     return {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
         "kind": "hunt_analysis",
@@ -201,14 +224,16 @@ def normalize_hunt_analysis_evidence(*, path: Path, payload: dict[str, Any], anc
         "timestamp": timestamp,
         "target": target_id,
         "run_id": str(payload.get("analysis_id") or path.stem),
-        "status": final_status,
+        "status": status,
         "metrics": {
             "total": len(stages),
             "passed": passed,
             "failed": failed,
             "skipped": skipped,
         },
-        "label": f"{target_id}: analysis {final_status}",
+        "links": {},
+        "source": {"final_status": final_status},
+        "label": f"{target_id}: analysis {status}",
     }
 
 

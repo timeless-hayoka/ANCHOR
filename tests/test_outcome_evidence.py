@@ -14,7 +14,7 @@ from outcome_evidence import (
     normalize_hunt_analysis_evidence,
     render_evidence_insights,
 )
-from evidence_schema import build_bugbot_training_record, is_canonical_evidence
+from evidence_schema import build_bugbot_training_record, enrich_benchmark_artifact, enrich_hunt_analysis_artifact, is_canonical_evidence
 
 
 def test_normalize_bugbot_training_evidence():
@@ -56,6 +56,7 @@ def test_normalize_hunt_analysis_evidence():
     )
     assert record["kind"] == "hunt_analysis"
     assert record["target"] == "dvd-local-lab"
+    assert record["status"] == "published"
     assert record["metrics"]["passed"] == 1
     assert record["metrics"]["failed"] == 1
 
@@ -293,6 +294,57 @@ def test_normalize_bugbot_training_evidence_supports_legacy_payload():
     )
     assert record["status"] == "proof_gate_passed"
     assert record["source"]["scenario_pack"] == "v1"
+
+
+def test_normalize_hunt_analysis_evidence_prefers_canonical_payload():
+    canonical = enrich_hunt_analysis_artifact(
+        {
+            "record_type": "analysis_run",
+            "analysis_id": "analysis-run-canonical",
+            "completed_at": "2026-06-30T12:00:00+00:00",
+            "final_status": "PASS",
+            "target": {"target_id": "enzyme-lab"},
+            "stages": [],
+        },
+        artifact_path="knowledge/analysis/analysis-run-canonical.json",
+    )
+    record = normalize_hunt_analysis_evidence(
+        path=Path("/tmp/ANCHOR/knowledge/analysis/analysis-run-canonical.json"),
+        payload=canonical,
+        anchor_root=Path("/tmp/ANCHOR"),
+    )
+    assert record["status"] == "published"
+    assert record["run_id"] == "analysis-run-canonical"
+
+
+def test_normalize_benchmark_evidence_prefers_canonical_payload(tmp_path):
+    artifact_path = "benchmarks/dvd/benchmark.json"
+    canonical = enrich_benchmark_artifact(
+        {
+            "benchmark_id": "dvd-phase1",
+            "run_id": "dvd-phase1",
+            "executed_at": "2026-06-29T18:00:00+00:00",
+            "status": "complete",
+            "target": "damn-vulnerable-defi",
+            "results_summary": {"passed": 2, "failed": 0, "timed_out": 0, "skipped": 0},
+        },
+        artifact_path=artifact_path,
+    )
+    run_dir = tmp_path / "benchmarks" / "dvd"
+    run_dir.mkdir(parents=True)
+    (run_dir / "benchmark.json").write_text(json.dumps(canonical), encoding="utf-8")
+    record = normalize_benchmark_evidence(
+        manifest_entry={
+            "id": "dvd-phase1",
+            "executed_at": "2026-06-29T18:00:00+00:00",
+            "status": "complete",
+            "artifact_json": artifact_path,
+        },
+        anchor_root=tmp_path,
+    )
+    assert record is not None
+    assert record["status"] == "published"
+    assert record["metrics"]["passed"] == 2
 
 
 def test_render_evidence_insights_uses_proof_gate_language():

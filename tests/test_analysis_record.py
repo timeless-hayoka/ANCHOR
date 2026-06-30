@@ -27,6 +27,7 @@ from bugbot.scope import (
     ScopeGrant,
 )
 from knowledge.pipeline import KnowledgePipeline
+from evidence_schema import is_canonical_evidence
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -160,6 +161,9 @@ def test_run_target_analysis_archives_record(tmp_path: Path) -> None:
     assert payload["final_status"] == FINAL_STATUS_PASS
     assert payload["target"]["target_id"] == "dvd-local-lab"
     assert payload["artifact_paths"]["archive_record"] == str(result.archive.path)
+    assert is_canonical_evidence(payload)
+    assert payload["kind"] == "hunt_analysis"
+    assert payload["status"] == "published"
 
 
 def test_write_analysis_run_via_pipeline(tmp_path: Path) -> None:
@@ -177,3 +181,5 @@ def test_write_analysis_run_via_pipeline(tmp_path: Path) -> None:
     payload = json.loads(result.path.read_text(encoding="utf-8"))
     assert payload["final_status"] == FINAL_STATUS_BLOCKED
     assert payload["artifact_paths"]["archive_record"] == str(result.path)
+    assert is_canonical_evidence(payload)
+    assert payload["status"] == "rejected"
