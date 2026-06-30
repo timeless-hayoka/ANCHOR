@@ -52,3 +52,26 @@ hits = kp.search("promotion gate", limit=5)
 1. Add or edit a `.md` file in this directory.
 2. Register it in `manifest.json` (`slug`, `subsystems`, `tags`).
 3. Run `pytest tests/test_knowledge_provider.py`.
+
+## Archival JSON (training / detectors / scenarios)
+
+Runtime artifacts from BugBot or trainers are written under:
+
+| Directory | Purpose |
+| --- | --- |
+| `training/` | Complete training run snapshots |
+| `detectors/` | Per-detector result archives |
+| `scenarios/` | Curated scenario definitions (stable ids) |
+
+Use `knowledge.pipeline.KnowledgePipeline` (respects `ANCHOR_ROOT`). These files are separate from manifest-registered markdown topics—retrieve reference docs via `KnowledgeProvider`, not by stuffing JSON into prompts.
+
+```python
+from knowledge.pipeline import KnowledgePipeline
+
+pipeline = KnowledgePipeline()
+result = pipeline.archive_scenario({"id": "reentrancy-basic", "steps": []})
+if result.success:
+    print(result.path)
+else:
+    print(result.error)
+```

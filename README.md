@@ -10,6 +10,57 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE).
 
 **Portfolio architecture:** canonical ownership and data flow live in [timeless-hayoka/ARCHITECTURE.md](https://github.com/timeless-hayoka/timeless-hayoka/blob/main/ARCHITECTURE.md). ANCHOR owns benchmarks, outcome ledger, and evidence lifecycle.
 
+Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) · Philosophy: [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)
+
+## Philosophy
+
+Most security tools answer:
+
+> What might be wrong?
+
+ANCHOR answers:
+
+> What can actually be reproduced?
+
+Every promoted finding must pass the [Proof Gate](docs/PROOF_GATE.md) before entering the knowledge corpus or influencing strategy. Trends are computed once (`anchor_trends.py`); strategy consumes them; dashboards and reports render snapshot fields—no duplicate math.
+
+## How ANCHOR differs
+
+ANCHOR is not another scanner. It is a **proof-gated smart-contract security research platform**:
+
+- **Evidence first** — findings must be locally reproducible and signed before promotion
+- **Structured knowledge** — reference topics in `knowledge/` plus archival JSON via `knowledge/pipeline.py`
+- **Comparative benchmarks** — measure against published runs in `benchmarks/index.json`
+- **Strategy from proof** — `./anchor strategy` consumes trends; it does not invent parallel rankings
+- **Local-first** — deep research without mandatory external services
+
+## Quick start
+
+Fifteen-minute path on a clean machine (full detail: [docs/REPRODUCTION.md](docs/REPRODUCTION.md)):
+
+```bash
+git clone https://github.com/timeless-hayoka/ANCHOR.git
+cd ANCHOR
+export ANCHOR_ROOT="$(pwd)"
+
+./anchor env init
+.venv/bin/pip install -r requirements.txt
+
+./anchor knowledge list
+./anchor knowledge show sarif
+
+./anchor benchmark dvd phase1   # requires Foundry + DVD checkout; see REPRODUCTION.md
+./anchor benchmark latest
+./anchor benchmark trends
+./anchor strategy
+```
+
+Sibling companion + MCP (optional):
+
+```bash
+git clone -b anchor https://github.com/timeless-hayoka/infj-bot.git ../infj_bot
+```
+
 ## Start here
 
 If you are new to ANCHOR, use this order:

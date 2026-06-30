@@ -4,3 +4,6 @@ anchor_signing_key.pem
 .venv/
 benchmarks/*/runs/
 chroma_db/
+# Ephemeral knowledge archival (curated scenarios may be committed intentionally)
+knowledge/training/
+knowledge/detectors/
