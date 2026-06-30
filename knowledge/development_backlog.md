@@ -8,6 +8,8 @@ Ordered for evidence-first ANCHOR evolution. Revisit after each published benchm
 - [x] CLI `anchor knowledge {list,show,search,refs}`
 - [x] HTTP knowledge endpoints on `anchor_server`
 - [x] Wire Trinity/Drift MCP tools (`anchor_knowledge_*`) to call `KnowledgeProvider`
+- [x] `knowledge/pipeline.py` archival sidecar (training / detectors / scenarios)
+- [x] `bugbot/trainer.py` — non-fatal archive after training run
 
 ## P1 — Graph & timeline
 
