@@ -6,8 +6,10 @@ from pathlib import Path
 import anchor_cli
 from outcome_evidence import (
     collect_evidence_records,
+    discover_benchmark_evidence,
     discover_bugbot_training_evidence,
     discover_hunt_analysis_evidence,
+    normalize_benchmark_evidence,
     normalize_bugbot_training_evidence,
     normalize_hunt_analysis_evidence,
     render_evidence_insights,
@@ -30,7 +32,7 @@ def test_normalize_bugbot_training_evidence():
         anchor_root=Path("/tmp/ANCHOR"),
     )
     assert record["kind"] == "bugbot_training"
-    assert record["status"] == "published"
+    assert record["status"] == "proof_gate_pass"
     assert record["metrics"]["passed"] == 1
 
 
@@ -188,3 +190,85 @@ def test_cmd_outcome_insights_collects_evidence(tmp_path, monkeypatch, capsys):
     assert rc == 0
     assert "Evidence artifacts" in out
     assert "bugbot_training: 1" in out
+
+
+def test_discover_skips_malformed_json(tmp_path):
+    training_dir = tmp_path / "outcomes" / "training"
+    training_dir.mkdir(parents=True)
+    (training_dir / "broken.json").write_text("{not json", encoding="utf-8")
+    (training_dir / "bugbot-scenarios-a.json").write_text(
+        json.dumps(
+            {
+                "runner": "bugbot",
+                "scenario_pack": "v1",
+                "timestamp": "2026-06-30T06:00:00+00:00",
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "proofs": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    rows = discover_bugbot_training_evidence(anchor_root=tmp_path, limit=5)
+    assert len(rows) == 1
+
+
+def test_normalize_benchmark_evidence_handles_non_dict_summary(tmp_path):
+    record = normalize_benchmark_evidence(
+        manifest_entry={
+            "id": "broken-summary",
+            "executed_at": "2026-06-29T18:00:00+00:00",
+            "status": "complete",
+            "artifact_json": "benchmarks/missing/benchmark.json",
+            "results_summary": ["not", "a", "dict"],
+        },
+        anchor_root=tmp_path,
+    )
+    assert record is not None
+    assert record["metrics"]["passed"] == 0
+    assert record["metrics"]["failed"] == 0
+
+
+def test_collect_evidence_records_sort_is_deterministic(tmp_path):
+    training_dir = tmp_path / "outcomes" / "training"
+    training_dir.mkdir(parents=True)
+    for name, ts in (("bugbot-a", "2026-06-30T06:00:00+00:00"), ("bugbot-b", "2026-06-30T06:00:00+00:00")):
+        (training_dir / f"{name}.json").write_text(
+            json.dumps(
+                {
+                    "runner": "bugbot",
+                    "scenario_pack": "v1",
+                    "timestamp": ts,
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "proofs": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+    first = collect_evidence_records(anchor_root=tmp_path, manifest_entries=[], limit=10)
+    second = collect_evidence_records(anchor_root=tmp_path, manifest_entries=[], limit=10)
+    assert [row["run_id"] for row in first] == [row["run_id"] for row in second]
+
+
+def test_render_evidence_insights_uses_proof_gate_language():
+    lines = render_evidence_insights(
+        [
+            {
+                "kind": "bugbot_training",
+                "timestamp": "2026-06-30T06:00:00+00:00",
+                "target": "bugbot-scenario-pack/v1",
+                "run_id": "bugbot-scenarios-a",
+                "artifact_path": "outcomes/training/bugbot-scenarios-a.json",
+                "status": "proof_gate_pass",
+                "label": "BugBot v1: 1/1 curriculum proofs passed",
+                "metrics": {"total": 1, "passed": 1, "failed": 0, "proofs": []},
+            }
+        ],
+        top_n=3,
+    )
+    text = "\n".join(lines)
+    assert "proof gate: proof_gate_pass" in text
+    assert "curriculum proofs passed" in text

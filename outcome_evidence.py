@@ -1,4 +1,8 @@
-"""Collect and normalize evidence artifacts for outcome insights."""
+"""Collect and normalize evidence artifacts for outcome insights.
+
+Read-only: discovers JSON on disk, normalizes records, and formats insight lines.
+Does not mutate ledger, manifests, or artifact files.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +21,7 @@ def _read_json(path: Path) -> dict[str, Any] | None:
         return None
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return None
     return payload if isinstance(payload, dict) else None
 
@@ -36,6 +40,59 @@ def _timestamp_sort_key(value: str) -> float:
     return parsed.timestamp()
 
 
+def _evidence_sort_key(row: dict[str, Any]) -> tuple[float, str, str, str]:
+    """Newest first; stable tie-breakers for equal/missing timestamps."""
+    return (
+        -_timestamp_sort_key(str(row.get("timestamp", ""))),
+        str(row.get("run_id", "")),
+        str(row.get("kind", "")),
+        str(row.get("artifact_path", "")),
+    )
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        if value is None or value == "":
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _coerce_summary(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, dict):
+        return raw
+    return {}
+
+
+def _coerce_proof_rows(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    rows: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        proof: dict[str, Any] = {}
+        if item.get("id") is not None:
+            proof["id"] = str(item.get("id"))
+        if item.get("result") is not None:
+            proof["result"] = str(item.get("result"))
+        if item.get("score") is not None:
+            proof["score"] = _safe_int(item.get("score"), default=0)
+        if proof:
+            rows.append(proof)
+    return rows
+
+
+def _bugbot_proof_gate_status(*, total: int, passed: int, failed: int) -> str:
+    """Curriculum proof gate only — not bounty publication status."""
+    if total > 0 and failed == 0 and passed == total:
+        return "proof_gate_pass"
+    if total > 0 and passed > 0:
+        return "proof_gate_partial"
+    return "proof_gate_fail"
+
+
 def normalize_benchmark_evidence(
     *,
     manifest_entry: dict[str, Any],
@@ -46,10 +103,12 @@ def normalize_benchmark_evidence(
         return None
     path = anchor_root / str(artifact_path)
     payload = load_benchmark_artifact(manifest_entry, anchor_root)
-    summary = summary_for_entry(manifest_entry, anchor_root)
-    if not isinstance(summary, dict):
-        summary = payload.get("results_summary") or payload.get("summary") or {}
-    rate = reproduction_rate(summary if isinstance(summary, dict) else {})
+    if not isinstance(payload, dict):
+        payload = {}
+    summary = _coerce_summary(summary_for_entry(manifest_entry, anchor_root))
+    if not summary:
+        summary = _coerce_summary(payload.get("results_summary") or payload.get("summary"))
+    rate = reproduction_rate(summary)
     run_id = str(
         manifest_entry.get("id")
         or payload.get("run_id")
@@ -62,40 +121,41 @@ def normalize_benchmark_evidence(
     )
     target = str(manifest_entry.get("target") or payload.get("target") or run_id)
     status = str(manifest_entry.get("status") or payload.get("status") or "unknown")
+    passed = _safe_int(summary.get("passed"))
+    failed = _safe_int(summary.get("failed"))
+    timed_out = _safe_int(summary.get("timed_out"))
+    skipped = _safe_int(summary.get("skipped"))
+    total = _safe_int(summary.get("cases")) or (passed + failed + timed_out + skipped)
+    artifact = path if path.suffix == ".json" else path.parent / "benchmark.json"
     return {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
         "kind": "benchmark",
-        "artifact_path": _rel_path(path if path.suffix == ".json" else path.parent / "benchmark.json", anchor_root),
+        "artifact_path": _rel_path(artifact, anchor_root),
         "timestamp": timestamp,
         "target": target,
         "run_id": run_id,
         "status": status,
         "metrics": {
-            "total": int(summary.get("cases") or 0) or (
-                int(summary.get("passed") or 0)
-                + int(summary.get("failed") or 0)
-                + int(summary.get("timed_out") or 0)
-                + int(summary.get("skipped") or 0)
-            ),
-            "passed": int(summary.get("passed") or 0),
-            "failed": int(summary.get("failed") or 0),
-            "timed_out": int(summary.get("timed_out") or 0),
-            "skipped": int(summary.get("skipped") or 0),
+            "total": total,
+            "passed": passed,
+            "failed": failed,
+            "timed_out": timed_out,
+            "skipped": skipped,
             "reproduction_rate": rate,
             "precision": summary.get("precision"),
             "recall": summary.get("recall"),
         },
-        "label": f"{run_id}: {status}",
+        "label": f"{run_id}: benchmark {status}",
     }
 
 
 def normalize_bugbot_training_evidence(*, path: Path, payload: dict[str, Any], anchor_root: Path) -> dict[str, Any]:
-    total = int(payload.get("total") or 0)
-    passed = int(payload.get("passed") or 0)
-    failed = int(payload.get("failed") or 0)
+    total = _safe_int(payload.get("total"))
+    passed = _safe_int(payload.get("passed"))
+    failed = _safe_int(payload.get("failed"))
     scenario_pack = str(payload.get("scenario_pack") or "v1")
     timestamp = str(payload.get("timestamp") or "")
-    status = "published" if failed == 0 and total > 0 and passed == total else "rejected"
+    gate = _bugbot_proof_gate_status(total=total, passed=passed, failed=failed)
     return {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
         "kind": "bugbot_training",
@@ -103,14 +163,14 @@ def normalize_bugbot_training_evidence(*, path: Path, payload: dict[str, Any], a
         "timestamp": timestamp,
         "target": f"bugbot-scenario-pack/{scenario_pack}",
         "run_id": path.stem,
-        "status": status,
+        "status": gate,
         "metrics": {
             "total": total,
             "passed": passed,
             "failed": failed,
-            "proofs": list(payload.get("proofs") or []),
+            "proofs": _coerce_proof_rows(payload.get("proofs")),
         },
-        "label": f"BugBot {scenario_pack}: {passed}/{total} proofs passed",
+        "label": f"BugBot {scenario_pack}: {passed}/{total} curriculum proofs passed",
     }
 
 
@@ -137,7 +197,7 @@ def normalize_hunt_analysis_evidence(*, path: Path, payload: dict[str, Any], anc
             "failed": failed,
             "skipped": skipped,
         },
-        "label": f"{target_id}: {final_status}",
+        "label": f"{target_id}: analysis {final_status}",
     }
 
 
@@ -149,12 +209,17 @@ def discover_benchmark_evidence(
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for entry in manifest_entries:
+        if not isinstance(entry, dict):
+            continue
         if not (entry.get("artifact_json") or entry.get("record")):
             continue
-        normalized = normalize_benchmark_evidence(manifest_entry=entry, anchor_root=anchor_root)
+        try:
+            normalized = normalize_benchmark_evidence(manifest_entry=entry, anchor_root=anchor_root)
+        except (TypeError, ValueError, OSError):
+            continue
         if normalized:
             rows.append(normalized)
-    rows.sort(key=lambda row: _timestamp_sort_key(str(row.get("timestamp", ""))), reverse=True)
+    rows.sort(key=_evidence_sort_key)
     if limit > 0:
         return rows[:limit]
     return rows
@@ -169,8 +234,11 @@ def discover_bugbot_training_evidence(*, anchor_root: Path, limit: int) -> list[
         payload = _read_json(path)
         if not payload or payload.get("runner") != "bugbot":
             continue
-        rows.append(normalize_bugbot_training_evidence(path=path, payload=payload, anchor_root=anchor_root))
-    rows.sort(key=lambda row: _timestamp_sort_key(str(row.get("timestamp", ""))), reverse=True)
+        try:
+            rows.append(normalize_bugbot_training_evidence(path=path, payload=payload, anchor_root=anchor_root))
+        except (TypeError, ValueError):
+            continue
+    rows.sort(key=_evidence_sort_key)
     if limit > 0:
         return rows[:limit]
     return rows
@@ -187,8 +255,11 @@ def discover_hunt_analysis_evidence(*, anchor_root: Path, limit: int) -> list[di
             continue
         if payload.get("record_type") not in {None, "analysis_run"}:
             continue
-        rows.append(normalize_hunt_analysis_evidence(path=path, payload=payload, anchor_root=anchor_root))
-    rows.sort(key=lambda row: _timestamp_sort_key(str(row.get("timestamp", ""))), reverse=True)
+        try:
+            rows.append(normalize_hunt_analysis_evidence(path=path, payload=payload, anchor_root=anchor_root))
+        except (TypeError, ValueError):
+            continue
+    rows.sort(key=_evidence_sort_key)
     if limit > 0:
         return rows[:limit]
     return rows
@@ -214,7 +285,7 @@ def collect_evidence_records(
     )
     rows.extend(discover_bugbot_training_evidence(anchor_root=anchor_root, limit=per_source))
     rows.extend(discover_hunt_analysis_evidence(anchor_root=anchor_root, limit=per_source))
-    rows.sort(key=lambda row: _timestamp_sort_key(str(row.get("timestamp", ""))), reverse=True)
+    rows.sort(key=_evidence_sort_key)
     if limit > 0:
         return rows[:limit]
     return rows
@@ -230,8 +301,9 @@ def render_evidence_insights(records: list[dict[str, Any]], *, top_n: int = 5) -
     if not records:
         return ["", "Evidence artifacts", "", "- No structured evidence artifacts found yet."]
 
+    sorted_records = sorted(records, key=_evidence_sort_key)
     by_kind: dict[str, list[dict[str, Any]]] = {kind: [] for kind in EVIDENCE_KINDS}
-    for record in records:
+    for record in sorted_records:
         kind = str(record.get("kind") or "unknown")
         by_kind.setdefault(kind, []).append(record)
 
@@ -244,27 +316,28 @@ def render_evidence_insights(records: list[dict[str, Any]], *, top_n: int = 5) -
     training = by_kind.get("bugbot_training", [])
     if training:
         latest = training[0]
-        metrics = latest.get("metrics") or {}
+        metrics = latest.get("metrics") if isinstance(latest.get("metrics"), dict) else {}
         lines.extend(
             [
                 "",
                 "BugBot training (latest)",
                 f"- {latest.get('label', latest.get('target', 'bugbot'))} · {latest.get('timestamp', 'unknown')}",
+                f"- proof gate: {latest.get('status', 'unknown')}",
             ]
         )
         if len(training) >= 2:
             previous = training[1]
-            prev_metrics = previous.get("metrics") or {}
-            delta = int(metrics.get("passed") or 0) - int(prev_metrics.get("passed") or 0)
+            prev_metrics = previous.get("metrics") if isinstance(previous.get("metrics"), dict) else {}
+            delta = _safe_int(metrics.get("passed")) - _safe_int(prev_metrics.get("passed"))
             if delta:
                 direction = "up" if delta > 0 else "down"
-                lines.append(f"- proof pass delta vs prior run: {direction} ({delta:+d})")
+                lines.append(f"- curriculum proof pass delta vs prior run: {direction} ({delta:+d})")
 
     benchmarks = by_kind.get("benchmark", [])[:top_n]
     if benchmarks:
         lines.extend(["", "Recent benchmark artifacts"])
         for row in benchmarks:
-            metrics = row.get("metrics") or {}
+            metrics = row.get("metrics") if isinstance(row.get("metrics"), dict) else {}
             lines.append(
                 f"- {row.get('run_id', row.get('target', 'benchmark'))}: "
                 f"pass={metrics.get('passed', '—')} fail={metrics.get('failed', '—')} "
@@ -276,7 +349,7 @@ def render_evidence_insights(records: list[dict[str, Any]], *, top_n: int = 5) -
     if hunts:
         lines.extend(["", "Hunt analysis archive"])
         for row in hunts:
-            metrics = row.get("metrics") or {}
+            metrics = row.get("metrics") if isinstance(row.get("metrics"), dict) else {}
             lines.append(
                 f"- {row.get('label', row.get('target', 'hunt'))}: "
                 f"stages pass={metrics.get('passed', '—')} fail={metrics.get('failed', '—')} "
