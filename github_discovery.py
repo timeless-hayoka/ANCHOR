@@ -20,6 +20,121 @@ DEFAULT_SEARCH_QUERIES = [
     "smart contract documentation testing",
 ]
 
+BUG_HUNT_PROFILES: dict[str, dict[str, Any]] = {
+    "auth": {
+        "label": "Authorization boundary",
+        "default_queries": [
+            "smart contract access control authorization owner role",
+            "solidity access control owner permission guard",
+            "bug bounty access control smart contract",
+        ],
+        "surface_terms": [
+            "access control",
+            "permission",
+            "owner",
+            "role",
+            "authorization",
+            "auth",
+            "guard",
+        ],
+        "issue_angles": [
+            "authorization boundary review",
+            "permission gate review",
+            "role and owner path review",
+        ],
+    },
+    "upgrade": {
+        "label": "Upgradeability",
+        "default_queries": [
+            "upgradeable proxy initializer uups smart contract",
+            "solidity proxy admin implementation upgrade",
+            "bug bounty upgradeability smart contract",
+        ],
+        "surface_terms": [
+            "upgrade",
+            "upgradable",
+            "upgradeability",
+            "proxy",
+            "initializer",
+            "implementation",
+            "uups",
+        ],
+        "issue_angles": [
+            "upgrade and initializer review",
+            "proxy boundary review",
+            "implementation slot review",
+        ],
+    },
+    "accounting": {
+        "label": "Accounting and rounding",
+        "default_queries": [
+            "smart contract accounting rounding share balance drift",
+            "solidity shares balances precision dust",
+            "bug bounty accounting invariant smart contract",
+        ],
+        "surface_terms": [
+            "account",
+            "accounting",
+            "balance",
+            "share",
+            "round",
+            "rounding",
+            "dust",
+            "precision",
+            "residual",
+            "drift",
+        ],
+        "issue_angles": [
+            "accounting drift review",
+            "rounding and residual review",
+            "share and balance delta review",
+        ],
+    },
+    "oracle": {
+        "label": "Oracle and input validation",
+        "default_queries": [
+            "oracle stale price feed validation smart contract",
+            "solidity price feed input validation",
+            "bug bounty oracle smart contract",
+        ],
+        "surface_terms": [
+            "oracle",
+            "price",
+            "stale",
+            "feed",
+            "input validation",
+            "validation",
+            "quote",
+        ],
+        "issue_angles": [
+            "oracle delay review",
+            "input validation review",
+            "stale feed review",
+        ],
+    },
+    "external": {
+        "label": "External call flow",
+        "default_queries": [
+            "smart contract external call reentrancy callback delegatecall",
+            "solidity external call low level call callback",
+            "bug bounty reentrancy smart contract",
+        ],
+        "surface_terms": [
+            "call",
+            "callback",
+            "delegatecall",
+            "external",
+            "reentrancy",
+            "low-level",
+        ],
+        "issue_angles": [
+            "external call ordering review",
+            "callback and reentrancy review",
+            "unchecked call result review",
+        ],
+    },
+}
+
 STOPWORDS = {
     "and",
     "for",
@@ -171,6 +286,12 @@ def tokenize_query(query: str) -> list[str]:
             continue
         tokens.append(raw)
     return tokens
+
+
+def get_profile_config(profile: str | None) -> dict[str, Any] | None:
+    if not profile:
+        return None
+    return BUG_HUNT_PROFILES.get(profile.strip().lower())
 
 
 def get_github_token() -> str | None:
@@ -503,7 +624,21 @@ def repo_text_blob(repo: dict[str, Any], readme: str) -> str:
     return " ".join(parts).lower()
 
 
-def compute_repo_score(repo: dict[str, Any], readme: str, query_tokens: list[str], public_signals: dict[str, Any] | None = None) -> RepoCandidate:
+def blob_has_any(blob: str, needles: Iterable[str]) -> bool:
+    return any(needle in blob for needle in needles)
+
+
+def count_blob_hits(blob: str, needles: Iterable[str]) -> int:
+    return sum(1 for needle in needles if needle in blob)
+
+
+def compute_repo_score(
+    repo: dict[str, Any],
+    readme: str,
+    query_tokens: list[str],
+    public_signals: dict[str, Any] | None = None,
+    profile: str | None = None,
+) -> RepoCandidate:
     full_name = str(repo.get("full_name") or f"{repo.get('owner', {}).get('login', '')}/{repo.get('name', '')}")
     signals = public_signals or {}
     candidate = RepoCandidate(
@@ -533,6 +668,18 @@ def compute_repo_score(repo: dict[str, Any], readme: str, query_tokens: list[str
     )
 
     text = repo_text_blob(repo, readme)
+    combined_surface_text = " ".join(
+        [
+            text,
+            " ".join(candidate.topics),
+            " ".join(candidate.security_signals),
+            " ".join(candidate.workflow_tools),
+            " ".join(candidate.dependency_manifests),
+        ]
+    ).lower()
+    profile_config = get_profile_config(profile)
+    profile_terms = [str(term).lower() for term in (profile_config or {}).get("surface_terms", []) if term]
+    profile_angles = [str(term).lower() for term in (profile_config or {}).get("issue_angles", []) if term]
     score = 0
 
     if not candidate.archived:
@@ -557,7 +704,7 @@ def compute_repo_score(repo: dict[str, Any], readme: str, query_tokens: list[str
         score += 2
         candidate.signals.append(RepoSignal("docs", "README present", 2))
         candidate.reasons.append("README present")
-        if len(readme) > 1000 or any(marker in text for marker in ("docs/", "contributing", "usage", "getting started", "invariant", "fuzz")):
+        if len(readme) > 1000 or blob_has_any(text, ("docs/", "contributing", "usage", "getting started", "invariant", "fuzz", "security policy", "bug bounty")):
             score += 1
             candidate.signals.append(RepoSignal("docs-depth", "README looks substantive", 1))
             candidate.reasons.append("README looks substantive")
@@ -599,14 +746,75 @@ def compute_repo_score(repo: dict[str, Any], readme: str, query_tokens: list[str
 
     if candidate.security_signals:
         score += sum(1 for signal in candidate.security_signals if "present" in signal.lower())
+        if any("SECURITY.md present" in signal for signal in candidate.security_signals):
+            score += 2
+            candidate.signals.append(RepoSignal("security-policy", "SECURITY.md present", 2))
+            candidate.reasons.append("security policy is visible")
+        if any("audit/advisory language present" in signal for signal in candidate.security_signals):
+            score += 3
+            candidate.signals.append(RepoSignal("security-context", "audit or bounty language", 3))
+            candidate.reasons.append("audit or bounty language is visible")
     if candidate.workflow_tools:
         score += 1
+        security_tools = count_blob_hits(" ".join(candidate.workflow_tools).lower(), ("codeql", "semgrep", "slither"))
+        if security_tools:
+            score += min(security_tools, 3)
+            candidate.signals.append(RepoSignal("security-tooling", f"{security_tools} security tool(s)", min(security_tools, 3)))
+            candidate.reasons.append("security tooling is configured")
+        if blob_has_any(" ".join(candidate.workflow_tools).lower(), ("foundry", "echidna", "forge")):
+            score += 2
+            candidate.signals.append(RepoSignal("test-harness", "foundry/echidna workflow", 2))
+            candidate.reasons.append("test or fuzz workflow is present")
     if candidate.dependency_manifests:
         score += 1
+        if blob_has_any(" ".join(candidate.dependency_manifests).lower(), ("foundry.toml", "package.json", "pyproject.toml", "cargo.toml", "go.mod", "dockerfile")):
+            score += 1
+            candidate.signals.append(RepoSignal("build-system", "structured build or package manifest", 1))
+            candidate.reasons.append("build or package metadata is present")
     if candidate.release_cadence == "active":
         score += 2
     elif candidate.release_cadence == "moderate":
         score += 1
+
+    if blob_has_any(combined_surface_text, ("solidity", "smart contract", "contract", "openzeppelin")):
+        score += 2
+        candidate.signals.append(RepoSignal("surface", "smart-contract surface", 2))
+        candidate.reasons.append("smart-contract surface is explicit")
+    if blob_has_any(combined_surface_text, ("access control", "permission", "owner", "role")):
+        score += 2
+        candidate.signals.append(RepoSignal("surface", "access control", 2))
+        candidate.reasons.append("access control surface is explicit")
+    if blob_has_any(combined_surface_text, ("upgrade", "proxy", "initializer", "uups")):
+        score += 2
+        candidate.signals.append(RepoSignal("surface", "upgradeability", 2))
+        candidate.reasons.append("upgradeability surface is explicit")
+    if blob_has_any(combined_surface_text, ("call", "delegatecall", "callback", "reentrancy", "external call")):
+        score += 2
+        candidate.signals.append(RepoSignal("surface", "external calls", 2))
+        candidate.reasons.append("external-call surface is explicit")
+    if blob_has_any(combined_surface_text, ("account", "balance", "share", "round", "dust", "precision")):
+        score += 1
+        candidate.signals.append(RepoSignal("surface", "accounting or rounding", 1))
+        candidate.reasons.append("accounting or rounding surface is explicit")
+    if blob_has_any(combined_surface_text, ("oracle", "price", "stale", "feed")):
+        score += 1
+        candidate.signals.append(RepoSignal("surface", "oracle or input validation", 1))
+        candidate.reasons.append("oracle or input-validation surface is explicit")
+    if blob_has_any(combined_surface_text, ("fuzz", "invariant", "property", "echidna", "foundry", "forge test", "pytest", "cargo test", "go test", "npm test")):
+        score += 2
+        candidate.signals.append(RepoSignal("testing-depth", "tests or fuzzing are explicit", 2))
+        candidate.reasons.append("tests or fuzzing are explicit")
+
+    if profile_terms and blob_has_any(combined_surface_text, profile_terms):
+        score += 3
+        candidate.signals.append(RepoSignal("profile-match", f"{profile or 'general'} profile match", 3))
+        candidate.reasons.append(f"{profile or 'general'} crawler profile match")
+        if profile_config and profile_config.get("issue_angles"):
+            candidate.reasons.append(str(profile_config["issue_angles"][0]))
+    if profile_angles and any(angle in combined_surface_text for angle in profile_angles):
+        score += 1
+        candidate.signals.append(RepoSignal("profile-angle", f"{profile or 'general'} issue angle match", 1))
+        candidate.reasons.append(f"{profile or 'general'} issue angle language is visible")
 
     keyword_hits = 0
     for token in query_tokens:
@@ -628,11 +836,18 @@ def compute_repo_score(repo: dict[str, Any], readme: str, query_tokens: list[str
         score += 1
         candidate.signals.append(RepoSignal("language", candidate.language, 1))
 
+    if candidate.archived and score < 10:
+        score -= 2
+        candidate.signals.append(RepoSignal("archive-age", "archived and low-signal", -2))
+    if not candidate.docs_present and not candidate.workflow_tools and not candidate.dependency_manifests:
+        score -= 2
+        candidate.signals.append(RepoSignal("surface-gap", "no docs, workflows, or manifests", -2))
+
     candidate.score = score
     candidate.priority_score = max(0, min(100, 50 + (score * 4)))
-    if score >= 9 and candidate.docs_present and candidate.open_issues > 0 and not candidate.archived:
+    if score >= 10 and candidate.docs_present and candidate.open_issues > 0 and not candidate.archived:
         candidate.recommendation = "join"
-    elif score >= 6:
+    elif score >= 7:
         candidate.recommendation = "watch"
     else:
         candidate.recommendation = "skip"
@@ -646,9 +861,12 @@ def compute_repo_score(repo: dict[str, Any], readme: str, query_tokens: list[str
     return candidate
 
 
-def issue_angles_for_repo(candidate: RepoCandidate) -> list[str]:
+def issue_angles_for_repo(candidate: RepoCandidate, profile: str | None = None) -> list[str]:
     text = f"{candidate.full_name} {candidate.description} {' '.join(candidate.topics)} {candidate.readme_excerpt}".lower()
     angles: list[str] = []
+    profile_config = get_profile_config(profile)
+    if profile_config:
+        angles.extend(str(item) for item in profile_config.get("issue_angles", []) if item)
     if any(term in text for term in ("solidity", "foundry", "echidna", "fuzz", "invariant", "smart contract")):
         angles.extend([
             "testing/invariants",
@@ -667,12 +885,17 @@ def issue_angles_for_repo(candidate: RepoCandidate) -> list[str]:
             "tests or regression coverage",
             "README / docs cleanup",
         ])
-    return angles[:3]
+    deduped: list[str] = []
+    for angle in angles:
+        if angle not in deduped:
+            deduped.append(angle)
+    return deduped[:3]
 
 
 def discover_repositories(
     queries: Iterable[str] | None = None,
     *,
+    profile: str | None = None,
     limit: int = 12,
     per_query: int = 25,
     include_forks: bool = False,
@@ -681,9 +904,11 @@ def discover_repositories(
     fetch_readmes: bool = True,
 ) -> dict[str, Any]:
     token = token or get_github_token()
-    active_queries = [query.strip() for query in (queries or DEFAULT_SEARCH_QUERIES) if query and query.strip()]
+    profile_config = get_profile_config(profile)
+    default_queries = list(profile_config.get("default_queries", [])) if profile_config else list(DEFAULT_SEARCH_QUERIES)
+    active_queries = [query.strip() for query in (queries or default_queries) if query and query.strip()]
     if not active_queries:
-        active_queries = list(DEFAULT_SEARCH_QUERIES)
+        active_queries = list(default_queries)
 
     search_hits: dict[str, dict[str, Any]] = {}
     search_order: list[str] = []
@@ -715,13 +940,15 @@ def discover_repositories(
             except Exception:
                 details = dict(item)
                 readme = ""
-        candidate = compute_repo_score(details, readme, query_terms, public_signals=public_signals)
+        candidate = compute_repo_score(details, readme, query_terms, public_signals=public_signals, profile=profile)
         candidates.append(candidate)
 
     candidates.sort(key=lambda candidate: (candidate.score, candidate.stars, candidate.open_issues), reverse=True)
     selected = candidates[:limit]
     bundle = {
         "generated_at": utcnow_iso(),
+        "profile": profile or "general",
+        "profile_label": (profile_config or {}).get("label", "General discovery"),
         "queries": active_queries,
         "query_terms": query_terms,
         "source_queries": [
@@ -746,7 +973,7 @@ def discover_repositories(
             "watch": sum(1 for candidate in selected if candidate.recommendation == "watch"),
             "skip": sum(1 for candidate in selected if candidate.recommendation == "skip"),
         },
-        "candidates": [candidate.to_dict() | {"issue_angles": issue_angles_for_repo(candidate)} for candidate in selected],
+        "candidates": [candidate.to_dict() | {"issue_angles": issue_angles_for_repo(candidate, profile=profile)} for candidate in selected],
     }
     return bundle
 
@@ -825,6 +1052,7 @@ def render_summary(bundle: dict[str, Any], run_dir: Path | None = None) -> str:
         "# GitHub Discovery Bundle",
         "",
         f"- generated_at: `{bundle.get('generated_at', 'unknown')}`",
+        f"- profile: `{bundle.get('profile', 'general')}`",
         f"- queries: `{'; '.join(bundle.get('queries', []) or [])}`",
         f"- selected: `{bundle.get('summary', {}).get('selected', 0)}`",
         f"- join: `{bundle.get('summary', {}).get('join', 0)}`",
@@ -957,6 +1185,7 @@ def copy_selection(
 def run_github_discovery(
     queries: Iterable[str] | None = None,
     *,
+    profile: str | None = None,
     limit: int = 12,
     per_query: int = 25,
     include_forks: bool = False,
@@ -966,6 +1195,7 @@ def run_github_discovery(
 ) -> tuple[dict[str, Any], Path]:
     bundle = discover_repositories(
         queries,
+        profile=profile,
         limit=limit,
         per_query=per_query,
         include_forks=include_forks,

@@ -56,6 +56,34 @@ BENCHMARK_RUNNERS = {
     ("ethernaut", "phase1"): ROOT / "benchmarks" / "ethernaut" / "run_phase1_benchmark.py",
 }
 
+GITHUB_CRAWLER_PROFILES = {
+    "auth": {
+        "command": "crawl-auth",
+        "profile": "auth",
+        "help": "Search GitHub for authorization-boundary bug surfaces",
+    },
+    "upgrade": {
+        "command": "crawl-upgrade",
+        "profile": "upgrade",
+        "help": "Search GitHub for upgradeability and initializer bug surfaces",
+    },
+    "accounting": {
+        "command": "crawl-accounting",
+        "profile": "accounting",
+        "help": "Search GitHub for accounting and rounding bug surfaces",
+    },
+    "oracle": {
+        "command": "crawl-oracle",
+        "profile": "oracle",
+        "help": "Search GitHub for oracle and input-validation bug surfaces",
+    },
+    "external": {
+        "command": "crawl-external",
+        "profile": "external",
+        "help": "Search GitHub for external-call and callback bug surfaces",
+    },
+}
+
 
 def utcnow_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
@@ -193,6 +221,16 @@ def create_parser() -> argparse.ArgumentParser:
     github_crawl.add_argument("--no-readmes", action="store_true", help="Skip README fetching and only use repository metadata")
     github_crawl.add_argument("--output-root", default=str(ROOT / "discoveries" / "github"), help="Folder where discovery bundles are written")
     github_crawl.add_argument("--json", action="store_true", help="Emit the bundle as JSON instead of text")
+    for profile_config in GITHUB_CRAWLER_PROFILES.values():
+        profile_parser = github_sub.add_parser(profile_config["command"], help=profile_config["help"])
+        profile_parser.add_argument("--query", action="append", default=[], help="Optional extra GitHub search query. Repeatable.")
+        profile_parser.add_argument("--limit", type=int, default=12, help="Maximum number of repositories to keep in the bundle")
+        profile_parser.add_argument("--per-query", type=int, default=25, help="Maximum search hits to inspect for each query")
+        profile_parser.add_argument("--include-forks", action="store_true", help="Include forked repositories in the discovery pass")
+        profile_parser.add_argument("--include-archived", action="store_true", help="Include archived repositories in the discovery pass")
+        profile_parser.add_argument("--no-readmes", action="store_true", help="Skip README fetching and only use repository metadata")
+        profile_parser.add_argument("--output-root", default=str(ROOT / "discoveries" / "github"), help="Folder where discovery bundles are written")
+        profile_parser.add_argument("--json", action="store_true", help="Emit the bundle as JSON instead of text")
     github_select = github_sub.add_parser("select", help="Copy a discovered repo into the human-approved queue")
     github_select.add_argument("repo", help="Repository full name to select, for example perimetersec/fuzzlib")
     github_select.add_argument("--output-root", default=str(ROOT / "discoveries" / "github"), help="Folder containing discovery bundles")
@@ -993,6 +1031,30 @@ def cmd_github_crawl(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_github_profile_crawl(args: argparse.Namespace, profile: str) -> int:
+    try:
+        bundle, run_dir = run_github_discovery(
+            args.query or None,
+            profile=profile,
+            limit=args.limit,
+            per_query=args.per_query,
+            include_forks=args.include_forks,
+            include_archived=args.include_archived,
+            fetch_readmes=not args.no_readmes,
+            output_root=Path(args.output_root),
+        )
+    except Exception as exc:
+        print(f"GitHub discovery failed: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(bundle, indent=2))
+    else:
+        print(render_github_discovery_summary(bundle, run_dir=run_dir))
+        print(f"\nDiscovery bundle written to: {run_dir}")
+    return 0
+
+
 def cmd_github_select(args: argparse.Namespace) -> int:
     output_root = Path(args.output_root)
     try:
@@ -1216,6 +1278,9 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_test(args)
     if args.command == "github" and args.github_command == "crawl":
         return cmd_github_crawl(args)
+    if args.command == "github" and args.github_command in {config["command"] for config in GITHUB_CRAWLER_PROFILES.values()}:
+        profile = next(config["profile"] for config in GITHUB_CRAWLER_PROFILES.values() if config["command"] == args.github_command)
+        return cmd_github_profile_crawl(args, profile)
     if args.command == "github" and args.github_command == "select":
         return cmd_github_select(args)
     if args.command == "github" and args.github_command == "plan":

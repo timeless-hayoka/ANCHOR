@@ -130,6 +130,172 @@ class GitHubDiscoveryTests(TestCase):
         self.assertEqual(signals["authorization_state"], "Explicitly authorized bounty / audit scope")
         self.assertEqual(signals["suggested_posture"], "Local clone analysis allowed and scope-limited review is encouraged")
 
+    def test_scoring_rewards_security_context_and_testing_depth(self):
+        candidate = github_discovery.compute_repo_score(
+            {
+                "full_name": "owner/security-lab",
+                "html_url": "https://github.com/owner/security-lab",
+                "description": "Smart contract security lab with fuzzing and invariants",
+                "stargazers_count": 42,
+                "forks_count": 8,
+                "open_issues_count": 4,
+                "pushed_at": "2026-06-29T00:00:00Z",
+                "updated_at": "2026-06-29T00:00:00Z",
+                "archived": False,
+                "fork": False,
+                "language": "Solidity",
+                "topics": ["solidity", "foundry", "fuzzing", "security"],
+            },
+            "Security policy, bug bounty scope, access control, upgradeability, external calls, invariant tests, echidna, codeql, semgrep, slither, foundry.toml",
+            ["security", "fuzzing", "invariant", "access", "control"],
+            public_signals={
+                "authorization_state": "Explicitly authorized bounty / audit scope",
+                "review_state": "Needs scope confirmation",
+                "suggested_posture": "Passive review only until scope is confirmed",
+                "likely_surface": ["smart-contract logic", "access control", "upgradeability", "external calls", "tests / fuzzing / CI"],
+                "security_signals": [
+                    "SECURITY.md present",
+                    "CodeQL present",
+                    "Semgrep present",
+                    "Slither present",
+                    "tests/fuzzing present",
+                    "audit/advisory language present",
+                ],
+                "workflow_tools": ["CodeQL", "Semgrep", "Slither", "Foundry", "Echidna"],
+                "dependency_manifests": ["foundry.toml"],
+                "release_cadence": "active",
+                "evidence_sources": [],
+            },
+        )
+
+        self.assertGreaterEqual(candidate.priority_score, 80)
+        self.assertEqual(candidate.recommendation, "join")
+        self.assertIn("security policy is visible", candidate.reasons)
+        self.assertIn("test or fuzz workflow is present", candidate.reasons)
+        self.assertIn("smart-contract surface is explicit", candidate.reasons)
+        self.assertIn("access control surface is explicit", candidate.reasons)
+
+    def test_profile_scoring_biases_matching_bug_classes(self):
+        cases = [
+            (
+                "auth",
+                {
+                    "full_name": "owner/auth-lab",
+                    "html_url": "https://github.com/owner/auth-lab",
+                    "description": "Access control study",
+                    "stargazers_count": 5,
+                    "forks_count": 1,
+                    "open_issues_count": 2,
+                    "pushed_at": "2026-06-29T00:00:00Z",
+                    "updated_at": "2026-06-29T00:00:00Z",
+                    "archived": False,
+                    "fork": False,
+                    "language": "Solidity",
+                    "topics": ["security", "solidity"],
+                },
+                "access control, owner, role, authorization",
+                "authorization boundary review",
+            ),
+            (
+                "upgrade",
+                {
+                    "full_name": "owner/upgrade-lab",
+                    "html_url": "https://github.com/owner/upgrade-lab",
+                    "description": "Proxy upgrade study",
+                    "stargazers_count": 5,
+                    "forks_count": 1,
+                    "open_issues_count": 2,
+                    "pushed_at": "2026-06-29T00:00:00Z",
+                    "updated_at": "2026-06-29T00:00:00Z",
+                    "archived": False,
+                    "fork": False,
+                    "language": "Solidity",
+                    "topics": ["security", "solidity"],
+                },
+                "proxy, initializer, implementation, uups",
+                "upgrade and initializer review",
+            ),
+            (
+                "accounting",
+                {
+                    "full_name": "owner/accounting-lab",
+                    "html_url": "https://github.com/owner/accounting-lab",
+                    "description": "Accounting drift study",
+                    "stargazers_count": 5,
+                    "forks_count": 1,
+                    "open_issues_count": 2,
+                    "pushed_at": "2026-06-29T00:00:00Z",
+                    "updated_at": "2026-06-29T00:00:00Z",
+                    "archived": False,
+                    "fork": False,
+                    "language": "Solidity",
+                    "topics": ["security", "solidity"],
+                },
+                "balance, share, rounding, dust, precision",
+                "accounting drift review",
+            ),
+            (
+                "oracle",
+                {
+                    "full_name": "owner/oracle-lab",
+                    "html_url": "https://github.com/owner/oracle-lab",
+                    "description": "Oracle validation study",
+                    "stargazers_count": 5,
+                    "forks_count": 1,
+                    "open_issues_count": 2,
+                    "pushed_at": "2026-06-29T00:00:00Z",
+                    "updated_at": "2026-06-29T00:00:00Z",
+                    "archived": False,
+                    "fork": False,
+                    "language": "Solidity",
+                    "topics": ["security", "solidity"],
+                },
+                "oracle, stale price feed, input validation",
+                "oracle delay review",
+            ),
+            (
+                "external",
+                {
+                    "full_name": "owner/external-lab",
+                    "html_url": "https://github.com/owner/external-lab",
+                    "description": "External call study",
+                    "stargazers_count": 5,
+                    "forks_count": 1,
+                    "open_issues_count": 2,
+                    "pushed_at": "2026-06-29T00:00:00Z",
+                    "updated_at": "2026-06-29T00:00:00Z",
+                    "archived": False,
+                    "fork": False,
+                    "language": "Solidity",
+                    "topics": ["security", "solidity"],
+                },
+                "delegatecall, callback, reentrancy, external call",
+                "external call ordering review",
+            ),
+        ]
+
+        for profile, repo, readme, expected_reason in cases:
+            candidate = github_discovery.compute_repo_score(
+                repo,
+                readme,
+                [profile, "security"],
+                public_signals={
+                    "authorization_state": "Public repo / no confirmed bounty scope",
+                    "review_state": "Needs scope confirmation",
+                    "suggested_posture": "Passive review only until scope is confirmed",
+                    "likely_surface": ["smart-contract logic"],
+                    "security_signals": ["SECURITY.md present", "tests/fuzzing present"],
+                    "workflow_tools": ["Foundry", "Echidna"],
+                    "dependency_manifests": ["foundry.toml"],
+                    "release_cadence": "active",
+                    "evidence_sources": [],
+                },
+                profile=profile,
+            )
+            self.assertGreaterEqual(candidate.priority_score, 80)
+            self.assertIn(f"{profile} crawler profile match", candidate.reasons)
+            self.assertIn(expected_reason, candidate.reasons)
+
     def test_selection_copies_candidate_without_mutating_source_bundle(self):
         run_dir = Path(self._tmpdir())
         run_dir.mkdir(parents=True, exist_ok=True)

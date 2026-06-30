@@ -102,6 +102,22 @@ def test_parser_accepts_github_crawl():
     assert args.no_readmes is True
 
 
+def test_parser_accepts_github_profile_crawls():
+    parser = anchor_cli.create_parser()
+    cases = [
+        (["github", "crawl-auth", "--limit", "7"], "crawl-auth"),
+        (["github", "crawl-upgrade", "--limit", "7"], "crawl-upgrade"),
+        (["github", "crawl-accounting", "--limit", "7"], "crawl-accounting"),
+        (["github", "crawl-oracle", "--limit", "7"], "crawl-oracle"),
+        (["github", "crawl-external", "--limit", "7"], "crawl-external"),
+    ]
+    for argv, command in cases:
+        args = parser.parse_args(argv)
+        assert args.command == "github"
+        assert args.github_command == command
+        assert args.limit == 7
+
+
 def test_parser_accepts_github_select():
     parser = anchor_cli.create_parser()
     args = parser.parse_args(["github", "select", "perimetersec/fuzzlib"])
