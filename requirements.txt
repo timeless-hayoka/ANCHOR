@@ -3,3 +3,4 @@ uvicorn
 cryptography
 pytest
 openai
+mcp>=1.27.0

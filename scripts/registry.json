@@ -11,9 +11,16 @@
       "language": "python",
       "owner": "anchor",
       "scope": "benchmark",
-      "allowed_inputs": ["ANCHOR_DVD_ROOT", "ANCHOR_BENCHMARK_TIMEOUT_SEC"],
+      "allowed_inputs": [
+        "ANCHOR_DVD_ROOT",
+        "ANCHOR_BENCHMARK_TIMEOUT_SEC"
+      ],
       "requires_authorization": false,
-      "output_types": ["benchmark.json", "README.md", "storage.json"],
+      "output_types": [
+        "benchmark.json",
+        "README.md",
+        "storage.json"
+      ],
       "audit_tag": "benchmark-runner"
     },
     {
@@ -24,9 +31,14 @@
       "language": "python",
       "owner": "anchor",
       "scope": "workflow",
-      "allowed_inputs": ["ANCHOR_BENCHMARK_LABEL"],
+      "allowed_inputs": [
+        "ANCHOR_BENCHMARK_LABEL"
+      ],
       "requires_authorization": false,
-      "output_types": ["stdout", "ledger.jsonl"],
+      "output_types": [
+        "stdout",
+        "ledger.jsonl"
+      ],
       "audit_tag": "workflow-entrypoint"
     },
     {
@@ -37,10 +49,35 @@
       "language": "python",
       "owner": "anchor",
       "scope": "telemetry",
-      "allowed_inputs": ["ANCHOR_SERVER_URL", "ANCHOR_RUN_ID"],
+      "allowed_inputs": [
+        "ANCHOR_SERVER_URL",
+        "ANCHOR_RUN_ID"
+      ],
       "requires_authorization": false,
-      "output_types": ["sse-events", "log.lines"],
+      "output_types": [
+        "sse-events",
+        "log.lines"
+      ],
       "audit_tag": "event-stream"
+    },
+    {
+      "id": "codex-mcp-launcher",
+      "name": "codex_mcp_launcher.py",
+      "path": "scripts/codex_mcp_launcher.py",
+      "description": "Launch or register the Codex MCP server for ANCHOR.",
+      "language": "python",
+      "owner": "anchor",
+      "scope": "workflow",
+      "allowed_inputs": [
+        "ANCHOR_ROOT"
+      ],
+      "requires_authorization": false,
+      "output_types": [
+        "stdout",
+        "mcp-registration",
+        "server-stdio"
+      ],
+      "audit_tag": "mcp-launcher"
     }
   ]
 }
