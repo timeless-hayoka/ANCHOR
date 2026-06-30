@@ -41,6 +41,7 @@ from anchor_sarif import build_research_loop, rewrite_finding, assess_economic_c
 from anchor_sarif.parser import Finding
 from anchor_work_queue import load_work_queue, render_work_queue, work_queue_summary
 from anchor_trends import compute_benchmark_trends, render_benchmark_trends
+from outcome_evidence import collect_evidence_records, render_evidence_insights
 from bugbot.analysis import AnalysisConfig, render_analysis_report, run_target_analysis
 from bugbot.scope import ANALYSIS, ScopeNotAuthorizedError, issue_scope_grant_from_confirmation, require_authorized_scope
 from bugbot.trainer import BugBotTrainer
@@ -1226,11 +1227,23 @@ def render_outcome_summary(entries: list[dict], lesson_limit: int = 5) -> str:
     return "\n".join(lines)
 
 
-def render_outcome_insights(entries: list[dict], limit: int = 50, top_n: int = 5) -> str:
-    if not entries:
+def render_outcome_insights(
+    entries: list[dict],
+    *,
+    evidence: list[dict] | None = None,
+    limit: int = 50,
+    top_n: int = 5,
+) -> str:
+    from anchor_strategy import categorize_lesson, PATTERN_RECOMMENDATIONS
+
+    if not entries and not evidence:
         return "No outcome ledger entries recorded yet."
 
-    from anchor_strategy import categorize_lesson, PATTERN_RECOMMENDATIONS
+    if not entries:
+        lines = ["No outcome ledger entries recorded yet."]
+        if evidence is not None:
+            lines.extend(render_evidence_insights(evidence, top_n=top_n))
+        return "\n".join(lines)
 
     rows = sorted(entries, key=lambda entry: entry.get("timestamp", ""), reverse=True)[:limit]
     by_status = Counter(entry.get("status", "unknown") for entry in rows)
@@ -1276,6 +1289,8 @@ def render_outcome_insights(entries: list[dict], limit: int = 50, top_n: int = 5
     lines.extend(["", "Top targets"])
     for target, count in by_target.most_common(top_n):
         lines.append(f"- {target}: {count}")
+    if evidence is not None:
+        lines.extend(render_evidence_insights(evidence, top_n=top_n))
     return "\n".join(lines)
 
 
@@ -1882,7 +1897,19 @@ def cmd_outcome_summary(args: argparse.Namespace) -> int:
 
 
 def cmd_outcome_insights(args: argparse.Namespace) -> int:
-    print(render_outcome_insights(load_outcome_entries(), limit=args.limit, top_n=args.top))
+    evidence = collect_evidence_records(
+        anchor_root=ROOT,
+        manifest_entries=load_manifest(),
+        limit=args.limit,
+    )
+    print(
+        render_outcome_insights(
+            load_outcome_entries(),
+            evidence=evidence,
+            limit=args.limit,
+            top_n=args.top,
+        )
+    )
     return 0
 
 
