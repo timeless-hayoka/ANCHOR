@@ -33,6 +33,7 @@ from anchor_trends import compute_benchmark_trends
 from anchor_strategy import compute_strategy
 from scabench_adapter import adapt as adapt_scabench
 from knowledge_provider import KnowledgeProvider
+from outcome_evidence import build_evidence_dashboard_summary
 
 APP_VERSION = "1.0.0"
 ROOT = Path(__file__).resolve().parent
@@ -763,6 +764,12 @@ def _anchor_snapshot(limit: int = 8) -> dict[str, Any]:
     )
     research_loop = _research_loop_snapshot(latest, strategy, trends, limit=max(1, limit))
     work_queue = work_queue_summary(load_work_queue())
+    evidence_summary = build_evidence_dashboard_summary(
+        anchor_root=ROOT,
+        manifest_entries=manifest.get("benchmarks", []),
+        record_limit=max(10, limit),
+        latest_n=max(3, min(limit, 8)),
+    )
     return {
         "identity": {"version": APP_VERSION, "service": "anchor", "release": f"ANCHOR {APP_VERSION}"},
         "history": {"runs": runs},
@@ -772,6 +779,7 @@ def _anchor_snapshot(limit: int = 8) -> dict[str, Any]:
         "benchmark_strategy": strategy,
         "research_loop": research_loop,
         "work_queue": work_queue,
+        "evidence_summary": evidence_summary,
         "script_registry": registry_summary(),
         "scabench": adapt_scabench(latest),
     }

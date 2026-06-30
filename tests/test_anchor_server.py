@@ -74,6 +74,9 @@ def test_anchor_snapshot_prefers_published_benchmark(monkeypatch: pytest.MonkeyP
         assert snap["work_queue"]["counts"]["active"] == 1
         assert snap["work_queue"]["top_item"]["id"] == "A-001"
         assert snap["benchmarks"][0]["id"] == "pub-run"
+        assert isinstance(snap["evidence_summary"]["sources"], dict)
+        assert "Benchmarks" in snap["evidence_summary"]["sources"]
+        assert isinstance(snap["evidence_summary"]["latest"], list)
         service = client.get("/api/service")
         assert service.status_code == 200
         assert service.json()["service"] == "anchor"
