@@ -1133,6 +1133,7 @@ def test_cmd_bugbot_analyze_runs_stages_with_grant(tmp_path: Path, monkeypatch, 
     assert rc == 0
     assert "Analysis: PASS" in out.out
     assert "INSPECT: PASS" in out.out
+    assert "Archive:" in out.out
 
 
 

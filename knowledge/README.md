@@ -62,6 +62,7 @@ Runtime artifacts from BugBot or trainers are written under:
 | `training/` | Complete training run snapshots |
 | `detectors/` | Per-detector result archives |
 | `scenarios/` | Curated scenario definitions (stable ids) |
+| `analysis/` | Immutable protected analysis run records |
 
 Use `knowledge.pipeline.KnowledgePipeline` (respects `ANCHOR_ROOT`). These files are separate from manifest-registered markdown topics—retrieve reference docs via `KnowledgeProvider`, not by stuffing JSON into prompts.
 

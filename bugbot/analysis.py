@@ -6,11 +6,11 @@ import logging
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 from bugbot.scope import (
-    IDENTITY_LOCAL_FIXTURE_UNPINNED,
     IDENTITY_VERIFIED_REPO,
     ScopeGrant,
     default_anchor_root,
@@ -20,6 +20,7 @@ from bugbot.target_identity import (
     blocked_identity_message,
     verify_target_identity,
 )
+from knowledge.pipeline import ArchiveResult
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +30,30 @@ _ALLOWED_ENV_PREFIXES = ("PATH", "LANG", "LC_", "FOUNDRY", "RUST", "CARGO")
 
 
 @dataclass(frozen=True)
+class CommandRecord:
+    stage: str
+    argv: tuple[str, ...]
+    cwd: str | None
+    started_at: datetime
+    finished_at: datetime
+    exit_code: int
+    isolated_env: bool = False
+
+
+@dataclass
+class AnalysisExecutionTrace:
+    commands: list[CommandRecord] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class AnalysisStageResult:
     stage: str
     success: bool
     summary: str
     skipped: bool = False
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    exit_code: int | None = None
 
 
 @dataclass(frozen=True)
@@ -44,6 +64,8 @@ class AnalysisConfig:
     repo_url: str | None = None
     workspace: Path | None = None
     anchor_root: Path | None = None
+    archive: bool = True
+    strict_archive: bool = False
 
 
 @dataclass
@@ -55,6 +77,11 @@ class AnalysisRunResult:
     blocked: bool = False
     blocked_reason: str | None = None
     identity_status: str | None = None
+    trace: AnalysisExecutionTrace = field(default_factory=AnalysisExecutionTrace)
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    target_commit: str | None = None
+    archive: ArchiveResult | None = None
 
 
 def default_analysis_workspace(target_id: str, anchor_root: Path | None = None) -> Path:
@@ -72,8 +99,12 @@ def _run_command(
     *,
     cwd: Path | None = None,
     env: dict[str, str] | None = None,
+    trace: AnalysisExecutionTrace | None = None,
+    stage: str | None = None,
+    isolated_env: bool = False,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    started = datetime.now(timezone.utc)
+    proc = subprocess.run(
         args,
         cwd=str(cwd) if cwd else None,
         env=env,
@@ -81,10 +112,28 @@ def _run_command(
         capture_output=True,
         text=True,
     )
+    finished = datetime.now(timezone.utc)
+    if trace is not None and stage:
+        trace.commands.append(
+            CommandRecord(
+                stage=stage,
+                argv=tuple(args),
+                cwd=str(cwd) if cwd else None,
+                started_at=started,
+                finished_at=finished,
+                exit_code=proc.returncode,
+                isolated_env=isolated_env,
+            )
+        )
+    return proc
 
 
-def _git_head(workspace: Path) -> str | None:
-    result = _run_command(["git", "-C", str(workspace), "rev-parse", "HEAD"])
+def _git_head(workspace: Path, trace: AnalysisExecutionTrace | None = None) -> str | None:
+    result = _run_command(
+        ["git", "-C", str(workspace), "rev-parse", "HEAD"],
+        trace=trace,
+        stage="clone",
+    )
     if result.returncode != 0:
         return None
     return result.stdout.strip()
@@ -94,12 +143,37 @@ def _effective_repo_url(config: AnalysisConfig) -> str | None:
     return config.repo_url or config.grant.target_repo_url
 
 
-def _stage_clone(config: AnalysisConfig, workspace: Path) -> AnalysisStageResult:
+def _stage_exit_code(trace: AnalysisExecutionTrace, stage: str) -> int | None:
+    stage_commands = [command for command in trace.commands if command.stage == stage]
+    if not stage_commands:
+        return None
+    return stage_commands[-1].exit_code
+
+
+def _stamp_stage(
+    result: AnalysisStageResult,
+    trace: AnalysisExecutionTrace,
+    started: datetime,
+    finished: datetime,
+) -> AnalysisStageResult:
+    return replace(
+        result,
+        started_at=started,
+        finished_at=finished,
+        exit_code=_stage_exit_code(trace, result.stage),
+    )
+
+
+def _stage_clone(
+    config: AnalysisConfig,
+    workspace: Path,
+    trace: AnalysisExecutionTrace,
+) -> AnalysisStageResult:
     verified = config.grant.identity_status == IDENTITY_VERIFIED_REPO
 
     if workspace.exists() and any(workspace.iterdir()):
         if (workspace / ".git").is_dir():
-            head = _git_head(workspace)
+            head = _git_head(workspace, trace)
             if head is None:
                 return AnalysisStageResult("clone", False, "workspace git repo unreadable")
             return AnalysisStageResult("clone", True, f"using existing workspace at {head[:12]}")
@@ -126,6 +200,8 @@ def _stage_clone(config: AnalysisConfig, workspace: Path) -> AnalysisStageResult
     workspace.parent.mkdir(parents=True, exist_ok=True)
     clone = _run_command(
         ["git", "clone", "--no-checkout", repo_url, str(workspace)],
+        trace=trace,
+        stage="clone",
     )
     if clone.returncode != 0:
         detail = (clone.stderr or clone.stdout or "git clone failed").strip()
@@ -135,12 +211,12 @@ def _stage_clone(config: AnalysisConfig, workspace: Path) -> AnalysisStageResult
     if verified:
         checkout_args.append("--detach")
     checkout_args.append(config.target_ref)
-    checkout = _run_command(checkout_args)
+    checkout = _run_command(checkout_args, trace=trace, stage="clone")
     if checkout.returncode != 0:
         detail = (checkout.stderr or checkout.stdout or "git checkout failed").strip()
         return AnalysisStageResult("clone", False, detail)
 
-    head = _git_head(workspace)
+    head = _git_head(workspace, trace)
     if head is None or (verified and not _head_matches_ref(config.target_ref, head)):
         return AnalysisStageResult("clone", False, "checked out ref does not match target_ref")
     return AnalysisStageResult("clone", True, f"cloned {repo_url} at {head[:12]}")
@@ -207,6 +283,7 @@ def _stage_test(
     *,
     grant: ScopeGrant,
     anchor_root: Path,
+    trace: AnalysisExecutionTrace,
 ) -> AnalysisStageResult:
     if grant.identity_status == IDENTITY_VERIFIED_REPO:
         if not _workspace_is_disposable(workspace, anchor_root):
@@ -221,17 +298,26 @@ def _stage_test(
     if not (workspace / "foundry.toml").is_file():
         return AnalysisStageResult("test", True, "skipped: no foundry.toml", skipped=True)
 
-    env = (
-        _isolated_execution_env(workspace)
-        if grant.identity_status == IDENTITY_VERIFIED_REPO
-        else None
+    isolated = grant.identity_status == IDENTITY_VERIFIED_REPO
+    env = _isolated_execution_env(workspace) if isolated else None
+    result = _run_command(
+        ["forge", "test", "--offline", "-q"],
+        cwd=workspace,
+        env=env,
+        trace=trace,
+        stage="test",
+        isolated_env=isolated,
     )
-    result = _run_command(["forge", "test", "--offline", "-q"], cwd=workspace, env=env)
     if result.returncode == 0:
-        return AnalysisStageResult("test", True, "forge test passed")
+        return AnalysisStageResult("test", True, "forge test passed", exit_code=0)
     detail = (result.stderr or result.stdout or "forge test failed").strip()
     lines = [line for line in detail.splitlines() if line.strip()]
-    return AnalysisStageResult("test", False, lines[-1] if lines else "forge test failed")
+    return AnalysisStageResult(
+        "test",
+        False,
+        lines[-1] if lines else "forge test failed",
+        exit_code=result.returncode,
+    )
 
 
 def _stage_fuzz(
@@ -261,6 +347,25 @@ def _stage_fuzz(
     )
 
 
+def _finalize_result(config: AnalysisConfig, result: AnalysisRunResult) -> AnalysisRunResult:
+    result.completed_at = datetime.now(timezone.utc)
+    if (result.workspace / ".git").is_dir():
+        result.target_commit = _git_head(result.workspace, result.trace)
+    if not config.archive:
+        return result
+    from bugbot.analysis_archive import archive_target_analysis
+
+    knowledge_root = (config.anchor_root or default_anchor_root()).resolve() / "knowledge"
+    result.archive = archive_target_analysis(
+        config,
+        result,
+        result.trace,
+        knowledge_root=knowledge_root,
+        strict_archive=config.strict_archive,
+    )
+    return result
+
+
 def run_target_analysis(config: AnalysisConfig) -> AnalysisRunResult:
     """
     Execute clone → identity → inspect → test → fuzz for an already authorized target.
@@ -269,24 +374,33 @@ def run_target_analysis(config: AnalysisConfig) -> AnalysisRunResult:
     """
     anchor_root = (config.anchor_root or default_anchor_root()).resolve()
     workspace = (config.workspace or default_analysis_workspace(config.target_id, anchor_root)).resolve()
+    trace = AnalysisExecutionTrace()
+    started_at = datetime.now(timezone.utc)
     stages: list[AnalysisStageResult] = []
 
-    clone_result = _stage_clone(config, workspace)
+    stage_started = datetime.now(timezone.utc)
+    clone_result = _stage_clone(config, workspace, trace)
+    clone_result = _stamp_stage(clone_result, trace, stage_started, datetime.now(timezone.utc))
     stages.append(clone_result)
     logger.info("analysis stage clone: %s", clone_result.summary)
     if not clone_result.success:
-        return AnalysisRunResult(
+        result = AnalysisRunResult(
             success=False,
             workspace=workspace,
             stages=stages,
             error=f"clone failed: {clone_result.summary}",
+            trace=trace,
+            started_at=started_at,
         )
+        return _finalize_result(config, result)
 
+    stage_started = datetime.now(timezone.utc)
     identity_stage, identity = _stage_identity(workspace, config.grant)
+    identity_stage = _stamp_stage(identity_stage, trace, stage_started, datetime.now(timezone.utc))
     stages.append(identity_stage)
     logger.info("analysis stage identity: %s", identity.summary)
     if not identity.verified:
-        return AnalysisRunResult(
+        result = AnalysisRunResult(
             success=False,
             workspace=workspace,
             stages=stages,
@@ -294,55 +408,81 @@ def run_target_analysis(config: AnalysisConfig) -> AnalysisRunResult:
             blocked_reason=identity.blocked_reason,
             identity_status=identity.identity_status,
             error=identity.summary,
+            trace=trace,
+            started_at=started_at,
         )
+        return _finalize_result(config, result)
 
+    stage_started = datetime.now(timezone.utc)
     inspect_result = _stage_inspect(workspace)
+    inspect_result = _stamp_stage(inspect_result, trace, stage_started, datetime.now(timezone.utc))
     stages.append(inspect_result)
     logger.info("analysis stage inspect: %s", inspect_result.summary)
     if not inspect_result.success:
-        return AnalysisRunResult(
+        result = AnalysisRunResult(
             success=False,
             workspace=workspace,
             stages=stages,
             identity_status=identity.identity_status,
             error=f"inspect failed: {inspect_result.summary}",
+            trace=trace,
+            started_at=started_at,
         )
+        return _finalize_result(config, result)
 
-    test_result = _stage_test(workspace, grant=config.grant, anchor_root=anchor_root)
+    stage_started = datetime.now(timezone.utc)
+    test_result = _stage_test(
+        workspace,
+        grant=config.grant,
+        anchor_root=anchor_root,
+        trace=trace,
+    )
+    test_result = _stamp_stage(test_result, trace, stage_started, datetime.now(timezone.utc))
     stages.append(test_result)
     logger.info("analysis stage test: %s", test_result.summary)
     if not test_result.success and not test_result.skipped:
-        return AnalysisRunResult(
+        result = AnalysisRunResult(
             success=False,
             workspace=workspace,
             stages=stages,
             identity_status=identity.identity_status,
             error=f"test failed: {test_result.summary}",
+            trace=trace,
+            started_at=started_at,
         )
+        return _finalize_result(config, result)
 
+    stage_started = datetime.now(timezone.utc)
     fuzz_result = _stage_fuzz(workspace, grant=config.grant, anchor_root=anchor_root)
+    fuzz_result = _stamp_stage(fuzz_result, trace, stage_started, datetime.now(timezone.utc))
     stages.append(fuzz_result)
     logger.info("analysis stage fuzz: %s", fuzz_result.summary)
     if not fuzz_result.success and not fuzz_result.skipped:
-        return AnalysisRunResult(
+        result = AnalysisRunResult(
             success=False,
             workspace=workspace,
             stages=stages,
             identity_status=identity.identity_status,
             error=f"fuzz failed: {fuzz_result.summary}",
+            trace=trace,
+            started_at=started_at,
         )
+        return _finalize_result(config, result)
 
-    return AnalysisRunResult(
+    result = AnalysisRunResult(
         success=True,
         workspace=workspace,
         stages=stages,
         identity_status=identity.identity_status,
+        trace=trace,
+        started_at=started_at,
     )
+    return _finalize_result(config, result)
 
 
 def render_analysis_report(result: AnalysisRunResult) -> str:
     if result.blocked:
-        return blocked_identity_message(
+        text = blocked_identity_message(
             TargetIdentityResult(
                 verified=False,
                 identity_status=result.identity_status or IDENTITY_VERIFIED_REPO,
@@ -350,9 +490,16 @@ def render_analysis_report(result: AnalysisRunResult) -> str:
                 blocked_reason=result.blocked_reason,
             )
         )
+        if result.archive and result.archive.success and result.archive.path:
+            text += f"\nArchive: {result.archive.path}"
+        elif result.archive and not result.archive.success:
+            text += f"\nArchive: FAILED — {result.archive.error}"
+        return text
+
+    from bugbot.analysis_record import derive_final_status
 
     lines = [
-        f"Analysis: {'PASS' if result.success else 'FAIL'}",
+        f"Analysis: {derive_final_status(result)}",
         f"Workspace: {result.workspace}",
     ]
     if result.identity_status:
@@ -366,4 +513,8 @@ def render_analysis_report(result: AnalysisRunResult) -> str:
         lines.append(f"{label}: {state} — {stage.summary}")
     if result.error:
         lines.append(f"Error: {result.error}")
+    if result.archive and result.archive.success and result.archive.path:
+        lines.append(f"Archive: {result.archive.path}")
+    elif result.archive and not result.archive.success:
+        lines.append(f"Archive: FAILED — {result.archive.error}")
     return "\n".join(lines)

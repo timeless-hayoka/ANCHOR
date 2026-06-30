@@ -120,6 +120,36 @@ class KnowledgeWriter:
             logger.error(msg)
             return ArchiveResult(success=False, error=msg)
 
+    def write_analysis_run(self, run_data: dict[str, Any]) -> ArchiveResult:
+        """Write an immutable protected analysis run record."""
+        try:
+            analysis_id = run_data.get("analysis_id")
+            if isinstance(analysis_id, str) and analysis_id.strip():
+                filename = f"{analysis_id.strip()}.json"
+            else:
+                filename = f"analysis-run-{_utc_stamp()}.json"
+            path = self.knowledge_root / "analysis" / filename
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = dict(run_data)
+            payload["analysis_id"] = path.stem
+            artifact_paths = dict(payload.get("artifact_paths") or {})
+            artifact_paths["archive_record"] = str(path)
+            payload["artifact_paths"] = artifact_paths
+            path.write_text(
+                json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            logger.info("[Knowledge] Analysis run archived: %s", path)
+            return ArchiveResult(success=True, path=path)
+        except TypeError as exc:
+            msg = f"JSON serialization error while writing analysis run: {exc}"
+            logger.error(msg)
+            return ArchiveResult(success=False, error=msg)
+        except OSError as exc:
+            msg = f"Failed to write analysis run: {exc}"
+            logger.error(msg)
+            return ArchiveResult(success=False, error=msg)
+
 
 class KnowledgePipeline:
     """High-level pipeline for BugBot → knowledge archival with graceful degradation."""
@@ -137,3 +167,6 @@ class KnowledgePipeline:
 
     def archive_scenario(self, scenario: dict[str, Any]) -> ArchiveResult:
         return self.writer.write_scenario(scenario)
+
+    def archive_analysis_run(self, run_data: dict[str, Any]) -> ArchiveResult:
+        return self.writer.write_analysis_run(run_data)

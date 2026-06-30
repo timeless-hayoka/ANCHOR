@@ -23,6 +23,7 @@ Ordered for evidence-first ANCHOR evolution. Revisit after each published benchm
 - [x] Protected analysis body: clone → identity → inspect → test → fuzz
 - [x] Target identity verification (`local_fixture_unpinned` vs `verified_repo`)
 - [x] Isolated execution guard for verified_repo test/fuzz under `scope/analysis/`
+- [x] Analysis archival via `KnowledgePipeline` (immutable analysis records)
 - [ ] GitHub selected-repo flow wiring
 - [ ] Per-target fuzz profiles and analysis archival
 

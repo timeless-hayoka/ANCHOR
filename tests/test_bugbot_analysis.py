@@ -94,6 +94,7 @@ def test_run_target_analysis_inspects_local_fixture_workspace(tmp_path: Path) ->
 
     assert result.success is True
     assert result.identity_status == IDENTITY_LOCAL_FIXTURE_UNPINNED
+    assert result.archive is not None and result.archive.success is True
     stages = {stage.stage: stage for stage in result.stages}
     assert stages["clone"].success is True
     assert stages["identity"].success is True

@@ -7,5 +7,6 @@ chroma_db/
 # Ephemeral knowledge archival (curated scenarios may be committed intentionally)
 knowledge/training/
 knowledge/detectors/
+knowledge/analysis/
 scope/active_grant.json
 scope/analysis/
