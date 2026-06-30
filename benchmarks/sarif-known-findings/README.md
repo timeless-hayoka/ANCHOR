@@ -40,20 +40,21 @@ Optional publish after review:
 
 ## Latest measured results
 
-**Run:** `sarif-known-findings-2026-06-30T19-17-27Z` (post-v1.0 A-001 baseline)
+**Run:** `sarif-known-findings-2026-06-30T23-48-08Z` (A-001 baseline after generic unchecked-call filter)
 
 | Metric | Value |
 |--------|-------|
 | Cases | 4 |
-| Passed | 3 |
-| Failed | 1 |
+| Passed | 4 |
+| Failed | 0 |
 | True positives | 3 |
-| False positives | 1 |
+| False positives | 0 |
 | False negatives | 0 |
+| True negatives | 1 |
 | Duplicates removed | 1 |
-| Precision | 0.75 |
+| Precision | 1.0 |
 | Recall | 1.0 |
-| F1 | 0.8571 |
+| F1 | 1.0 |
 
 ### Case outcomes
 
@@ -61,14 +62,14 @@ Optional publish after review:
 |------|--------|-------|
 | `duplicate-owner-check` | TP | Dedup collapsed two tool reports to one visible finding |
 | `halmos-balance-invariant` | TP | Halmos invariant surfaced correctly |
-| `generic-source-warning` | FP | Known false positive — unchecked-call promoted without exploit context |
-| `reentrancy-benign-miss` | TP | Cross-function reentrancy visible despite guard snippet (tracked regression) |
+| `generic-source-warning` | TN | Generic Slither `unchecked-call` discarded without exploit context |
+| `reentrancy-benign-miss` | TP | Cross-function reentrancy visible despite guard snippet |
 
 ## Lessons learned
 
 - Dedup and normalization behave on multi-tool duplicate owner checks.
-- **Open gap:** generic Slither warnings still promote as visible (`generic-source-warning` FP) — filter tuning is the next A-001 iteration.
-- Cross-function reentrancy case documents a prior FN regression with fix hint in run report.
+- Generic Slither `unchecked-call` warnings with only “Low-level call may be unsafe” are filtered; exploit-context messages still promote.
+- Cross-function reentrancy case documents guard-snippet dismissal behavior with fix hint in run report.
 
 ## Evidence artifacts
 

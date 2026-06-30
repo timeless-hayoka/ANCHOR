@@ -28,6 +28,22 @@ _OZ_PATTERN_RE = re.compile(
     r"\b(OpenZeppelin|Ownable|AccessControl|Pausable|SafeERC20|ReentrancyGuard)\b",
     re.IGNORECASE,
 )
+_GENERIC_UNCHECKED_CALL_MSG_RE = re.compile(
+    r"^low[- ]level call may be unsafe\.?$",
+    re.IGNORECASE,
+)
+_UNCHECKED_CALL_EXPLOIT_CONTEXT_RE = re.compile(
+    r"\b("
+    r"reentranc|"
+    r"delegatecall|"
+    r"arbitrary control|"
+    r"drain|"
+    r"loss[- ]of[- ]funds|"
+    r"unauthorized|"
+    r"eth sent"
+    r")\b",
+    re.IGNORECASE,
+)
 
 NOISY_RULES: dict[str, set[str]] = {
     "slither": {
@@ -72,6 +88,21 @@ def _match_noisy_rule(tool: str, rule_id: str, message: str) -> str | None:
     return None
 
 
+def _is_generic_slither_unchecked_call(finding: Finding) -> bool:
+    """Slither unchecked-call with only the generic low-level-call warning text."""
+    tool = (finding.tool or "").lower()
+    rule_id = (finding.rule_id or "").lower()
+    message = (finding.message or "").strip()
+    if tool != "slither" or "unchecked-call" not in rule_id:
+        return False
+    if not _GENERIC_UNCHECKED_CALL_MSG_RE.match(message):
+        return False
+    context = f"{message}\n{finding.snippet or ''}"
+    if _UNCHECKED_CALL_EXPLOIT_CONTEXT_RE.search(context):
+        return False
+    return True
+
+
 def assess_signal_noise(finding: Finding, *, source_context: str | None = None) -> dict[str, Any]:
     """Score whether a finding is likely scanner noise (rule-based only)."""
     reasons: list[str] = []
@@ -95,6 +126,10 @@ def assess_signal_noise(finding: Finding, *, source_context: str | None = None) 
     if noisy:
         reasons.append(noisy)
         score += 0.45
+
+    if _is_generic_slither_unchecked_call(finding):
+        reasons.append("Generic Slither unchecked-call without exploit context")
+        score += 0.7
 
     if _TEST_PATH_RE.search(file_path.replace("\\", "/")):
         reasons.append("Finding in test, mock, or library path")

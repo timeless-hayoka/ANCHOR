@@ -18,9 +18,9 @@ ANCHOR is only useful if its findings can be measured for signal quality, reprod
 
 - Corpus: `benchmarks/sarif-known-findings/` (4 labeled cases)
 - CLI path: `./anchor benchmark sarif known-findings`
-- Latest run: `sarif-known-findings-2026-06-30T19-17-27Z`
-- Measured: TP=3, FP=1, FN=0, dedup=1, precision=0.75, recall=1.0
-- Open: suppress `generic-source-warning` false positive (filter tuning)
+- Latest run: `sarif-known-findings-2026-06-30T23-48-08Z`
+- Measured: **TP=3, FP=0, FN=0, TN=1**, precision=1.0, recall=1.0
+- Filter fix: generic Slither `unchecked-call` without exploit context → discard (score 0.7)
 
 **Acceptance criteria**
 
@@ -35,7 +35,7 @@ ANCHOR is only useful if its findings can be measured for signal quality, reprod
   ```bash
   python3 -m pytest -q tests/test_anchor_cli.py tests/test_anchor_server.py tests/test_anchor_sarif.py
   ```
-* [ ] Publish a baseline run to `published` tier after FP regression is addressed or documented as known gap.
+* [ ] Publish a baseline run to `published` tier (`./anchor benchmark publish sarif-known-findings-2026-06-30T23-48-08Z`)
 
 **Evidence required**
 
