@@ -78,16 +78,18 @@ def test_build_scenario_pack_artifact_matches_canonical_schema():
         run=run,
         timestamp="2026-06-26T12:00:00+00:00",
         scenario_pack="v1",
+        run_id="bugbot-scenarios-test",
+        artifact_path="outcomes/training/bugbot-scenarios-test.json",
     )
-    assert payload == {
-        "runner": "bugbot",
-        "scenario_pack": "v1",
-        "timestamp": "2026-06-26T12:00:00+00:00",
-        "total": 1,
-        "passed": 1,
-        "failed": 0,
-        "proofs": [{"id": "uups-initializer-takeover", "result": "PASS", "score": 92}],
-    }
+    assert payload["kind"] == "bugbot_training"
+    assert payload["status"] == "proof_gate_passed"
+    assert payload["schema_version"] == "1.0"
+    assert payload["runner"] == "bugbot"
+    assert payload["scenario_pack"] == "v1"
+    assert payload["total"] == 1
+    assert payload["passed"] == 1
+    assert payload["failed"] == 0
+    assert payload["proofs"] == [{"id": "uups-initializer-takeover", "result": "PASS", "score": 92}]
 
 
 def test_archive_scenario_pack_run_writes_training_artifact(tmp_path):
@@ -112,6 +114,8 @@ def test_archive_scenario_pack_run_writes_training_artifact(tmp_path):
 
     assert artifact.exists()
     payload = json.loads(artifact.read_text(encoding="utf-8"))
+    assert payload["kind"] == "bugbot_training"
+    assert payload["status"] == "proof_gate_passed"
     assert payload["runner"] == "bugbot"
     assert payload["total"] == 1
     assert payload["proofs"][0]["id"] == "uups-initializer-takeover"

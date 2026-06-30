@@ -11,8 +11,14 @@ from pathlib import Path
 from typing import Any
 
 from anchor_trends import load_benchmark_artifact, parse_iso_timestamp, reproduction_rate, summary_for_entry
+from evidence_schema import (
+    EVIDENCE_SCHEMA_VERSION,
+    bugbot_proof_gate_status,
+    insight_record_from_canonical,
+    is_canonical_evidence,
+    normalize_evidence_status,
+)
 
-EVIDENCE_SCHEMA_VERSION = "1.0"
 EVIDENCE_KINDS = ("benchmark", "bugbot_training", "hunt_analysis")
 
 
@@ -84,13 +90,43 @@ def _coerce_proof_rows(raw: Any) -> list[dict[str, Any]]:
     return rows
 
 
-def _bugbot_proof_gate_status(*, total: int, passed: int, failed: int) -> str:
-    """Curriculum proof gate only — not bounty publication status."""
-    if total > 0 and failed == 0 and passed == total:
-        return "proof_gate_pass"
-    if total > 0 and passed > 0:
-        return "proof_gate_partial"
-    return "proof_gate_fail"
+def _is_bugbot_training_artifact(payload: dict[str, Any]) -> bool:
+    if is_canonical_evidence(payload):
+        return payload.get("kind") == "bugbot_training"
+    return payload.get("runner") == "bugbot"
+
+
+def normalize_bugbot_training_evidence(*, path: Path, payload: dict[str, Any], anchor_root: Path) -> dict[str, Any]:
+    if is_canonical_evidence(payload) and payload.get("kind") == "bugbot_training":
+        row = insight_record_from_canonical(payload)
+        if not row.get("artifact_path"):
+            row["artifact_path"] = _rel_path(path, anchor_root)
+        return row
+
+    total = _safe_int(payload.get("total"))
+    passed = _safe_int(payload.get("passed"))
+    failed = _safe_int(payload.get("failed"))
+    scenario_pack = str(payload.get("scenario_pack") or "v1")
+    timestamp = str(payload.get("timestamp") or "")
+    gate = normalize_evidence_status(bugbot_proof_gate_status(total=total, passed=passed, failed=failed))
+    return {
+        "schema_version": EVIDENCE_SCHEMA_VERSION,
+        "kind": "bugbot_training",
+        "artifact_path": _rel_path(path, anchor_root),
+        "timestamp": timestamp,
+        "target": f"bugbot-scenario-pack/{scenario_pack}",
+        "run_id": path.stem,
+        "status": gate,
+        "metrics": {
+            "total": total,
+            "passed": passed,
+            "failed": failed,
+            "proofs": _coerce_proof_rows(payload.get("proofs")),
+        },
+        "links": {},
+        "source": {"runner": "bugbot", "scenario_pack": scenario_pack},
+        "label": f"BugBot {scenario_pack}: {passed}/{total} curriculum proofs passed",
+    }
 
 
 def normalize_benchmark_evidence(
@@ -146,31 +182,6 @@ def normalize_benchmark_evidence(
             "recall": summary.get("recall"),
         },
         "label": f"{run_id}: benchmark {status}",
-    }
-
-
-def normalize_bugbot_training_evidence(*, path: Path, payload: dict[str, Any], anchor_root: Path) -> dict[str, Any]:
-    total = _safe_int(payload.get("total"))
-    passed = _safe_int(payload.get("passed"))
-    failed = _safe_int(payload.get("failed"))
-    scenario_pack = str(payload.get("scenario_pack") or "v1")
-    timestamp = str(payload.get("timestamp") or "")
-    gate = _bugbot_proof_gate_status(total=total, passed=passed, failed=failed)
-    return {
-        "schema_version": EVIDENCE_SCHEMA_VERSION,
-        "kind": "bugbot_training",
-        "artifact_path": _rel_path(path, anchor_root),
-        "timestamp": timestamp,
-        "target": f"bugbot-scenario-pack/{scenario_pack}",
-        "run_id": path.stem,
-        "status": gate,
-        "metrics": {
-            "total": total,
-            "passed": passed,
-            "failed": failed,
-            "proofs": _coerce_proof_rows(payload.get("proofs")),
-        },
-        "label": f"BugBot {scenario_pack}: {passed}/{total} curriculum proofs passed",
     }
 
 
@@ -232,7 +243,7 @@ def discover_bugbot_training_evidence(*, anchor_root: Path, limit: int) -> list[
     rows: list[dict[str, Any]] = []
     for path in sorted(training_dir.glob("*.json"), reverse=True):
         payload = _read_json(path)
-        if not payload or payload.get("runner") != "bugbot":
+        if not payload or not _is_bugbot_training_artifact(payload):
             continue
         try:
             rows.append(normalize_bugbot_training_evidence(path=path, payload=payload, anchor_root=anchor_root))

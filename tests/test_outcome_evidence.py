@@ -14,6 +14,7 @@ from outcome_evidence import (
     normalize_hunt_analysis_evidence,
     render_evidence_insights,
 )
+from evidence_schema import build_bugbot_training_record, is_canonical_evidence
 
 
 def test_normalize_bugbot_training_evidence():
@@ -32,7 +33,7 @@ def test_normalize_bugbot_training_evidence():
         anchor_root=Path("/tmp/ANCHOR"),
     )
     assert record["kind"] == "bugbot_training"
-    assert record["status"] == "proof_gate_pass"
+    assert record["status"] == "proof_gate_passed"
     assert record["metrics"]["passed"] == 1
 
 
@@ -253,6 +254,47 @@ def test_collect_evidence_records_sort_is_deterministic(tmp_path):
     assert [row["run_id"] for row in first] == [row["run_id"] for row in second]
 
 
+def test_normalize_bugbot_training_evidence_prefers_canonical_payload():
+    canonical = build_bugbot_training_record(
+        artifact_path="outcomes/training/bugbot-scenarios-canonical.json",
+        timestamp="2026-06-30T07:00:00+00:00",
+        run_id="bugbot-scenarios-canonical",
+        scenario_pack="v1",
+        total=2,
+        passed=2,
+        failed=0,
+        proofs=[],
+    )
+    assert is_canonical_evidence(canonical)
+    record = normalize_bugbot_training_evidence(
+        path=Path("/tmp/ANCHOR/outcomes/training/bugbot-scenarios-canonical.json"),
+        payload=canonical,
+        anchor_root=Path("/tmp/ANCHOR"),
+    )
+    assert record["status"] == "proof_gate_passed"
+    assert record["run_id"] == "bugbot-scenarios-canonical"
+    assert record["artifact_path"] == "outcomes/training/bugbot-scenarios-canonical.json"
+
+
+def test_normalize_bugbot_training_evidence_supports_legacy_payload():
+    legacy = {
+        "runner": "bugbot",
+        "scenario_pack": "v1",
+        "timestamp": "2026-06-30T05:38:57+00:00",
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "proofs": [{"id": "uups-initializer-takeover", "result": "PASS", "score": 92}],
+    }
+    record = normalize_bugbot_training_evidence(
+        path=Path("/tmp/ANCHOR/outcomes/training/bugbot-scenarios-legacy.json"),
+        payload=legacy,
+        anchor_root=Path("/tmp/ANCHOR"),
+    )
+    assert record["status"] == "proof_gate_passed"
+    assert record["source"]["scenario_pack"] == "v1"
+
+
 def test_render_evidence_insights_uses_proof_gate_language():
     lines = render_evidence_insights(
         [
@@ -262,7 +304,7 @@ def test_render_evidence_insights_uses_proof_gate_language():
                 "target": "bugbot-scenario-pack/v1",
                 "run_id": "bugbot-scenarios-a",
                 "artifact_path": "outcomes/training/bugbot-scenarios-a.json",
-                "status": "proof_gate_pass",
+                "status": "proof_gate_passed",
                 "label": "BugBot v1: 1/1 curriculum proofs passed",
                 "metrics": {"total": 1, "passed": 1, "failed": 0, "proofs": []},
             }
@@ -270,5 +312,5 @@ def test_render_evidence_insights_uses_proof_gate_language():
         top_n=3,
     )
     text = "\n".join(lines)
-    assert "proof gate: proof_gate_pass" in text
+    assert "proof gate: proof_gate_passed" in text
     assert "curriculum proofs passed" in text
