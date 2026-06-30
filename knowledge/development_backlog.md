@@ -11,8 +11,16 @@ Ordered for evidence-first ANCHOR evolution. Revisit after each published benchm
 - [x] `knowledge/pipeline.py` archival sidecar (training / detectors / scenarios)
 - [x] `bugbot/trainer.py` — non-fatal archive after training run
 - [x] `anchor bugbot train --scenario …` operator surface
+- [x] `require_authorized_scope(...)` gate (default: planning only)
 
-## P1 — Graph & timeline
+## P0.5 — BugBot hunt pipeline (paused)
+
+Workflow: `crawl → select → plan → scope-check → analysis`
+
+- [ ] Scope grant / scope-check command (records authorized target)
+- [ ] Wire `require_authorized_scope(...)` as first line of target-touching commands
+- [ ] `crawl`, `select`, `plan` remain planning-only until scope-check passes
+
 
 - [ ] Export investigation graph JSON from findings DB + ledger
 - [ ] Timeline view: signal → cluster → repro → outcome per case_id
