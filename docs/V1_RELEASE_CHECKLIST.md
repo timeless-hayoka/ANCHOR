@@ -152,5 +152,5 @@ Measure TP/FP/FN against `benchmarks/sarif-known-findings/` corpus through the n
 - [x] Published DVD Phase 1 metadata validated
 - [x] Fork failures documented as environmental
 - [x] Release notes complete
-- [ ] Tag `v1.0.0` pushed
-- [ ] GitHub Release published
+- [x] Tag `v1.0.0` pushed
+- [x] GitHub Release published — https://github.com/timeless-hayoka/ANCHOR/releases/tag/v1.0.0
