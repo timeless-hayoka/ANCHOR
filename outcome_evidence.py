@@ -24,6 +24,12 @@ from evidence_schema import (
 
 EVIDENCE_KINDS = ("benchmark", "bugbot_training", "hunt_analysis")
 
+EVIDENCE_KIND_LABELS = {
+    "benchmark": "Benchmarks",
+    "bugbot_training": "BugBot Training",
+    "hunt_analysis": "Hunt Analysis",
+}
+
 
 def _read_json(path: Path) -> dict[str, Any] | None:
     if not path.is_file():
@@ -327,6 +333,125 @@ def collect_evidence_records(
     return rows
 
 
+def evidence_source_counts(
+    *,
+    anchor_root: Path,
+    manifest_entries: list[dict[str, Any]] | None = None,
+) -> dict[str, int]:
+    """Count normalized evidence records per source kind (no artificial cap)."""
+    manifest_entries = manifest_entries or []
+    return {
+        "benchmark": len(
+            discover_benchmark_evidence(
+                anchor_root=anchor_root,
+                manifest_entries=manifest_entries,
+                limit=0,
+            )
+        ),
+        "bugbot_training": len(
+            discover_bugbot_training_evidence(anchor_root=anchor_root, limit=0)
+        ),
+        "hunt_analysis": len(
+            discover_hunt_analysis_evidence(anchor_root=anchor_root, limit=0)
+        ),
+    }
+
+
+def build_evidence_dashboard_summary(
+    *,
+    anchor_root: Path,
+    manifest_entries: list[dict[str, Any]] | None = None,
+    record_limit: int = 50,
+    latest_n: int = 5,
+) -> dict[str, Any]:
+    """Structured evidence summary for dashboards and API surfaces."""
+    manifest_entries = manifest_entries or []
+    counts = evidence_source_counts(anchor_root=anchor_root, manifest_entries=manifest_entries)
+    records = collect_evidence_records(
+        anchor_root=anchor_root,
+        manifest_entries=manifest_entries,
+        limit=record_limit,
+    )
+    latest = [
+        {
+            "kind": str(row.get("kind") or "unknown"),
+            "target": str(row.get("target") or ""),
+            "status": str(row.get("status") or "unknown"),
+            "timestamp": str(row.get("timestamp") or ""),
+        }
+        for row in records[: max(latest_n, 0)]
+    ]
+    return {
+        "sources": {
+            EVIDENCE_KIND_LABELS[kind]: counts.get(kind, 0)
+            for kind in EVIDENCE_KINDS
+        },
+        "latest": latest,
+    }
+
+
+def render_evidence_dashboard_summary(
+    *,
+    anchor_root: Path,
+    manifest_entries: list[dict[str, Any]] | None = None,
+    record_limit: int = 50,
+    latest_n: int = 5,
+) -> list[str]:
+    """Render the unified evidence layer for CLI and text dashboards."""
+    summary = build_evidence_dashboard_summary(
+        anchor_root=anchor_root,
+        manifest_entries=manifest_entries,
+        record_limit=record_limit,
+        latest_n=latest_n,
+    )
+    lines = ["", "Evidence Sources"]
+    for kind in EVIDENCE_KINDS:
+        label = EVIDENCE_KIND_LABELS[kind]
+        lines.append(f"- {label}: {summary['sources'].get(label, 0)}")
+    lines.extend(["", "Latest Evidence"])
+    latest = summary.get("latest") or []
+    if not latest:
+        lines.append("- No structured evidence artifacts found yet.")
+    else:
+        for row in latest:
+            lines.append(
+                f"- {row.get('kind', 'unknown')} · {row.get('target', '—')} · "
+                f"{row.get('status', 'unknown')} · {row.get('timestamp', 'unknown')}"
+            )
+    return lines
+
+
+def render_evidence_dashboard_summary_from_records(
+    records: list[dict[str, Any]],
+    *,
+    source_counts: dict[str, int] | None = None,
+    latest_n: int = 5,
+) -> list[str]:
+    """Render dashboard summary when records and optional counts are already loaded."""
+    counts = source_counts or {}
+    if not counts:
+        by_kind: dict[str, int] = {kind: 0 for kind in EVIDENCE_KINDS}
+        for row in records:
+            kind = str(row.get("kind") or "unknown")
+            if kind in by_kind:
+                by_kind[kind] += 1
+        counts = by_kind
+    lines = ["", "Evidence Sources"]
+    for kind in EVIDENCE_KINDS:
+        label = EVIDENCE_KIND_LABELS[kind]
+        lines.append(f"- {label}: {counts.get(kind, counts.get(label, 0))}")
+    lines.extend(["", "Latest Evidence"])
+    if not records:
+        lines.append("- No structured evidence artifacts found yet.")
+    else:
+        for row in records[: max(latest_n, 0)]:
+            lines.append(
+                f"- {row.get('kind', 'unknown')} · {row.get('target', '—')} · "
+                f"{row.get('status', 'unknown')} · {row.get('timestamp', 'unknown')}"
+            )
+    return lines
+
+
 def _format_rate(rate: float | None) -> str:
     if rate is None:
         return "n/a"
@@ -335,19 +460,24 @@ def _format_rate(rate: float | None) -> str:
 
 def render_evidence_insights(records: list[dict[str, Any]], *, top_n: int = 5) -> list[str]:
     if not records:
-        return ["", "Evidence artifacts", "", "- No structured evidence artifacts found yet."]
+        return render_evidence_dashboard_summary_from_records([], latest_n=top_n)
 
     sorted_records = sorted(records, key=_evidence_sort_key)
+    source_counts: dict[str, int] = {kind: 0 for kind in EVIDENCE_KINDS}
+    for record in sorted_records:
+        kind = str(record.get("kind") or "unknown")
+        if kind in source_counts:
+            source_counts[kind] += 1
+
+    lines = render_evidence_dashboard_summary_from_records(
+        sorted_records,
+        source_counts=source_counts,
+        latest_n=top_n,
+    )
     by_kind: dict[str, list[dict[str, Any]]] = {kind: [] for kind in EVIDENCE_KINDS}
     for record in sorted_records:
         kind = str(record.get("kind") or "unknown")
         by_kind.setdefault(kind, []).append(record)
-
-    lines = ["", "Evidence artifacts", "", "Source mix"]
-    for kind in EVIDENCE_KINDS:
-        count = len(by_kind.get(kind, []))
-        if count:
-            lines.append(f"- {kind}: {count}")
 
     training = by_kind.get("bugbot_training", [])
     if training:

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import anchor_cli
 from outcome_evidence import (
+    build_evidence_dashboard_summary,
     collect_evidence_records,
     discover_benchmark_evidence,
     discover_bugbot_training_evidence,
@@ -12,6 +13,7 @@ from outcome_evidence import (
     normalize_benchmark_evidence,
     normalize_bugbot_training_evidence,
     normalize_hunt_analysis_evidence,
+    render_evidence_dashboard_summary,
     render_evidence_insights,
 )
 from evidence_schema import build_bugbot_training_record, enrich_benchmark_artifact, enrich_hunt_analysis_artifact, is_canonical_evidence
@@ -161,8 +163,9 @@ def test_render_outcome_insights_includes_evidence_section():
         ],
         top_n=3,
     )
-    assert "Evidence artifacts" in rendered
-    assert "bugbot_training: 1" in rendered
+    assert "Evidence Sources" in rendered
+    assert "BugBot Training: 1" in rendered
+    assert "Latest Evidence" in rendered
     assert "BugBot training (latest)" in rendered
 
 
@@ -190,8 +193,9 @@ def test_cmd_outcome_insights_collects_evidence(tmp_path, monkeypatch, capsys):
     rc = anchor_cli.cmd_outcome_insights(type("Args", (), {"limit": 10, "top": 3}))
     out = capsys.readouterr().out
     assert rc == 0
-    assert "Evidence artifacts" in out
-    assert "bugbot_training: 1" in out
+    assert "Evidence Sources" in out
+    assert "BugBot Training: 1" in out
+    assert "Latest Evidence" in out
 
 
 def test_discover_skips_malformed_json(tmp_path):
@@ -345,6 +349,76 @@ def test_normalize_benchmark_evidence_prefers_canonical_payload(tmp_path):
     assert record is not None
     assert record["status"] == "published"
     assert record["metrics"]["passed"] == 2
+
+
+def test_build_evidence_dashboard_summary_counts_sources(tmp_path):
+    training_dir = tmp_path / "outcomes" / "training"
+    training_dir.mkdir(parents=True)
+    (training_dir / "bugbot-scenarios-a.json").write_text(
+        json.dumps(
+            {
+                "runner": "bugbot",
+                "scenario_pack": "v1",
+                "timestamp": "2026-06-30T06:00:00+00:00",
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "proofs": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest = [
+        {
+            "id": "dvd-phase1",
+            "executed_at": "2026-06-29T18:00:00+00:00",
+            "status": "complete",
+            "artifact_json": "benchmarks/dvd/benchmark.json",
+            "results_summary": {"passed": 2, "failed": 0, "timed_out": 0, "skipped": 0},
+        }
+    ]
+    run_dir = tmp_path / "benchmarks" / "dvd"
+    run_dir.mkdir(parents=True)
+    (run_dir / "benchmark.json").write_text(
+        json.dumps({"run_id": "dvd-phase1", "results_summary": manifest[0]["results_summary"]}),
+        encoding="utf-8",
+    )
+    summary = build_evidence_dashboard_summary(
+        anchor_root=tmp_path,
+        manifest_entries=manifest,
+        record_limit=10,
+        latest_n=3,
+    )
+    assert summary["sources"]["Benchmarks"] == 1
+    assert summary["sources"]["BugBot Training"] == 1
+    assert summary["sources"]["Hunt Analysis"] == 0
+    assert len(summary["latest"]) >= 2
+    assert {row["kind"] for row in summary["latest"]} >= {"benchmark", "bugbot_training"}
+
+
+def test_render_evidence_dashboard_summary_format(tmp_path):
+    training_dir = tmp_path / "outcomes" / "training"
+    training_dir.mkdir(parents=True)
+    (training_dir / "bugbot-scenarios-a.json").write_text(
+        json.dumps(
+            {
+                "runner": "bugbot",
+                "scenario_pack": "v1",
+                "timestamp": "2026-06-30T06:00:00+00:00",
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "proofs": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    lines = render_evidence_dashboard_summary(anchor_root=tmp_path, manifest_entries=[], latest_n=2)
+    text = "\n".join(lines)
+    assert "Evidence Sources" in text
+    assert "BugBot Training: 1" in text
+    assert "Latest Evidence" in text
+    assert "bugbot_training ·" in text
 
 
 def test_render_evidence_insights_uses_proof_gate_language():
