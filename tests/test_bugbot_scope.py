@@ -139,7 +139,8 @@ def test_load_active_grant_reports_expired_grant(tmp_path: Path) -> None:
     assert reason == ScopeDenialReason.SCOPE_RECORD_EXPIRED
 
 
-def test_require_authorized_scope_denies_by_default() -> None:
+def test_require_authorized_scope_denies_by_default(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("ANCHOR_ROOT", str(tmp_path))
     with pytest.raises(ScopeNotAuthorizedError) as exc:
         require_authorized_scope(
             target_id="dvd-local-lab",
