@@ -57,27 +57,29 @@ def test_run_benchmark_writes_compare_artifacts(tmp_path: Path, monkeypatch):
 
     assert payload["results_summary"]["cases"] == 5
     assert payload["results_summary"]["true_positives"] == 3
-    assert payload["results_summary"]["false_positives"] == 1
+    assert payload["results_summary"]["false_positives"] == 0
     assert payload["results_summary"]["false_negatives"] == 0
+    assert payload["results_summary"]["true_negatives"] == 2
     assert payload["results_summary"]["source_tool"]["visible_count"] == 4
-    assert payload["results_summary"]["source_tool"]["shared_visible"] == 3
+    assert payload["results_summary"]["source_tool"]["shared_visible"] == 2
     assert payload["results_summary"]["source_tool"]["anchor_only"] == 1
-    assert payload["results_summary"]["source_tool"]["source_only"] == 1
+    assert payload["results_summary"]["source_tool"]["source_only"] == 2
 
     assert benchmark_json["results_summary"] == payload["results_summary"]
     assert benchmark_json["source_tool_compare_json"].endswith("/runs/2026-06-28T13-00-00Z/source_tool_compare.json")
     assert metrics_json["benchmark"] == "defihacklabs-source-comparison"
     assert metrics_json["counts"]["true_positive"] == 3
-    assert metrics_json["metrics"]["precision"] == 0.75
+    assert metrics_json["counts"]["true_negative"] == 2
+    assert metrics_json["metrics"]["precision"] == 1.0
     assert metrics_json["source_tool"]["visible_count"] == 4
     assert metrics_json["source_tool"]["anchor_only"] == 1
-    assert metrics_json["source_tool"]["source_only"] == 1
+    assert metrics_json["source_tool"]["source_only"] == 2
     assert source_tool_metrics["source_tool"] == "slither"
     assert source_tool_metrics["visible_count"] == 4
     assert source_tool_compare["source_tool"] == "slither"
-    assert source_tool_compare["comparison"]["shared_visible"] == 3
+    assert source_tool_compare["comparison"]["shared_visible"] == 2
     assert source_tool_compare["comparison"]["anchor_only"] == 1
-    assert source_tool_compare["comparison"]["source_only"] == 1
+    assert source_tool_compare["comparison"]["source_only"] == 2
     assert "Source Tool Comparison" in report
     assert "source_tool_compare.json" in report
     assert "DeFiHackLabs Source-Tool Comparison" in root_report

@@ -10,6 +10,15 @@ import subprocess
 from collections import Counter
 from pathlib import Path
 
+from anchor_fork_rpc import (
+    ENV_KEY,
+    classify_fork_log,
+    fork_url_is_publicnode_without_token,
+    mask_rpc_url,
+    probe_archive_rpc,
+    resolve_mainnet_fork_url,
+    rpc_setup_instructions,
+)
 from anchor_storage import build_storage_manifest, evidence_dir, storage_manifest_path, storage_summary, write_json
 from evidence_schema import enrich_benchmark_artifact
 
@@ -32,13 +41,22 @@ SEVERITY_ORDER = ["High", "Medium", "Low", "Informational", "Optimization"]
 SIGNAL_IMPACTS = {"High", "Medium"}
 
 
-def run(cmd: list[str], cwd: Path | None = None, timeout: int | None = None) -> subprocess.CompletedProcess[str]:
+def run(
+    cmd: list[str],
+    cwd: Path | None = None,
+    timeout: int | None = None,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    merged_env = os.environ.copy()
+    if env:
+        merged_env.update(env)
     return subprocess.run(
         cmd,
         cwd=str(cwd) if cwd else None,
         text=True,
         capture_output=True,
         timeout=timeout,
+        env=merged_env,
     )
 
 
@@ -327,6 +345,22 @@ def main() -> int:
     }
     mythril_probe = probe_mythril()
 
+    fork_url, fork_source = resolve_mainnet_fork_url(dvd_root=DVD_ROOT, anchor_root=ANCHOR_ROOT)
+    fork_env: dict[str, str] = {}
+    if fork_url:
+        fork_env[ENV_KEY] = fork_url
+    rpc_probe = probe_archive_rpc(fork_url) if fork_url else {"ok": False, "error_kind": "missing_fork_url", "detail": "MAINNET_FORKING_URL not configured"}
+    using_publicnode_default = fork_url is None or fork_url_is_publicnode_without_token(fork_url)
+    rpc_environment = {
+        "mainnet_fork_url_source": fork_source,
+        "mainnet_fork_url_configured": bool(fork_url),
+        "mainnet_fork_url_masked": mask_rpc_url(fork_url),
+        "archive_probe_ok": bool(rpc_probe.get("ok")),
+        "archive_probe_error_kind": rpc_probe.get("error_kind"),
+        "using_publicnode_without_token": using_publicnode_default and not rpc_probe.get("ok"),
+        "setup_instructions": rpc_setup_instructions(using_default_publicnode=using_publicnode_default),
+    }
+
     results = []
     for item in expectations:
         rel = item["test_path"]
@@ -335,7 +369,7 @@ def main() -> int:
         started = dt.datetime.now(dt.timezone.utc)
         timed_out = False
         try:
-            proc = run(cmd, cwd=DVD_ROOT, timeout=challenge_timeout)
+            proc = run(cmd, cwd=DVD_ROOT, timeout=challenge_timeout, env=fork_env or None)
         except subprocess.TimeoutExpired as exc:
             timed_out = True
             proc = subprocess.CompletedProcess(
@@ -349,9 +383,19 @@ def main() -> int:
         duration = (ended - started).total_seconds()
         stdout_text = normalize_text(proc.stdout)
         stderr_text = normalize_text(proc.stderr)
+        combined_log = stdout_text + "\n" + stderr_text
+        rpc_failure_kind = classify_fork_log(combined_log) if item["requires_rpc"] else None
         log_path = run_dir / f"{item['challenge']}.log"
+        rpc_header = ""
+        if item["requires_rpc"]:
+            rpc_header = (
+                f"RPC source: {fork_source}\n"
+                f"RPC configured: {bool(fork_url)}\n"
+                f"Archive probe: {'ok' if rpc_probe.get('ok') else rpc_probe.get('error_kind')}\n\n"
+            )
         log_path.write_text(
             "$ " + " ".join(cmd) + "\n\n"
+            + rpc_header
             + "STDOUT\n" + stdout_text + "\n\n"
             + "STDERR\n" + stderr_text + "\n"
         )
@@ -375,6 +419,7 @@ def main() -> int:
             "anchor_output": anchor_output,
             "notes": item["notes"],
             "log_path": rel_to_anchor(log_path),
+            "rpc_failure_kind": rpc_failure_kind,
         })
 
     summary = {
@@ -424,6 +469,7 @@ def main() -> int:
             "os": platform.platform(),
             "forge_version": forge_version.stdout.strip(),
             "per_challenge_timeout_sec": TIMEOUT_SEC,
+            "fork_rpc": rpc_environment,
         },
         "detector_provenance": detector_provenance,
         "summary": summary,
@@ -503,6 +549,12 @@ def main() -> int:
         f"- OS: `{payload['environment']['os']}`",
         f"- Forge: `{payload['environment']['forge_version']}`",
         f"- Per-challenge timeout: `{TIMEOUT_SEC}s`",
+        f"- Mainnet fork URL source: `{rpc_environment['mainnet_fork_url_source']}`",
+        f"- Mainnet fork URL configured: `{rpc_environment['mainnet_fork_url_configured']}`",
+        f"- Archive probe: `{'ok' if rpc_environment['archive_probe_ok'] else rpc_environment['archive_probe_error_kind']}`",
+        "",
+        "## Fork RPC setup",
+        *([f"- {line}" for line in rpc_environment["setup_instructions"]]),
         "",
         "## Detector provenance",
         f"- Slither: `{slither_provenance['status']}`{f' · {slither_provenance.get("version")}' if slither_provenance.get('version') else ''}",
@@ -540,6 +592,10 @@ def main() -> int:
             f"- `{item['challenge']}` -> observed `{item['status']}` / expected `{item['expected_phase1_outcome']}` / comparison `{item['comparison']}`",
             f"  - anchor output: detection `{item['anchor_output']['detection_state']}`, reproduction `{item['anchor_output']['reproduction_state']}`, council `{item['anchor_output']['council_state']}`",
             f"  - detector stage: {slither_text}",
+        ])
+        if item.get("rpc_failure_kind"):
+            lines.append(f"  - rpc failure: `{item['rpc_failure_kind']}`")
+        lines.extend([
             f"  - path: `{item['test_path']}`",
             f"  - log: `{item['log_path']}`",
         ])

@@ -173,6 +173,12 @@ def create_parser() -> argparse.ArgumentParser:
     env_sub = env_parser.add_subparsers(dest="env_command", required=True)
     env_init = env_sub.add_parser("init", help="Create a local .venv for ANCHOR")
     env_init.add_argument("--python", default=sys.executable, help="Python interpreter to use for the venv")
+    env_fork_check = env_sub.add_parser("fork-check", help="Validate archive-capable mainnet fork RPC for DVD benchmarks")
+    env_fork_check.add_argument(
+        "--dvd-root",
+        default=None,
+        help="Damn Vulnerable DeFi checkout (default: ANCHOR_DVD_ROOT or ~/damn-vulnerable-defi)",
+    )
 
     benchmark_parser = sub.add_parser("benchmark", help="Run or inspect benchmark workflows")
     benchmark_sub = benchmark_parser.add_subparsers(dest="benchmark_command", required=True)
@@ -1349,6 +1355,53 @@ def cmd_env_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_env_fork_check(args: argparse.Namespace) -> int:
+    from anchor_fork_rpc import (
+        CURVY_PUPPET_FORK_BLOCK,
+        ENV_KEY,
+        PUPPET_V3_FORK_BLOCK,
+        fork_url_is_publicnode_without_token,
+        mask_rpc_url,
+        probe_archive_rpc,
+        resolve_mainnet_fork_url,
+        rpc_setup_instructions,
+    )
+
+    dvd_root = Path(args.dvd_root or __import__("os").environ.get("ANCHOR_DVD_ROOT", "/home/crexs/damn-vulnerable-defi"))
+    fork_url, source = resolve_mainnet_fork_url(dvd_root=dvd_root, anchor_root=ROOT)
+    using_default = fork_url is None or fork_url_is_publicnode_without_token(fork_url)
+
+    print("Mainnet fork RPC check")
+    print(f"- source: {source}")
+    print(f"- url: {mask_rpc_url(fork_url)}")
+    if not fork_url:
+        print("- status: NOT CONFIGURED")
+        print("")
+        for line in rpc_setup_instructions(using_default_publicnode=True):
+            print(f"  • {line}")
+        return 1
+
+    for label, block in (("puppet-v3", PUPPET_V3_FORK_BLOCK), ("curvy-puppet", CURVY_PUPPET_FORK_BLOCK)):
+        probe = probe_archive_rpc(fork_url, block)
+        status = "ok" if probe.get("ok") else probe.get("error_kind")
+        print(f"- probe {label} @ block {block}: {status}")
+        if not probe.get("ok"):
+            detail = str(probe.get("detail", ""))
+            if detail:
+                print(f"  detail: {detail[:240]}")
+
+    final_probe = probe_archive_rpc(fork_url, PUPPET_V3_FORK_BLOCK)
+    if final_probe.get("ok"):
+        print(f"- status: READY ({ENV_KEY} resolves and archive state is readable)")
+        return 0
+
+    print("- status: BROKEN")
+    print("")
+    for line in rpc_setup_instructions(using_default_publicnode=using_default):
+        print(f"  • {line}")
+    return 1
+
+
 def cmd_benchmark_history(args: argparse.Namespace) -> int:
     print(render_benchmark_history(load_manifest(), limit=args.limit, include_development=args.all))
     return 0
@@ -2015,6 +2068,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "env" and args.env_command == "init":
         return cmd_env_init(args)
+    if args.command == "env" and args.env_command == "fork-check":
+        return cmd_env_fork_check(args)
     if args.command == "benchmark" and args.benchmark_command == "history":
         return cmd_benchmark_history(args)
     if args.command == "benchmark" and args.benchmark_command == "compare":

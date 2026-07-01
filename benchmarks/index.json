@@ -1008,6 +1008,59 @@
       "published_at": "2026-07-01T02:51:21.983479+00:00",
       "published_record": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/PUBLISHED.md",
       "regression_report": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/REGRESSION_REPORT.md"
+    },
+    {
+      "id": "defihacklabs-source-comparison-2026-07-01T03-08-57Z",
+      "target": "anchor_sarif",
+      "title": "DeFiHackLabs source-tool comparison benchmark run",
+      "status": "complete",
+      "level": "Phase 3",
+      "executed_at": "2026-07-01T03:08:57.729324+00:00",
+      "confidence": "measured",
+      "publication_tier": "development",
+      "record": "benchmarks/defihacklabs/source-comparison/runs/2026-07-01T03-08-57Z/REPORT.md",
+      "artifact_json": "benchmarks/defihacklabs/source-comparison/runs/2026-07-01T03-08-57Z/benchmark.json",
+      "metrics_json": "benchmarks/defihacklabs/source-comparison/runs/2026-07-01T03-08-57Z/metrics.json",
+      "results_summary": {
+        "passed": 5,
+        "failed": 0,
+        "timed_out": 0,
+        "skipped": 0,
+        "true_positives": 3,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "true_negatives": 2,
+        "duplicates_removed": 1,
+        "raw_findings": 5,
+        "unique_findings": 4,
+        "detector_signals": 3,
+        "raw_detector_findings": 5,
+        "target_relevant_detector_findings": 3,
+        "medium_high_target_relevant_findings": 3,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "source_tool": {
+          "name": "slither",
+          "visible_count": 4,
+          "hidden_count": 1,
+          "shared_visible": 2,
+          "anchor_only": 1,
+          "source_only": 2,
+          "shared_hidden": 0,
+          "agreement": 2,
+          "visible_delta": -1
+        },
+        "cases": 5
+      },
+      "confidence_ladder": {
+        "methodology": "high",
+        "environment": "high",
+        "detection": "high",
+        "reproduction": "high",
+        "comparative_data": "high"
+      },
+      "verified": true
     }
   ],
   "history_policy": {

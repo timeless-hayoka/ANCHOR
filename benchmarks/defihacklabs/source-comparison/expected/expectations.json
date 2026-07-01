@@ -7,9 +7,9 @@
     "anchor_visible_false": 2,
     "source_tool_visible_true": 4,
     "source_tool_visible_false": 1,
-    "shared_visible": 3,
+    "shared_visible": 2,
     "anchor_only": 1,
-    "source_only": 1
+    "source_only": 2
   },
   "case_expectations": [
     {

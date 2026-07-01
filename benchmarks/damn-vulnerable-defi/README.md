@@ -55,6 +55,26 @@ Store run notes, registry outputs, and signed evidence references here as the be
 
 The expectation file gives future runs a stable comparison contract: expected ground truth, expected Phase 1 outcome, and per-challenge notes.
 
+## Fork RPC (puppet-v3, curvy-puppet)
+
+These challenges fork mainnet at historical blocks and require an **archive-capable** RPC endpoint.
+
+1. Copy [env.example](env.example) to your DVD checkout as `.env` (or export `MAINNET_FORKING_URL`).
+2. PublicNode’s free endpoint without a token returns HTTP 403 for archive state — add a personal token from https://www.allnodes.com/publicnode
+3. Verify from ANCHOR:
+
+```bash
+./anchor env fork-check
+```
+
+4. Re-run Phase 1:
+
+```bash
+./anchor benchmark dvd phase1
+```
+
+Benchmark logs label RPC failures as `archive_token_required` when PublicNode blocks historical state.
+
 ## Benchmark records
 
 - [2026-06-26 Phase 0 baseline](2026-06-26-phase0-baseline.md)
