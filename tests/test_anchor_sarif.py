@@ -158,6 +158,37 @@ def test_signal_filter_promotes_halmos_invariant():
     assert result["suggested_action"] == "promote"
 
 
+def test_signal_filter_discards_generic_slither_unchecked_call():
+    finding = Finding(
+        tool="slither",
+        rule_id="unchecked-call",
+        level="warning",
+        message="Low-level call may be unsafe",
+        file_path="src/Vault.sol",
+        start_line=88,
+        snippet='ok = payable(msg.sender).call{value: amount}("");',
+    )
+    result = assess_signal_noise(finding)
+    assert result["is_likely_false_positive"]
+    assert result["suggested_action"] == "discard"
+    assert result["confidence"] >= 0.7
+
+
+def test_signal_filter_promotes_exploit_specific_unchecked_call():
+    finding = Finding(
+        tool="slither",
+        rule_id="unchecked-call",
+        level="warning",
+        message="Unchecked low-level call may allow reentrancy drain of vault funds",
+        file_path="src/Vault.sol",
+        start_line=88,
+        snippet="target.call(data);",
+    )
+    result = assess_signal_noise(finding)
+    assert not result["is_likely_false_positive"]
+    assert result["suggested_action"] == "promote"
+
+
 def test_pipeline_filters_high_confidence_false_positives(tmp_path):
     db_path = tmp_path / "findings.db"
     pipeline = SARIFProcessingPipeline(

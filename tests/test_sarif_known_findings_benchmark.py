@@ -48,11 +48,17 @@ def test_run_benchmark_writes_metrics_and_report(tmp_path: Path, monkeypatch):
     root_report = (tmp_path / "REPORT.md").read_text()
     manifest = json.loads((tmp_path / "index.json").read_text())
 
-    assert payload["results_summary"]["duplicates_removed"] >= 1
-    assert payload["results_summary"]["passed"] + payload["results_summary"]["failed"] == 4
-    assert payload["results_summary"]["true_positives"] >= 1
-    assert payload["results_summary"]["false_positives"] >= 0
-    assert payload["results_summary"]["false_negatives"] >= 0
+    summary = payload["results_summary"]
+    assert summary["duplicates_removed"] >= 1
+    assert summary["cases"] == 4
+    assert summary["true_positives"] == 3
+    assert summary["false_positives"] == 0
+    assert summary["false_negatives"] == 0
+    assert summary["true_negatives"] == 1
+    assert summary["passed"] == 4
+    assert summary["failed"] == 0
+    assert summary["precision"] == 1.0
+    assert summary["recall"] == 1.0
     assert benchmark_json["results_summary"] == payload["results_summary"]
     assert metrics_json["benchmark"] == "sarif-known-findings"
     assert metrics_json["run_id"] == "sarif-known-findings-2026-06-28T12-00-00Z"
