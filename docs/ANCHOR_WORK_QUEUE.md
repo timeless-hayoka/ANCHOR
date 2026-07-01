@@ -6,7 +6,7 @@
 
 ### A-001 — Benchmark the SARIF pipeline against known findings
 
-**Status:** IN PROGRESS (post-v1.0.0)
+**Status:** COMPLETE
 
 **Goal**
 Run ANCHOR's SARIF ingest, normalization, deduplication, validation, and reporting flow against a known benchmark corpus.
@@ -20,7 +20,8 @@ ANCHOR is only useful if its findings can be measured for signal quality, reprod
 - CLI path: `./anchor benchmark sarif known-findings`
 - Latest run: `sarif-known-findings-2026-06-30T23-48-08Z`
 - Measured: **TP=3, FP=0, FN=0, TN=1**, precision=1.0, recall=1.0
-- Filter fix: generic Slither `unchecked-call` without exploit context → discard (score 0.7)
+- Published baseline: `sarif-known-findings-2026-06-30T23-48-08Z` (`publication_tier: published`)
+- Merge: PR #13 → `main` at `b16e92e`
 
 **Acceptance criteria**
 
@@ -35,7 +36,7 @@ ANCHOR is only useful if its findings can be measured for signal quality, reprod
   ```bash
   python3 -m pytest -q tests/test_anchor_cli.py tests/test_anchor_server.py tests/test_anchor_sarif.py
   ```
-* [ ] Publish a baseline run to `published` tier (`./anchor benchmark publish sarif-known-findings-2026-06-30T23-48-08Z`)
+* [x] Publish a baseline run to `published` tier (`./anchor benchmark publish sarif-known-findings-2026-06-30T23-48-08Z`)
 
 **Evidence required**
 

@@ -968,11 +968,11 @@
       "id": "sarif-known-findings-2026-06-30T23-48-08Z",
       "target": "anchor_sarif",
       "title": "SARIF known findings benchmark run",
-      "status": "complete",
+      "status": "published",
       "level": "Phase 1",
       "executed_at": "2026-06-30T23:48:08.336980+00:00",
       "confidence": "measured",
-      "publication_tier": "development",
+      "publication_tier": "published",
       "record": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/REPORT.md",
       "artifact_json": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/benchmark.json",
       "metrics_json": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/metrics.json",
@@ -1004,7 +1004,10 @@
         "reproduction": "high",
         "comparative_data": "partial"
       },
-      "verified": true
+      "verified": true,
+      "published_at": "2026-07-01T02:51:21.983479+00:00",
+      "published_record": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/PUBLISHED.md",
+      "regression_report": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/REGRESSION_REPORT.md"
     }
   ],
   "history_policy": {
