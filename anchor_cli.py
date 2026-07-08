@@ -40,6 +40,7 @@ from anchor_strategy import compute_strategy, render_strategy
 from anchor_sarif import build_research_loop, rewrite_finding, assess_economic_context
 from anchor_sarif.parser import Finding
 from anchor_work_queue import load_work_queue, render_work_queue, work_queue_summary
+from trinity_lead_state_machine import LeadRecord, render_lead_state, validate_lead
 from anchor_trends import compute_benchmark_trends, render_benchmark_trends
 from outcome_evidence import collect_evidence_records, render_evidence_insights
 from bugbot.analysis import AnalysisConfig, render_analysis_report, run_target_analysis
@@ -277,6 +278,12 @@ def create_parser() -> argparse.ArgumentParser:
     work_sub = work_parser.add_subparsers(dest="work_command", required=True)
     work_queue = work_sub.add_parser("queue", help="Render the repo-owned work queue document")
     work_queue.add_argument("--json", action="store_true", help="Emit structured JSON instead of text")
+
+    lead_parser = sub.add_parser("lead", help="Inspect Trinity lead state machine records")
+    lead_sub = lead_parser.add_subparsers(dest="lead_command", required=True)
+    lead_show = lead_sub.add_parser("show", help="Show a lead record's current state and validation status")
+    lead_show.add_argument("path", help="Path to a Trinity lead record JSON file")
+    lead_show.add_argument("--json", action="store_true", help="Emit structured JSON instead of text")
 
     knowledge_parser = sub.add_parser("knowledge", help="Browse structured ANCHOR reference documents")
     knowledge_sub = knowledge_parser.add_subparsers(dest="knowledge_command", required=True)
@@ -1459,6 +1466,18 @@ def cmd_work_queue(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_lead_show(args: argparse.Namespace) -> int:
+    path = Path(args.path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    record = LeadRecord.from_dict(payload)
+    errors = validate_lead(record)
+    if args.json:
+        print(json.dumps({"lead": record.to_dict(), "valid": not errors, "errors": errors}, indent=2))
+    else:
+        print(render_lead_state(record))
+    return 0 if not errors else 1
+
+
 def _knowledge_provider() -> KnowledgeProvider:
     return KnowledgeProvider(ROOT / "knowledge")
 
@@ -2084,6 +2103,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_strategy(args)
     if args.command == "work" and args.work_command == "queue":
         return cmd_work_queue(args)
+    if args.command == "lead" and args.lead_command == "show":
+        return cmd_lead_show(args)
     if args.command == "knowledge" and args.knowledge_command == "list":
         return cmd_knowledge_list(args)
     if args.command == "knowledge" and args.knowledge_command == "show":
