@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -1287,3 +1289,128 @@ def test_anchor_codex_mcp_print_config_matches_launcher():
     assert anchor_proc.returncode == 0
     assert launcher_proc.returncode == 0
     assert json.loads(anchor_proc.stdout) == json.loads(launcher_proc.stdout)
+
+
+def test_parser_accepts_lead_show():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["lead", "show", "leads/lead_001.json"])
+    assert args.command == "lead"
+    assert args.lead_command == "show"
+    assert args.path == "leads/lead_001.json"
+    assert args.json is False
+
+
+def test_parser_accepts_lead_show_json():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["lead", "show", "leads/lead_001.json", "--json"])
+    assert args.command == "lead"
+    assert args.lead_command == "show"
+    assert args.json is True
+
+
+def test_parser_requires_lead_subcommand():
+    parser = anchor_cli.create_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["lead"])
+
+
+def _valid_lead_payload(state: str = "signal") -> dict:
+    return {
+        "schema_version": "1.0",
+        "lead_id": "lead_001",
+        "target": "authorized-demo-target",
+        "scope_status": "authorized",
+        "state": state,
+        "title": "Unchecked external call may break accounting invariant",
+        "claim": "",
+        "scope": "",
+        "mechanism": "",
+        "falsifier": "",
+        "repro_plan": "",
+        "impact_boundary": "",
+        "evidence_refs": [],
+        "review_refs": [],
+        "created_at": "2026-07-03T00:00:00Z",
+        "updated_at": "2026-07-03T00:00:00Z",
+        "events": [],
+    }
+
+
+def test_cmd_lead_show_text_output_for_valid_record(tmp_path, capsys):
+    lead_path = tmp_path / "lead.json"
+    lead_path.write_text(json.dumps(_valid_lead_payload()), encoding="utf-8")
+
+    rc = anchor_cli.cmd_lead_show(type("Args", (), {"path": str(lead_path), "json": False}))
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "[lead_001] signal" in out
+    assert "(OK)" in out
+
+
+def test_cmd_lead_show_json_output_for_valid_record(tmp_path, capsys):
+    lead_path = tmp_path / "lead.json"
+    lead_path.write_text(json.dumps(_valid_lead_payload()), encoding="utf-8")
+
+    rc = anchor_cli.cmd_lead_show(type("Args", (), {"path": str(lead_path), "json": True}))
+    out = capsys.readouterr().out
+    payload = json.loads(out)
+
+    assert rc == 0
+    assert payload["valid"] is True
+    assert payload["errors"] == []
+    assert payload["lead"]["lead_id"] == "lead_001"
+    assert payload["lead"]["state"] == "signal"
+
+
+def test_cmd_lead_show_text_output_reports_invalid_record(tmp_path, capsys):
+    lead_path = tmp_path / "lead.json"
+    # hypothesis state without the rubric fields required to reach it.
+    lead_path.write_text(json.dumps(_valid_lead_payload(state="hypothesis")), encoding="utf-8")
+
+    rc = anchor_cli.cmd_lead_show(type("Args", (), {"path": str(lead_path), "json": False}))
+    out = capsys.readouterr().out
+
+    assert rc == 1
+    assert "INVALID" in out
+    assert "lead_001" in out
+
+
+def test_cmd_lead_show_json_output_lists_validation_errors(tmp_path, capsys):
+    lead_path = tmp_path / "lead.json"
+    lead_path.write_text(json.dumps(_valid_lead_payload(state="hypothesis")), encoding="utf-8")
+
+    rc = anchor_cli.cmd_lead_show(type("Args", (), {"path": str(lead_path), "json": True}))
+    out = capsys.readouterr().out
+    payload = json.loads(out)
+
+    assert rc == 1
+    assert payload["valid"] is False
+    assert len(payload["errors"]) > 0
+    assert any("claim" in error for error in payload["errors"])
+
+
+def test_cmd_lead_show_reads_the_repo_example_file(capsys):
+    example_path = ROOT / "examples" / "trinity_lead_state_machine.example.json"
+
+    rc = anchor_cli.cmd_lead_show(type("Args", (), {"path": str(example_path), "json": False}))
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "[lead_001] report_ready" in out
+    assert "(OK)" in out
+
+
+def test_cmd_lead_show_main_dispatches_to_lead_show(monkeypatch):
+    called = {}
+
+    def fake_cmd_lead_show(args):
+        called["path"] = args.path
+        called["json"] = args.json
+        return 0
+
+    monkeypatch.setattr(anchor_cli, "cmd_lead_show", fake_cmd_lead_show)
+    rc = anchor_cli.main(["lead", "show", "leads/lead_001.json", "--json"])
+
+    assert rc == 0
+    assert called == {"path": "leads/lead_001.json", "json": True}
