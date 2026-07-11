@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -133,6 +135,30 @@ def test_parser_accepts_work_queue():
     assert args.command == "work"
     assert args.work_command == "queue"
     assert args.json is True
+
+
+def test_parser_accepts_lead_show():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["lead", "show", "leads/lead_001.json"])
+    assert args.command == "lead"
+    assert args.lead_command == "show"
+    assert args.path == "leads/lead_001.json"
+    assert args.json is False
+
+
+def test_parser_accepts_lead_show_json():
+    parser = anchor_cli.create_parser()
+    args = parser.parse_args(["lead", "show", "leads/lead_001.json", "--json"])
+    assert args.command == "lead"
+    assert args.lead_command == "show"
+    assert args.path == "leads/lead_001.json"
+    assert args.json is True
+
+
+def test_parser_requires_lead_subcommand():
+    parser = anchor_cli.create_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["lead"])
 
 
 def test_parser_accepts_hunt_plan():
@@ -1287,3 +1313,89 @@ def test_anchor_codex_mcp_print_config_matches_launcher():
     assert anchor_proc.returncode == 0
     assert launcher_proc.returncode == 0
     assert json.loads(anchor_proc.stdout) == json.loads(launcher_proc.stdout)
+
+
+def test_cmd_lead_show_text_output_for_valid_signal_record(tmp_path: Path, capsys) -> None:
+    lead_path = tmp_path / "lead.json"
+    lead_path.write_text(
+        json.dumps({"lead_id": "lead_x", "target": "authorized-demo-target", "title": "Test lead"}),
+        encoding="utf-8",
+    )
+
+    rc = anchor_cli.cmd_lead_show(type("Args", (), {"path": str(lead_path), "json": False}))
+    out = capsys.readouterr()
+
+    assert rc == 0
+    assert "[lead_x] signal" in out.out
+    assert "Test lead" in out.out
+    assert "(OK)" in out.out
+
+
+def test_cmd_lead_show_json_output_for_valid_signal_record(tmp_path: Path, capsys) -> None:
+    lead_path = tmp_path / "lead.json"
+    lead_path.write_text(
+        json.dumps({"lead_id": "lead_x", "target": "authorized-demo-target", "title": "Test lead"}),
+        encoding="utf-8",
+    )
+
+    rc = anchor_cli.cmd_lead_show(type("Args", (), {"path": str(lead_path), "json": True}))
+    out = capsys.readouterr()
+    payload = json.loads(out.out)
+
+    assert rc == 0
+    assert payload["valid"] is True
+    assert payload["errors"] == []
+    assert payload["lead"]["lead_id"] == "lead_x"
+    assert payload["lead"]["state"] == "signal"
+
+
+def test_cmd_lead_show_text_output_for_invalid_record_returns_nonzero(tmp_path: Path, capsys) -> None:
+    lead_path = tmp_path / "lead.json"
+    lead_path.write_text(
+        json.dumps({
+            "lead_id": "lead_y",
+            "target": "authorized-demo-target",
+            "title": "Incomplete lead",
+            "state": "hypothesis",
+        }),
+        encoding="utf-8",
+    )
+
+    rc = anchor_cli.cmd_lead_show(type("Args", (), {"path": str(lead_path), "json": False}))
+    out = capsys.readouterr()
+
+    assert rc == 1
+    assert "[lead_y] hypothesis" in out.out
+    assert "INVALID" in out.out
+
+
+def test_cmd_lead_show_json_output_for_invalid_record_includes_errors(tmp_path: Path, capsys) -> None:
+    lead_path = tmp_path / "lead.json"
+    lead_path.write_text(
+        json.dumps({
+            "lead_id": "lead_y",
+            "target": "authorized-demo-target",
+            "title": "Incomplete lead",
+            "state": "hypothesis",
+        }),
+        encoding="utf-8",
+    )
+
+    rc = anchor_cli.cmd_lead_show(type("Args", (), {"path": str(lead_path), "json": True}))
+    out = capsys.readouterr()
+    payload = json.loads(out.out)
+
+    assert rc == 1
+    assert payload["valid"] is False
+    assert any("claim" in error for error in payload["errors"])
+
+
+def test_cmd_lead_show_against_example_file(capsys) -> None:
+    example_path = ROOT / "examples" / "trinity_lead_state_machine.example.json"
+
+    rc = anchor_cli.cmd_lead_show(type("Args", (), {"path": str(example_path), "json": False}))
+    out = capsys.readouterr()
+
+    assert rc == 0
+    assert "[lead_001] report_ready" in out.out
+    assert "(OK)" in out.out
