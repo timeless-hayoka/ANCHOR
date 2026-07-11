@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://anchor.local/schemas/trinity_lead_state_machine.schema.json",
+  "title": "Trinity Lead State Machine",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "lead_id",
+    "target",
+    "scope_status",
+    "state",
+    "title",
+    "claim",
+    "scope",
+    "mechanism",
+    "falsifier",
+    "repro_plan",
+    "impact_boundary",
+    "evidence_refs",
+    "review_refs",
+    "created_at",
+    "updated_at",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "lead_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope_status": {
+      "type": "string",
+      "enum": ["authorized", "unknown", "out_of_scope"]
+    },
+    "state": {
+      "$ref": "#/$defs/state"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "string"
+    },
+    "mechanism": {
+      "type": "string"
+    },
+    "falsifier": {
+      "type": "string"
+    },
+    "repro_plan": {
+      "type": "string"
+    },
+    "impact_boundary": {
+      "type": "string"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "review_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    }
+  },
+  "$defs": {
+    "state": {
+      "type": "string",
+      "enum": [
+        "signal",
+        "hypothesis",
+        "repro_attempted",
+        "reproduced_real",
+        "council_accepted",
+        "report_ready",
+        "rejected",
+        "out_of_scope",
+        "duplicate",
+        "needs_environment",
+        "needs_manual_review"
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "lead_id",
+        "from_state",
+        "to_state",
+        "actor",
+        "reason",
+        "evidence_refs",
+        "created_at"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lead_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "from_state": {
+          "anyOf": [{ "$ref": "#/$defs/state" }, { "type": "null" }]
+        },
+        "to_state": {
+          "$ref": "#/$defs/state"
+        },
+        "actor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}
