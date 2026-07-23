@@ -20,17 +20,19 @@ The server uses stdio, which is the best fit for local Codex workflows.
 
 ## Example host config
 
-```json
-{
-  "mcpServers": {
-    "anchor-codex": {
-      "command": "python3",
-      "args": ["codex_mcp_server.py"],
-      "cwd": "/home/crexs/ANCHOR"
-    }
-  }
-}
+Do not hand-type an absolute path here — it will break the moment the repo
+moves, the environment is renamed, or you register from a different
+machine. Instead, generate the config from the repo itself, which resolves
+its own location at runtime:
+
+```bash
+./scripts/codex_mcp_launcher.py --print-config
 ```
+
+That prints a `command`/`args`/`cwd` triple computed from `codex_mcp_launcher.py`'s
+own path (`Path(__file__).resolve().parents[1]`), so it is always correct for
+wherever the repo currently lives — no hardcoded host, username, or
+environment name involved.
 
 ## Notes
 
