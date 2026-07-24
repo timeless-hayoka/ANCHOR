@@ -2,8 +2,8 @@
 
 A plausible claim is not a finding (see TRINITY_RUBRIC.md). This module gives
 that rule a schema: leads move through an explicit, evidence-gated lifecycle
-and cannot be promoted to report_ready without reproduction and impact
-evidence attached along the way.
+and cannot be promoted to report_ready without reproduction, an independent
+Watcher challenge, and impact evidence attached along the way.
 """
 
 from __future__ import annotations
@@ -12,13 +12,14 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 LEAD_STATES = (
     "signal",
     "hypothesis",
     "repro_attempted",
     "reproduced_real",
+    "watcher_reviewed",
     "council_accepted",
     "report_ready",
     "rejected",
@@ -29,18 +30,21 @@ LEAD_STATES = (
 )
 
 TERMINAL_STATES = frozenset({"report_ready", "rejected", "out_of_scope", "duplicate"})
-
 SCOPE_STATUSES = frozenset({"authorized", "unknown", "out_of_scope"})
+WATCHER_VERDICTS = frozenset({"pending", "validated", "discredited", "inconclusive"})
 
-# Canonical transition graph. A lead may only move to a state listed for its
-# current state; anything else is an illegal transition.
+# The Watcher is deliberately placed between proof and council acceptance. It
+# receives the hypothesis and reproduction produced by the first two agents,
+# then tries to falsify them independently. It may validate the finding, send it
+# back for reframing, request human review, or reject it.
 ALLOWED_TRANSITIONS: dict[str, frozenset[str]] = {
     "signal": frozenset({"hypothesis", "rejected", "out_of_scope", "duplicate"}),
     "hypothesis": frozenset({"repro_attempted", "rejected", "out_of_scope", "duplicate", "needs_manual_review"}),
     "repro_attempted": frozenset({"reproduced_real", "needs_environment", "rejected", "out_of_scope"}),
     "needs_environment": frozenset({"repro_attempted", "rejected"}),
-    "reproduced_real": frozenset({"council_accepted", "needs_manual_review", "rejected"}),
-    "needs_manual_review": frozenset({"council_accepted", "hypothesis", "rejected"}),
+    "reproduced_real": frozenset({"watcher_reviewed", "needs_manual_review", "rejected"}),
+    "watcher_reviewed": frozenset({"council_accepted", "hypothesis", "needs_manual_review", "rejected"}),
+    "needs_manual_review": frozenset({"watcher_reviewed", "council_accepted", "hypothesis", "rejected"}),
     "council_accepted": frozenset({"report_ready", "rejected"}),
     "report_ready": frozenset(),
     "rejected": frozenset(),
@@ -48,29 +52,30 @@ ALLOWED_TRANSITIONS: dict[str, frozenset[str]] = {
     "duplicate": frozenset(),
 }
 
-# Fields required by the Trinity rubric (claim, mechanism, falsifier, repro
-# plan, impact boundary) that must be non-empty once a lead reaches a given
-# state. Each state's requirement set is cumulative over the canonical path.
 REQUIRED_FIELDS_BY_STATE: dict[str, tuple[str, ...]] = {
     "signal": (),
     "hypothesis": ("claim", "scope", "mechanism", "falsifier"),
     "repro_attempted": ("claim", "scope", "mechanism", "falsifier", "repro_plan"),
     "needs_environment": ("claim", "scope", "mechanism", "falsifier", "repro_plan"),
     "reproduced_real": ("claim", "scope", "mechanism", "falsifier", "repro_plan"),
+    "watcher_reviewed": ("claim", "scope", "mechanism", "falsifier", "repro_plan", "watcher_challenge"),
     "needs_manual_review": ("claim", "scope", "mechanism", "falsifier", "repro_plan"),
-    "council_accepted": ("claim", "scope", "mechanism", "falsifier", "repro_plan", "impact_boundary"),
-    "report_ready": ("claim", "scope", "mechanism", "falsifier", "repro_plan", "impact_boundary"),
+    "council_accepted": (
+        "claim", "scope", "mechanism", "falsifier", "repro_plan",
+        "watcher_challenge", "impact_boundary",
+    ),
+    "report_ready": (
+        "claim", "scope", "mechanism", "falsifier", "repro_plan",
+        "watcher_challenge", "impact_boundary",
+    ),
     "rejected": (),
     "out_of_scope": (),
     "duplicate": (),
 }
 
-# States from which evidence_refs must already contain at least one entry
-# before the lead may sit in that state (reproduction proof).
-STATES_REQUIRING_EVIDENCE = frozenset({"reproduced_real", "council_accepted", "report_ready"})
-
-# States from which review_refs must already contain at least one entry
-# (council sign-off) before the lead may sit in that state.
+STATES_REQUIRING_EVIDENCE = frozenset({"reproduced_real", "watcher_reviewed", "council_accepted", "report_ready"})
+STATES_REQUIRING_WATCHER = frozenset({"watcher_reviewed", "council_accepted", "report_ready"})
+STATES_REQUIRING_VALIDATED_WATCHER = frozenset({"council_accepted", "report_ready"})
 STATES_REQUIRING_REVIEW = frozenset({"council_accepted", "report_ready"})
 
 
@@ -132,8 +137,11 @@ class LeadRecord:
     mechanism: str = ""
     falsifier: str = ""
     repro_plan: str = ""
+    watcher_verdict: str = "pending"
+    watcher_challenge: str = ""
     impact_boundary: str = ""
     evidence_refs: list[str] = field(default_factory=list)
+    watcher_refs: list[str] = field(default_factory=list)
     review_refs: list[str] = field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
@@ -152,8 +160,11 @@ class LeadRecord:
             "mechanism": self.mechanism,
             "falsifier": self.falsifier,
             "repro_plan": self.repro_plan,
+            "watcher_verdict": self.watcher_verdict,
+            "watcher_challenge": self.watcher_challenge,
             "impact_boundary": self.impact_boundary,
             "evidence_refs": list(self.evidence_refs),
+            "watcher_refs": list(self.watcher_refs),
             "review_refs": list(self.review_refs),
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -165,6 +176,7 @@ class LeadRecord:
         events_raw = payload.get("events")
         events = [LeadEvent.from_dict(item) for item in events_raw] if isinstance(events_raw, list) else []
         evidence_refs = payload.get("evidence_refs")
+        watcher_refs = payload.get("watcher_refs")
         review_refs = payload.get("review_refs")
         return cls(
             lead_id=str(payload.get("lead_id") or ""),
@@ -177,8 +189,11 @@ class LeadRecord:
             mechanism=str(payload.get("mechanism") or ""),
             falsifier=str(payload.get("falsifier") or ""),
             repro_plan=str(payload.get("repro_plan") or ""),
+            watcher_verdict=str(payload.get("watcher_verdict") or "pending"),
+            watcher_challenge=str(payload.get("watcher_challenge") or ""),
             impact_boundary=str(payload.get("impact_boundary") or ""),
             evidence_refs=list(evidence_refs) if isinstance(evidence_refs, list) else [],
+            watcher_refs=list(watcher_refs) if isinstance(watcher_refs, list) else [],
             review_refs=list(review_refs) if isinstance(review_refs, list) else [],
             created_at=str(payload.get("created_at") or ""),
             updated_at=str(payload.get("updated_at") or ""),
@@ -191,16 +206,16 @@ def can_transition(from_state: str, to_state: str) -> bool:
 
 
 def validate_lead(record: LeadRecord) -> list[str]:
-    """Return a list of validation error strings; empty means the record is
-    internally consistent for the state it currently claims to be in."""
+    """Return validation errors; an empty list means the record is consistent."""
     errors: list[str] = []
 
     if record.state not in LEAD_STATES:
         errors.append(f"unknown state '{record.state}'")
         return errors
-
     if record.scope_status not in SCOPE_STATUSES:
         errors.append(f"unknown scope_status '{record.scope_status}'")
+    if record.watcher_verdict not in WATCHER_VERDICTS:
+        errors.append(f"unknown watcher_verdict '{record.watcher_verdict}'")
 
     if not record.lead_id.strip():
         errors.append("lead_id is required")
@@ -215,7 +230,12 @@ def validate_lead(record: LeadRecord) -> list[str]:
 
     if record.state in STATES_REQUIRING_EVIDENCE and not record.evidence_refs:
         errors.append(f"state '{record.state}' requires at least one evidence_refs entry")
-
+    if record.state in STATES_REQUIRING_WATCHER and not record.watcher_refs:
+        errors.append(f"state '{record.state}' requires at least one watcher_refs entry")
+    if record.state in STATES_REQUIRING_WATCHER and record.watcher_verdict == "pending":
+        errors.append(f"state '{record.state}' requires a completed watcher_verdict")
+    if record.state in STATES_REQUIRING_VALIDATED_WATCHER and record.watcher_verdict != "validated":
+        errors.append(f"state '{record.state}' requires watcher_verdict 'validated'")
     if record.state in STATES_REQUIRING_REVIEW and not record.review_refs:
         errors.append(f"state '{record.state}' requires at least one review_refs entry")
 
@@ -232,8 +252,7 @@ def apply_transition(
     evidence_refs: list[str] | None = None,
     created_at: str | None = None,
 ) -> LeadRecord:
-    """Return a new LeadRecord advanced to to_state, or raise
-    LeadTransitionError if the transition or resulting state is invalid."""
+    """Return a new LeadRecord advanced to ``to_state`` or raise on failure."""
     if to_state not in LEAD_STATES:
         raise LeadTransitionError(f"unknown target state '{to_state}'")
     if not can_transition(record.state, to_state):
@@ -253,13 +272,15 @@ def apply_transition(
         mechanism=record.mechanism,
         falsifier=record.falsifier,
         repro_plan=record.repro_plan,
+        watcher_verdict=record.watcher_verdict,
+        watcher_challenge=record.watcher_challenge,
         impact_boundary=record.impact_boundary,
         evidence_refs=list(record.evidence_refs) + [ref for ref in refs if ref not in record.evidence_refs],
+        watcher_refs=list(record.watcher_refs),
         review_refs=list(record.review_refs),
         created_at=record.created_at or timestamp,
         updated_at=timestamp,
-        events=list(record.events)
-        + [
+        events=list(record.events) + [
             LeadEvent(
                 event_id=event_id,
                 lead_id=record.lead_id,
@@ -276,7 +297,6 @@ def apply_transition(
     errors = validate_lead(next_record)
     if errors:
         raise LeadTransitionError("; ".join(errors))
-
     return next_record
 
 
