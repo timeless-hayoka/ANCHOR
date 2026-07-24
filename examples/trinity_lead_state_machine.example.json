@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "lead_id": "lead_001",
   "target": "authorized-demo-target",
   "scope_status": "authorized",
@@ -8,14 +8,20 @@
   "claim": "A state update may occur after an external call, allowing the accounting invariant to be violated if control flow is re-entered.",
   "scope": "authorized-demo-target is in scope; accounting invariant impact is an in-scope asset-loss category.",
   "mechanism": "withdraw() calls the external token transfer before zeroing the caller's tracked balance, so a reentrant callback observes stale accounting state.",
-  "falsifier": "If withdraw() zeroes the balance before the external call (checks-effects-interactions order), the theory is dead.",
-  "repro_plan": "Foundry test: deploy a malicious receiver that reenters withdraw() from its callback and assert the balance underflows or double-pays.",
-  "impact_boundary": "Reentrant caller can drain up to the full tracked balance of any other depositor sharing the same accounting slot.",
+  "falsifier": "If withdraw() zeroes the balance before the external call, or the callback cannot reenter the vulnerable path, the theory is dead.",
+  "repro_plan": "Foundry test: deploy a malicious receiver that reenters withdraw() from its callback and assert the contract double-pays.",
+  "watcher_verdict": "validated",
+  "watcher_challenge": "The Watcher reran the proof with a benign receiver, reordered setup, minimized attacker privileges, checked the execution trace, and attempted to explain the result as fixture contamination. The exploit remained repeatable only when the vulnerable ordering was present.",
+  "impact_boundary": "A reentrant caller can drain up to the available shared balance exposed by the stale accounting state.",
   "evidence_refs": [
     "evidence/lead_001/hypothesis.md",
     "evidence/lead_001/foundry_repro.t.sol",
     "evidence/lead_001/forge_output.txt",
     "evidence/lead_001/evidence_bundle.json"
+  ],
+  "watcher_refs": [
+    "reviews/lead_001/watcher_review.md",
+    "reviews/lead_001/watcher_negative_control.txt"
   ],
   "review_refs": [
     "reviews/lead_001/council_review.md"
@@ -50,10 +56,7 @@
       "to_state": "repro_attempted",
       "actor": "forge",
       "reason": "A reproduction test was created and executed.",
-      "evidence_refs": [
-        "evidence/lead_001/foundry_repro.t.sol",
-        "evidence/lead_001/forge_output.txt"
-      ],
+      "evidence_refs": ["evidence/lead_001/foundry_repro.t.sol", "evidence/lead_001/forge_output.txt"],
       "created_at": "2026-07-03T00:15:00Z"
     },
     {
@@ -63,33 +66,37 @@
       "to_state": "reproduced_real",
       "actor": "evidence-gate",
       "reason": "Reproduction output demonstrated repeatable impact.",
-      "evidence_refs": [
-        "evidence/lead_001/hypothesis.md"
-      ],
+      "evidence_refs": ["evidence/lead_001/forge_output.txt"],
       "created_at": "2026-07-03T00:20:00Z"
     },
     {
       "event_id": "evt_005",
       "lead_id": "lead_001",
       "from_state": "reproduced_real",
-      "to_state": "council_accepted",
-      "actor": "council",
-      "reason": "Reviewer accepted scope, impact, and reproduction quality.",
-      "evidence_refs": [
-        "reviews/lead_001/council_review.md"
-      ],
-      "created_at": "2026-07-03T00:25:00Z"
+      "to_state": "watcher_reviewed",
+      "actor": "watcher",
+      "reason": "Independent falsification attempts failed and the claim survived negative controls.",
+      "evidence_refs": ["reviews/lead_001/watcher_review.md", "reviews/lead_001/watcher_negative_control.txt"],
+      "created_at": "2026-07-03T00:23:00Z"
     },
     {
       "event_id": "evt_006",
+      "lead_id": "lead_001",
+      "from_state": "watcher_reviewed",
+      "to_state": "council_accepted",
+      "actor": "council",
+      "reason": "Reviewer accepted scope, impact, reproduction quality, and the Watcher's independent challenge.",
+      "evidence_refs": ["reviews/lead_001/council_review.md"],
+      "created_at": "2026-07-03T00:25:00Z"
+    },
+    {
+      "event_id": "evt_007",
       "lead_id": "lead_001",
       "from_state": "council_accepted",
       "to_state": "report_ready",
       "actor": "anchor",
       "reason": "Evidence bundle and report narrative were archived.",
-      "evidence_refs": [
-        "evidence/lead_001/evidence_bundle.json"
-      ],
+      "evidence_refs": ["evidence/lead_001/evidence_bundle.json"],
       "created_at": "2026-07-03T00:30:00Z"
     }
   ]
