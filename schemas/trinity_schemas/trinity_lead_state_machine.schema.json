@@ -16,82 +16,37 @@
     "mechanism",
     "falsifier",
     "repro_plan",
+    "watcher_verdict",
+    "watcher_challenge",
     "impact_boundary",
     "evidence_refs",
+    "watcher_refs",
     "review_refs",
     "created_at",
     "updated_at",
     "events"
   ],
   "properties": {
-    "schema_version": {
-      "type": "string"
-    },
-    "lead_id": {
-      "type": "string",
-      "minLength": 1
-    },
-    "target": {
-      "type": "string",
-      "minLength": 1
-    },
-    "scope_status": {
-      "type": "string",
-      "enum": ["authorized", "unknown", "out_of_scope"]
-    },
-    "state": {
-      "$ref": "#/$defs/state"
-    },
-    "title": {
-      "type": "string",
-      "minLength": 1
-    },
-    "claim": {
-      "type": "string"
-    },
-    "scope": {
-      "type": "string"
-    },
-    "mechanism": {
-      "type": "string"
-    },
-    "falsifier": {
-      "type": "string"
-    },
-    "repro_plan": {
-      "type": "string"
-    },
-    "impact_boundary": {
-      "type": "string"
-    },
-    "evidence_refs": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "review_refs": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "created_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "updated_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "events": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/event"
-      }
-    }
+    "schema_version": {"type": "string"},
+    "lead_id": {"type": "string", "minLength": 1},
+    "target": {"type": "string", "minLength": 1},
+    "scope_status": {"type": "string", "enum": ["authorized", "unknown", "out_of_scope"]},
+    "state": {"$ref": "#/$defs/state"},
+    "title": {"type": "string", "minLength": 1},
+    "claim": {"type": "string"},
+    "scope": {"type": "string"},
+    "mechanism": {"type": "string"},
+    "falsifier": {"type": "string"},
+    "repro_plan": {"type": "string"},
+    "watcher_verdict": {"type": "string", "enum": ["pending", "validated", "discredited", "inconclusive"]},
+    "watcher_challenge": {"type": "string"},
+    "impact_boundary": {"type": "string"},
+    "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "watcher_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "review_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "events": {"type": "array", "items": {"$ref": "#/$defs/event"}}
   },
   "$defs": {
     "state": {
@@ -101,6 +56,7 @@
         "hypothesis",
         "repro_attempted",
         "reproduced_real",
+        "watcher_reviewed",
         "council_accepted",
         "report_ready",
         "rejected",
@@ -113,50 +69,16 @@
     "event": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "event_id",
-        "lead_id",
-        "from_state",
-        "to_state",
-        "actor",
-        "reason",
-        "evidence_refs",
-        "created_at"
-      ],
+      "required": ["event_id", "lead_id", "from_state", "to_state", "actor", "reason", "evidence_refs", "created_at"],
       "properties": {
-        "event_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "lead_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "from_state": {
-          "anyOf": [{ "$ref": "#/$defs/state" }, { "type": "null" }]
-        },
-        "to_state": {
-          "$ref": "#/$defs/state"
-        },
-        "actor": {
-          "type": "string",
-          "minLength": 1
-        },
-        "reason": {
-          "type": "string",
-          "minLength": 1
-        },
-        "evidence_refs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "created_at": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "event_id": {"type": "string", "minLength": 1},
+        "lead_id": {"type": "string", "minLength": 1},
+        "from_state": {"anyOf": [{"$ref": "#/$defs/state"}, {"type": "null"}]},
+        "to_state": {"$ref": "#/$defs/state"},
+        "actor": {"type": "string", "minLength": 1},
+        "reason": {"type": "string", "minLength": 1},
+        "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "created_at": {"type": "string", "format": "date-time"}
       }
     }
   }
