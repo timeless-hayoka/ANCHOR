@@ -67,12 +67,22 @@ class EnvironmentSpec:
 class HuntPackage:
     """Complete hunt package ready for Trinity investigation."""
     hunt_id: str                                        # hunt_yearn_v3_001
-    target: dict[str, Any]                              # target metadata
+    target: dict[str, Any]                              # target metadata (includes commit_sha)
     scope: dict[str, Any]                               # in/out of scope, forbidden actions
     environment: EnvironmentSpec                        # testing setup
     recommended_focus: list[str]                        # e.g., ["share accounting", "withdrawal flow"]
     evidence_refs: list[str]                            # proof that scope is authorized
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def __post_init__(self):
+        """Validate that hunt package has required authorization markers."""
+        # Hard gates for Trinity ingestion
+        if not self.target.get("authorized"):
+            raise ValueError("hunt_package.target.authorized must be True")
+        if not self.target.get("commit_sha"):
+            raise ValueError("hunt_package.target.commit_sha must be pinned")
+        if not self.target.get("verification_confidence"):
+            raise ValueError("hunt_package.target.verification_confidence must be recorded")
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dict for JSON output."""
@@ -179,6 +189,11 @@ class TargetForge:
             "authorized": verification.get("authorized", False),
             "authorization_method": verification.get("method", ""),
             "verification_confidence": verification.get("confidence", 0.0),
+            # CRITICAL: Commit pinning prevents hunting wrong versions
+            "commit_sha": target.get("commit_sha", ""),  # Must be full 40-char SHA
+            "commit_resolved_at": target.get("commit_resolved_at", ""),  # When was it pinned?
+            # RPC endpoints use env var refs, never hardcoded URLs
+            "rpc_env_var": self._get_rpc_env_var(chain),
         }
 
         return HuntPackage(
@@ -191,16 +206,32 @@ class TargetForge:
         )
 
     def _get_rpc_endpoint(self, chain: Chain) -> str:
-        """Get recommended RPC endpoint for chain."""
-        endpoints = {
-            Chain.ETHEREUM: "https://eth-mainnet.alchemyapi.io/v2/",
-            Chain.ARBITRUM: "https://arb-mainnet.g.alchemy.com/v2/",
-            Chain.POLYGON: "https://polygon-mainnet.g.alchemy.com/v2/",
-            Chain.OPTIMISM: "https://opt-mainnet.g.alchemy.com/v2/",
-            Chain.BASE: "https://base-mainnet.g.alchemy.com/v2/",
-            Chain.SOLANA: "https://api.mainnet-beta.solana.com",
+        """Get environment variable reference for RPC endpoint.
+
+        IMPORTANT: Never embed actual RPC URLs or API keys in hunt packages.
+        Use environment variable references instead. Trinity/user provides at runtime.
+        """
+        env_refs = {
+            Chain.ETHEREUM: "${ETHEREUM_RPC_URL}",
+            Chain.ARBITRUM: "${ARBITRUM_RPC_URL}",
+            Chain.POLYGON: "${POLYGON_RPC_URL}",
+            Chain.OPTIMISM: "${OPTIMISM_RPC_URL}",
+            Chain.BASE: "${BASE_RPC_URL}",
+            Chain.SOLANA: "${SOLANA_RPC_URL}",
         }
-        return endpoints.get(chain, "")
+        return env_refs.get(chain, "")
+
+    def _get_rpc_env_var(self, chain: Chain) -> str:
+        """Get RPC environment variable name for this chain."""
+        env_vars = {
+            Chain.ETHEREUM: "ETHEREUM_RPC_URL",
+            Chain.ARBITRUM: "ARBITRUM_RPC_URL",
+            Chain.POLYGON: "POLYGON_RPC_URL",
+            Chain.OPTIMISM: "OPTIMISM_RPC_URL",
+            Chain.BASE: "BASE_RPC_URL",
+            Chain.SOLANA: "SOLANA_RPC_URL",
+        }
+        return env_vars.get(chain, "")
 
     def _get_constraints(self, framework: Framework, chain: Chain, target: dict[str, Any]) -> list[str]:
         """Determine environment constraints."""
