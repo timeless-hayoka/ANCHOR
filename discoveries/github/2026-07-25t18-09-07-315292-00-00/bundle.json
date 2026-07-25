@@ -1,0 +1,982 @@
+{
+  "generated_at": "2026-07-25T18:09:07.312325+00:00",
+  "profile": "general",
+  "profile_label": "General discovery",
+  "queries": [
+    "smart contract security fuzzing invariant testing",
+    "solidity foundry echidna slither",
+    "smart contract documentation testing"
+  ],
+  "query_terms": [
+    "contract",
+    "echidna",
+    "foundry",
+    "fuzzing",
+    "invariant",
+    "security",
+    "slither",
+    "smart",
+    "solidity",
+    "testing"
+  ],
+  "source_queries": [
+    {
+      "type": "search",
+      "url": "https://api.github.com/search/repositories?q=smart%20contract%20security%20fuzzing%20invariant%20testing%20fork%3Afalse%20archived%3Afalse",
+      "note": "search query used for candidate discovery"
+    },
+    {
+      "type": "search",
+      "url": "https://api.github.com/search/repositories?q=solidity%20foundry%20echidna%20slither%20fork%3Afalse%20archived%3Afalse",
+      "note": "search query used for candidate discovery"
+    },
+    {
+      "type": "search",
+      "url": "https://api.github.com/search/repositories?q=smart%20contract%20documentation%20testing%20fork%3Afalse%20archived%3Afalse",
+      "note": "search query used for candidate discovery"
+    }
+  ],
+  "settings": {
+    "limit": 5,
+    "per_query": 25,
+    "include_forks": false,
+    "include_archived": false,
+    "fetch_readmes": true
+  },
+  "summary": {
+    "total_candidates": 32,
+    "selected": 5,
+    "join": 0,
+    "watch": 5,
+    "skip": 0
+  },
+  "candidates": [
+    {
+      "full_name": "tiancaijb366-pixel/foundry-security-tests",
+      "html_url": "https://github.com/tiancaijb366-pixel/foundry-security-tests",
+      "description": "Practical Foundry security testing cookbook \u2014 runnable Solidity tests for fuzzing, invariant testing, and smart contract vulnerability patterns.",
+      "stars": 0,
+      "forks": 0,
+      "open_issues": 0,
+      "pushed_at": "2026-07-23T02:44:31Z",
+      "updated_at": "2026-07-23T02:44:35Z",
+      "archived": false,
+      "fork": false,
+      "language": "Solidity",
+      "topics": [],
+      "docs_present": true,
+      "readme_excerpt": "# Foundry Security Tests \u2014 Fuzz, Invariant & Security Testing Cookbook",
+      "priority_score": 100,
+      "authorization_state": "Explicitly authorized bounty / audit scope",
+      "review_state": "Explicitly authorized bounty / audit scope",
+      "suggested_posture": "Local clone analysis allowed and scope-limited review is encouraged",
+      "likely_surface": [
+        "smart-contract logic",
+        "access control",
+        "external calls",
+        "tests / fuzzing / CI"
+      ],
+      "security_signals": [
+        "SECURITY.md absent",
+        "CodeQL absent",
+        "Semgrep absent",
+        "Slither absent",
+        "tests/fuzzing present",
+        "dependency manifests absent",
+        "audit/advisory language present",
+        "release cadence: inactive"
+      ],
+      "dependency_manifests": [],
+      "workflow_tools": [],
+      "release_cadence": "inactive",
+      "evidence_sources": [
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/tiancaijb366-pixel/foundry-security-tests",
+          "note": "repository metadata"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/tiancaijb366-pixel/foundry-security-tests/readme",
+          "note": "README"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/tiancaijb366-pixel/foundry-security-tests/contents",
+          "note": "root listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/tiancaijb366-pixel/foundry-security-tests/contents/.github",
+          "note": ".github listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/tiancaijb366-pixel/foundry-security-tests/contents/.github/workflows",
+          "note": "workflow listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/tiancaijb366-pixel/foundry-security-tests/releases?per_page=5",
+          "note": "releases"
+        },
+        {
+          "type": "file",
+          "path": "README.md",
+          "note": "README text"
+        }
+      ],
+      "score": 26,
+      "recommendation": "watch",
+      "reasons": [
+        "repo is not archived",
+        "no open issues visible",
+        "README present",
+        "README looks substantive",
+        "recently updated",
+        "audit or bounty language is visible",
+        "smart-contract surface is explicit",
+        "access control surface is explicit",
+        "external-call surface is explicit",
+        "accounting or rounding surface is explicit",
+        "oracle or input-validation surface is explicit",
+        "tests or fuzzing are explicit",
+        "8 query terms matched"
+      ],
+      "signals": [
+        {
+          "name": "active",
+          "value": "not archived",
+          "weight": 2
+        },
+        {
+          "name": "issues",
+          "value": "no open issues",
+          "weight": -1
+        },
+        {
+          "name": "docs",
+          "value": "README present",
+          "weight": 2
+        },
+        {
+          "name": "docs-depth",
+          "value": "README looks substantive",
+          "weight": 1
+        },
+        {
+          "name": "fresh",
+          "value": "updated 2 days ago",
+          "weight": 3
+        },
+        {
+          "name": "maturity",
+          "value": "no stars",
+          "weight": -1
+        },
+        {
+          "name": "security-context",
+          "value": "audit or bounty language",
+          "weight": 3
+        },
+        {
+          "name": "surface",
+          "value": "smart-contract surface",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "access control",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "external calls",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "accounting or rounding",
+          "weight": 1
+        },
+        {
+          "name": "surface",
+          "value": "oracle or input validation",
+          "weight": 1
+        },
+        {
+          "name": "testing-depth",
+          "value": "tests or fuzzing are explicit",
+          "weight": 2
+        },
+        {
+          "name": "relevance",
+          "value": "8 keyword hits",
+          "weight": 4
+        },
+        {
+          "name": "language",
+          "value": "Solidity",
+          "weight": 1
+        }
+      ],
+      "query_matches": [
+        "contract",
+        "foundry",
+        "fuzzing",
+        "invariant",
+        "security",
+        "smart",
+        "solidity",
+        "testing"
+      ],
+      "issue_angles": [
+        "testing/invariants",
+        "docs/workflow clarity",
+        "regression harness or machine-readable output"
+      ]
+    },
+    {
+      "full_name": "omniologynow-rgb/omniology-contract",
+      "html_url": "https://github.com/omniologynow-rgb/omniology-contract",
+      "description": "Omniology's Solana smart contract \u2014 Anchor Rust source, tests, and security documentation. AI agent contest platform on Solana mainnet.",
+      "stars": 0,
+      "forks": 0,
+      "open_issues": 0,
+      "pushed_at": "2026-07-18T20:42:28Z",
+      "updated_at": "2026-07-18T20:42:30Z",
+      "archived": false,
+      "fork": false,
+      "language": "TypeScript",
+      "topics": [
+        "ai-agents",
+        "anchor",
+        "contests",
+        "smart-contract",
+        "solana"
+      ],
+      "docs_present": true,
+      "readme_excerpt": "# Omniology Contest Pool \u2014 Solana Smart Contract",
+      "priority_score": 100,
+      "authorization_state": "Explicitly authorized bounty / audit scope",
+      "review_state": "Explicitly authorized bounty / audit scope",
+      "suggested_posture": "Local clone analysis allowed and scope-limited review is encouraged",
+      "likely_surface": [
+        "smart-contract logic",
+        "upgradeability",
+        "access control",
+        "external calls",
+        "parsing / serialization"
+      ],
+      "security_signals": [
+        "SECURITY.md absent",
+        "CodeQL absent",
+        "Semgrep absent",
+        "Slither absent",
+        "tests/fuzzing not obvious",
+        "dependency manifests absent",
+        "audit/advisory language present",
+        "release cadence: inactive"
+      ],
+      "dependency_manifests": [],
+      "workflow_tools": [],
+      "release_cadence": "inactive",
+      "evidence_sources": [
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/omniologynow-rgb/omniology-contract",
+          "note": "repository metadata"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/omniologynow-rgb/omniology-contract/readme",
+          "note": "README"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/omniologynow-rgb/omniology-contract/contents",
+          "note": "root listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/omniologynow-rgb/omniology-contract/contents/.github",
+          "note": ".github listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/omniologynow-rgb/omniology-contract/contents/.github/workflows",
+          "note": "workflow listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/omniologynow-rgb/omniology-contract/releases?per_page=5",
+          "note": "releases"
+        },
+        {
+          "type": "file",
+          "path": "README.md",
+          "note": "README text"
+        }
+      ],
+      "score": 26,
+      "recommendation": "watch",
+      "reasons": [
+        "repo is not archived",
+        "no open issues visible",
+        "README present",
+        "README looks substantive",
+        "recently updated",
+        "audit or bounty language is visible",
+        "smart-contract surface is explicit",
+        "access control surface is explicit",
+        "upgradeability surface is explicit",
+        "external-call surface is explicit",
+        "accounting or rounding surface is explicit",
+        "oracle or input-validation surface is explicit",
+        "tests or fuzzing are explicit",
+        "3 query terms matched"
+      ],
+      "signals": [
+        {
+          "name": "active",
+          "value": "not archived",
+          "weight": 2
+        },
+        {
+          "name": "issues",
+          "value": "no open issues",
+          "weight": -1
+        },
+        {
+          "name": "docs",
+          "value": "README present",
+          "weight": 2
+        },
+        {
+          "name": "docs-depth",
+          "value": "README looks substantive",
+          "weight": 1
+        },
+        {
+          "name": "fresh",
+          "value": "updated 6 days ago",
+          "weight": 3
+        },
+        {
+          "name": "maturity",
+          "value": "no stars",
+          "weight": -1
+        },
+        {
+          "name": "security-context",
+          "value": "audit or bounty language",
+          "weight": 3
+        },
+        {
+          "name": "surface",
+          "value": "smart-contract surface",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "access control",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "upgradeability",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "external calls",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "accounting or rounding",
+          "weight": 1
+        },
+        {
+          "name": "surface",
+          "value": "oracle or input validation",
+          "weight": 1
+        },
+        {
+          "name": "testing-depth",
+          "value": "tests or fuzzing are explicit",
+          "weight": 2
+        },
+        {
+          "name": "relevance",
+          "value": "3 keyword hits",
+          "weight": 3
+        },
+        {
+          "name": "language",
+          "value": "TypeScript",
+          "weight": 1
+        }
+      ],
+      "query_matches": [
+        "contract",
+        "security",
+        "smart"
+      ],
+      "issue_angles": [
+        "testing/invariants",
+        "docs/workflow clarity",
+        "regression harness or machine-readable output"
+      ]
+    },
+    {
+      "full_name": "uliyach45/PenTest-Assign2-Blockchain-Security",
+      "html_url": "https://github.com/uliyach45/PenTest-Assign2-Blockchain-Security",
+      "description": "Assignment 2 for Penetration Testing \u2014 Advanced Blockchain Security assessment of the UnstoppableVault smart contract (Damn Vulnerable DeFi v4) using Slither, Foundry, Mythril, Manticore, and Echidna. 48 vulnerabilities identified including 2 HIGH severity findings (arbitrary transferFrom & controlled delegatecall).",
+      "stars": 0,
+      "forks": 0,
+      "open_issues": 0,
+      "pushed_at": "2026-05-15T19:59:27Z",
+      "updated_at": "2026-05-15T20:02:45Z",
+      "archived": false,
+      "fork": false,
+      "language": "",
+      "topics": [
+        "blockchain-security",
+        "defi",
+        "echidna",
+        "erc4626",
+        "ethereum",
+        "foundry",
+        "fuzzing",
+        "manticore",
+        "mythril",
+        "penetration-testing",
+        "slither",
+        "smart-contracts",
+        "solidity",
+        "static-analysis",
+        "symbolic-execution",
+        "web3-security"
+      ],
+      "docs_present": true,
+      "readme_excerpt": "# PenTest-Assign2-Blockchain-Security",
+      "priority_score": 100,
+      "authorization_state": "Explicitly authorized bounty / audit scope",
+      "review_state": "Explicitly authorized bounty / audit scope",
+      "suggested_posture": "Local clone analysis allowed and scope-limited review is encouraged",
+      "likely_surface": [
+        "smart-contract logic",
+        "external calls",
+        "tests / fuzzing / CI"
+      ],
+      "security_signals": [
+        "SECURITY.md absent",
+        "CodeQL absent",
+        "Semgrep absent",
+        "Slither absent",
+        "tests/fuzzing present",
+        "dependency manifests absent",
+        "audit/advisory language present",
+        "release cadence: inactive"
+      ],
+      "dependency_manifests": [],
+      "workflow_tools": [],
+      "release_cadence": "inactive",
+      "evidence_sources": [
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/uliyach45/PenTest-Assign2-Blockchain-Security",
+          "note": "repository metadata"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/uliyach45/PenTest-Assign2-Blockchain-Security/readme",
+          "note": "README"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/uliyach45/PenTest-Assign2-Blockchain-Security/contents",
+          "note": "root listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/uliyach45/PenTest-Assign2-Blockchain-Security/contents/.github",
+          "note": ".github listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/uliyach45/PenTest-Assign2-Blockchain-Security/contents/.github/workflows",
+          "note": "workflow listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/uliyach45/PenTest-Assign2-Blockchain-Security/releases?per_page=5",
+          "note": "releases"
+        },
+        {
+          "type": "file",
+          "path": "README.md",
+          "note": "README text"
+        }
+      ],
+      "score": 25,
+      "recommendation": "watch",
+      "reasons": [
+        "repo is not archived",
+        "no open issues visible",
+        "README present",
+        "README looks substantive",
+        "recently updated",
+        "audit or bounty language is visible",
+        "smart-contract surface is explicit",
+        "external-call surface is explicit",
+        "accounting or rounding surface is explicit",
+        "tests or fuzzing are explicit",
+        "10 query terms matched",
+        "4 relevant topic(s)"
+      ],
+      "signals": [
+        {
+          "name": "active",
+          "value": "not archived",
+          "weight": 2
+        },
+        {
+          "name": "issues",
+          "value": "no open issues",
+          "weight": -1
+        },
+        {
+          "name": "docs",
+          "value": "README present",
+          "weight": 2
+        },
+        {
+          "name": "docs-depth",
+          "value": "README looks substantive",
+          "weight": 1
+        },
+        {
+          "name": "fresh",
+          "value": "updated 70 days ago",
+          "weight": 3
+        },
+        {
+          "name": "maturity",
+          "value": "no stars",
+          "weight": -1
+        },
+        {
+          "name": "security-context",
+          "value": "audit or bounty language",
+          "weight": 3
+        },
+        {
+          "name": "surface",
+          "value": "smart-contract surface",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "external calls",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "accounting or rounding",
+          "weight": 1
+        },
+        {
+          "name": "testing-depth",
+          "value": "tests or fuzzing are explicit",
+          "weight": 2
+        },
+        {
+          "name": "relevance",
+          "value": "10 keyword hits",
+          "weight": 4
+        },
+        {
+          "name": "topics",
+          "value": "4 matched topics",
+          "weight": 3
+        }
+      ],
+      "query_matches": [
+        "contract",
+        "echidna",
+        "foundry",
+        "fuzzing",
+        "invariant",
+        "security",
+        "slither",
+        "smart",
+        "solidity",
+        "testing"
+      ],
+      "issue_angles": [
+        "testing/invariants",
+        "docs/workflow clarity",
+        "regression harness or machine-readable output"
+      ]
+    },
+    {
+      "full_name": "ola196/validus-protocol",
+      "html_url": "https://github.com/ola196/validus-protocol",
+      "description": "Production-ready Soroban smart contract for trustless bug bounties using Groth16 ZK proofs. Includes React dashboard, 85%+ test coverage, comprehensive documentation, CI/CD pipeline, and deployment automation for Stellar Testnet and Mainnet.",
+      "stars": 0,
+      "forks": 0,
+      "open_issues": 0,
+      "pushed_at": "2026-07-15T22:01:54Z",
+      "updated_at": "2026-07-15T22:02:02Z",
+      "archived": false,
+      "fork": false,
+      "language": "TypeScript",
+      "topics": [],
+      "docs_present": true,
+      "readme_excerpt": "# \ud83d\udee1\ufe0f Validus Protocol",
+      "priority_score": 100,
+      "authorization_state": "Explicitly authorized bounty / audit scope",
+      "review_state": "Explicitly authorized bounty / audit scope",
+      "suggested_posture": "Local clone analysis allowed and scope-limited review is encouraged",
+      "likely_surface": [
+        "smart-contract logic",
+        "access control",
+        "external calls",
+        "parsing / serialization"
+      ],
+      "security_signals": [
+        "SECURITY.md absent",
+        "CodeQL absent",
+        "Semgrep absent",
+        "Slither absent",
+        "tests/fuzzing not obvious",
+        "dependency manifests absent",
+        "audit/advisory language present",
+        "release cadence: inactive"
+      ],
+      "dependency_manifests": [],
+      "workflow_tools": [],
+      "release_cadence": "inactive",
+      "evidence_sources": [
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/ola196/validus-protocol",
+          "note": "repository metadata"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/ola196/validus-protocol/readme",
+          "note": "README"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/ola196/validus-protocol/contents",
+          "note": "root listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/ola196/validus-protocol/contents/.github",
+          "note": ".github listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/ola196/validus-protocol/contents/.github/workflows",
+          "note": "workflow listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/ola196/validus-protocol/releases?per_page=5",
+          "note": "releases"
+        },
+        {
+          "type": "file",
+          "path": "README.md",
+          "note": "README text"
+        }
+      ],
+      "score": 25,
+      "recommendation": "watch",
+      "reasons": [
+        "repo is not archived",
+        "no open issues visible",
+        "README present",
+        "README looks substantive",
+        "recently updated",
+        "audit or bounty language is visible",
+        "smart-contract surface is explicit",
+        "access control surface is explicit",
+        "external-call surface is explicit",
+        "accounting or rounding surface is explicit",
+        "oracle or input-validation surface is explicit",
+        "tests or fuzzing are explicit",
+        "4 query terms matched"
+      ],
+      "signals": [
+        {
+          "name": "active",
+          "value": "not archived",
+          "weight": 2
+        },
+        {
+          "name": "issues",
+          "value": "no open issues",
+          "weight": -1
+        },
+        {
+          "name": "docs",
+          "value": "README present",
+          "weight": 2
+        },
+        {
+          "name": "docs-depth",
+          "value": "README looks substantive",
+          "weight": 1
+        },
+        {
+          "name": "fresh",
+          "value": "updated 9 days ago",
+          "weight": 3
+        },
+        {
+          "name": "maturity",
+          "value": "no stars",
+          "weight": -1
+        },
+        {
+          "name": "security-context",
+          "value": "audit or bounty language",
+          "weight": 3
+        },
+        {
+          "name": "surface",
+          "value": "smart-contract surface",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "access control",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "external calls",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "accounting or rounding",
+          "weight": 1
+        },
+        {
+          "name": "surface",
+          "value": "oracle or input validation",
+          "weight": 1
+        },
+        {
+          "name": "testing-depth",
+          "value": "tests or fuzzing are explicit",
+          "weight": 2
+        },
+        {
+          "name": "relevance",
+          "value": "4 keyword hits",
+          "weight": 4
+        },
+        {
+          "name": "language",
+          "value": "TypeScript",
+          "weight": 1
+        }
+      ],
+      "query_matches": [
+        "contract",
+        "security",
+        "smart",
+        "testing"
+      ],
+      "issue_angles": [
+        "testing/invariants",
+        "docs/workflow clarity",
+        "regression harness or machine-readable output"
+      ]
+    },
+    {
+      "full_name": "fluxion-protocol/fluxion-contracts",
+      "html_url": "https://github.com/fluxion-protocol/fluxion-contracts",
+      "description": "Production-ready smart contracts for continuous asset streaming on Stellar Soroban. Implements real-time payroll, token vesting with cliffs, and grant distribution. Audit-ready with 100+ tests, comprehensive documentation, and enterprise-class security. Apache 2.0 licensed.",
+      "stars": 0,
+      "forks": 0,
+      "open_issues": 0,
+      "pushed_at": "2026-07-13T17:02:13Z",
+      "updated_at": "2026-07-13T17:02:27Z",
+      "archived": false,
+      "fork": false,
+      "language": "Rust",
+      "topics": [],
+      "docs_present": true,
+      "readme_excerpt": "# Fluxion Contracts",
+      "priority_score": 100,
+      "authorization_state": "Explicitly authorized bounty / audit scope",
+      "review_state": "Explicitly authorized bounty / audit scope",
+      "suggested_posture": "Local clone analysis allowed and scope-limited review is encouraged",
+      "likely_surface": [
+        "smart-contract logic",
+        "upgradeability",
+        "external calls",
+        "tests / fuzzing / CI"
+      ],
+      "security_signals": [
+        "SECURITY.md absent",
+        "CodeQL absent",
+        "Semgrep absent",
+        "Slither absent",
+        "tests/fuzzing present",
+        "dependency manifests absent",
+        "audit/advisory language present",
+        "release cadence: inactive"
+      ],
+      "dependency_manifests": [],
+      "workflow_tools": [],
+      "release_cadence": "inactive",
+      "evidence_sources": [
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/fluxion-protocol/fluxion-contracts",
+          "note": "repository metadata"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/fluxion-protocol/fluxion-contracts/readme",
+          "note": "README"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/fluxion-protocol/fluxion-contracts/contents",
+          "note": "root listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/fluxion-protocol/fluxion-contracts/contents/.github",
+          "note": ".github listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/fluxion-protocol/fluxion-contracts/contents/.github/workflows",
+          "note": "workflow listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/fluxion-protocol/fluxion-contracts/releases?per_page=5",
+          "note": "releases"
+        },
+        {
+          "type": "file",
+          "path": "README.md",
+          "note": "README text"
+        }
+      ],
+      "score": 25,
+      "recommendation": "watch",
+      "reasons": [
+        "repo is not archived",
+        "no open issues visible",
+        "README present",
+        "README looks substantive",
+        "recently updated",
+        "audit or bounty language is visible",
+        "smart-contract surface is explicit",
+        "upgradeability surface is explicit",
+        "external-call surface is explicit",
+        "accounting or rounding surface is explicit",
+        "tests or fuzzing are explicit",
+        "5 query terms matched"
+      ],
+      "signals": [
+        {
+          "name": "active",
+          "value": "not archived",
+          "weight": 2
+        },
+        {
+          "name": "issues",
+          "value": "no open issues",
+          "weight": -1
+        },
+        {
+          "name": "docs",
+          "value": "README present",
+          "weight": 2
+        },
+        {
+          "name": "docs-depth",
+          "value": "README looks substantive",
+          "weight": 1
+        },
+        {
+          "name": "fresh",
+          "value": "updated 12 days ago",
+          "weight": 3
+        },
+        {
+          "name": "maturity",
+          "value": "no stars",
+          "weight": -1
+        },
+        {
+          "name": "security-context",
+          "value": "audit or bounty language",
+          "weight": 3
+        },
+        {
+          "name": "surface",
+          "value": "smart-contract surface",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "upgradeability",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "external calls",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "accounting or rounding",
+          "weight": 1
+        },
+        {
+          "name": "testing-depth",
+          "value": "tests or fuzzing are explicit",
+          "weight": 2
+        },
+        {
+          "name": "relevance",
+          "value": "5 keyword hits",
+          "weight": 4
+        },
+        {
+          "name": "language",
+          "value": "Rust",
+          "weight": 1
+        }
+      ],
+      "query_matches": [
+        "contract",
+        "invariant",
+        "security",
+        "smart",
+        "testing"
+      ],
+      "issue_angles": [
+        "testing/invariants",
+        "docs/workflow clarity",
+        "regression harness or machine-readable output"
+      ]
+    }
+  ]
+}

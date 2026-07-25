@@ -1,0 +1,181 @@
+{
+  "full_name": "Manirider/Token-Vault-uups",
+  "html_url": "https://github.com/Manirider/Token-Vault-uups",
+  "description": "Upgradeable TokenVault smart contracts using UUPS proxy pattern with secure initialization, role-based access control, and upgrade-safe storage design.",
+  "stars": 0,
+  "forks": 0,
+  "open_issues": 0,
+  "pushed_at": "2026-07-02T17:13:20Z",
+  "updated_at": "2026-07-02T17:13:25Z",
+  "archived": false,
+  "fork": false,
+  "language": "JavaScript",
+  "topics": [],
+  "docs_present": true,
+  "readme_excerpt": "# Token-Vault-uups",
+  "priority_score": 100,
+  "authorization_state": "Public repo / no confirmed bounty scope",
+  "review_state": "Local clone analysis allowed",
+  "suggested_posture": "Local clone analysis allowed",
+  "likely_surface": [
+    "smart-contract logic",
+    "upgradeability",
+    "access control"
+  ],
+  "security_signals": [
+    "SECURITY.md absent",
+    "CodeQL absent",
+    "Semgrep absent",
+    "Slither absent",
+    "tests/fuzzing not obvious",
+    "dependency manifests absent",
+    "no audit/advisory language found",
+    "release cadence: inactive"
+  ],
+  "dependency_manifests": [],
+  "workflow_tools": [],
+  "release_cadence": "inactive",
+  "evidence_sources": [
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/Manirider/Token-Vault-uups",
+      "note": "repository metadata"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/Manirider/Token-Vault-uups/readme",
+      "note": "README"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/Manirider/Token-Vault-uups/contents",
+      "note": "root listing"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/Manirider/Token-Vault-uups/contents/.github",
+      "note": ".github listing"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/Manirider/Token-Vault-uups/contents/.github/workflows",
+      "note": "workflow listing"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/Manirider/Token-Vault-uups/releases?per_page=5",
+      "note": "releases"
+    },
+    {
+      "type": "file",
+      "path": "README.md",
+      "note": "README text"
+    }
+  ],
+  "score": 23,
+  "recommendation": "watch",
+  "reasons": [
+    "repo is not archived",
+    "no open issues visible",
+    "README present",
+    "README looks substantive",
+    "recently updated",
+    "smart-contract surface is explicit",
+    "access control surface is explicit",
+    "upgradeability surface is explicit",
+    "accounting or rounding surface is explicit",
+    "tests or fuzzing are explicit",
+    "upgrade crawler profile match",
+    "upgrade and initializer review",
+    "10 query terms matched"
+  ],
+  "signals": [
+    {
+      "name": "active",
+      "value": "not archived",
+      "weight": 2
+    },
+    {
+      "name": "issues",
+      "value": "no open issues",
+      "weight": -1
+    },
+    {
+      "name": "docs",
+      "value": "README present",
+      "weight": 2
+    },
+    {
+      "name": "docs-depth",
+      "value": "README looks substantive",
+      "weight": 1
+    },
+    {
+      "name": "fresh",
+      "value": "updated 23 days ago",
+      "weight": 3
+    },
+    {
+      "name": "maturity",
+      "value": "no stars",
+      "weight": -1
+    },
+    {
+      "name": "surface",
+      "value": "smart-contract surface",
+      "weight": 2
+    },
+    {
+      "name": "surface",
+      "value": "access control",
+      "weight": 2
+    },
+    {
+      "name": "surface",
+      "value": "upgradeability",
+      "weight": 2
+    },
+    {
+      "name": "surface",
+      "value": "accounting or rounding",
+      "weight": 1
+    },
+    {
+      "name": "testing-depth",
+      "value": "tests or fuzzing are explicit",
+      "weight": 2
+    },
+    {
+      "name": "profile-match",
+      "value": "upgrade profile match",
+      "weight": 3
+    },
+    {
+      "name": "relevance",
+      "value": "10 keyword hits",
+      "weight": 4
+    },
+    {
+      "name": "language",
+      "value": "JavaScript",
+      "weight": 1
+    }
+  ],
+  "query_matches": [
+    "admin",
+    "bug",
+    "contract",
+    "implementation",
+    "proxy",
+    "smart",
+    "solidity",
+    "upgrade",
+    "upgradeable",
+    "uups"
+  ],
+  "issue_angles": [
+    "upgrade and initializer review",
+    "proxy boundary review",
+    "implementation slot review"
+  ]
+}

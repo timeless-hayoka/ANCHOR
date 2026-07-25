@@ -10,6 +10,8 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE).
 
 **Portfolio architecture:** canonical ownership and data flow live in [timeless-hayoka/ARCHITECTURE.md](https://github.com/timeless-hayoka/timeless-hayoka/blob/main/ARCHITECTURE.md). ANCHOR owns benchmarks, outcome ledger, and evidence lifecycle.
 
+**Commercial offer:** [sales/index.html](sales/index.html) · [docs/COMMERCIAL_OFFER.md](docs/COMMERCIAL_OFFER.md)
+
 Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) · Philosophy: [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)
 
 ## Philosophy
@@ -66,12 +68,21 @@ git clone -b anchor https://github.com/timeless-hayoka/infj-bot.git ../infj_bot
 If you are new to ANCHOR, use this order:
 
 1. [demo/index.html](demo/index.html) - see the product and proof gate quickly
-2. [docs/REPRODUCTION.md](docs/REPRODUCTION.md) - reproduce benchmarks on a clean machine (Phase C credibility gate)
-3. [docs/METHODOLOGY.md](docs/METHODOLOGY.md) - understand the hunt workflow
-4. [docs/PROOF_GATE.md](docs/PROOF_GATE.md) - understand what counts as a finding
-5. [benchmarks/README.md](benchmarks/README.md) - inspect published benchmark artifacts
-6. [knowledge/README.md](knowledge/README.md) - structured reference corpus (SARIF, evidence models, architecture)
-7. [targets/enzyme-blue.md](targets/enzyme-blue.md) - see the current real-world target note
+2. [sales/index.html](sales/index.html) - see the buyer-facing offer and pricing
+3. [docs/REPRODUCTION.md](docs/REPRODUCTION.md) - reproduce benchmarks on a clean machine (Phase C credibility gate)
+4. [docs/METHODOLOGY.md](docs/METHODOLOGY.md) - understand the hunt workflow
+5. [docs/PROOF_GATE.md](docs/PROOF_GATE.md) - understand what counts as a finding
+6. [benchmarks/README.md](benchmarks/README.md) - inspect published benchmark artifacts
+7. [knowledge/README.md](knowledge/README.md) - structured reference corpus (SARIF, evidence models, architecture)
+8. [targets/enzyme-blue.md](targets/enzyme-blue.md) - see the current real-world target note
+
+## Buy ANCHOR
+
+If you want a scoped engagement, start with the commercial offer:
+
+- [Landing page](sales/index.html)
+- [Commercial brief](docs/COMMERCIAL_OFFER.md)
+- GitHub Sponsors: https://github.com/sponsors/timeless-hayoka
 
 If you want the short public-facing wording for profiles and outreach, use [docs/PROFILE_COPY.md](docs/PROFILE_COPY.md).
 

@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ANCHOR | Proof-Gated Smart-Contract Validation</title>
+  <meta name="description" content="Scoped smart-contract triage, proof-backed validation, and buyer-ready reports for teams that need fewer false positives and faster decisions.">
+  <style>
+    :root {
+      --bg: #07111f;
+      --bg2: #0d1b2e;
+      --panel: rgba(9, 17, 31, 0.78);
+      --panel2: rgba(11, 25, 44, 0.92);
+      --line: rgba(126, 197, 255, 0.18);
+      --text: #eff6ff;
+      --muted: #a7bdd6;
+      --cyan: #65d6ff;
+      --lime: #a6ff7a;
+      --amber: #ffcf6e;
+      --red: #ff7d6e;
+      --shadow: 0 28px 60px rgba(0, 0, 0, 0.42);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background:
+      radial-gradient(circle at top left, rgba(101, 214, 255, 0.18), transparent 28%),
+      radial-gradient(circle at 80% 10%, rgba(166, 255, 122, 0.10), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(255, 207, 110, 0.12), transparent 30%),
+      linear-gradient(180deg, var(--bg), var(--bg2) 72%, #040915 100%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: inherit; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 56px; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center; gap: 16px;
+      padding: 12px 16px; border: 1px solid var(--line); border-radius: 18px;
+      background: rgba(4, 10, 22, 0.42); backdrop-filter: blur(16px); box-shadow: var(--shadow);
+      position: sticky; top: 12px; z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .mark {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: radial-gradient(circle, var(--lime), var(--cyan) 55%, transparent 70%);
+      box-shadow: 0 0 24px rgba(101, 214, 255, 0.85);
+    }
+    .brand strong { letter-spacing: 0.12em; font-size: 12px; text-transform: uppercase; }
+    .brand span { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .links { display: flex; gap: 14px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+    .links a { text-decoration: none; }
+    .hero {
+      display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 26px; align-items: stretch;
+      padding: 40px 0 20px;
+    }
+    .card {
+      border: 1px solid var(--line); background: var(--panel); border-radius: 28px;
+      box-shadow: var(--shadow); overflow: hidden;
+    }
+    .hero-main { padding: 32px; position: relative; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: .14em;
+      text-transform: uppercase; color: var(--cyan);
+    }
+    .eyebrow::before {
+      content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--cyan);
+      box-shadow: 0 0 12px rgba(101, 214, 255, 0.9);
+    }
+    h1 { font-size: clamp(40px, 7vw, 76px); line-height: 0.96; margin: 16px 0 18px; max-width: 12ch; }
+    .lede { font-size: 18px; line-height: 1.65; color: var(--muted); max-width: 62ch; }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 14px 18px; border-radius: 999px; text-decoration: none; font-weight: 700;
+      border: 1px solid transparent;
+    }
+    .btn.primary { background: linear-gradient(135deg, var(--lime), var(--cyan)); color: #041019; }
+    .btn.secondary { border-color: var(--line); background: rgba(8, 18, 33, 0.58); color: var(--text); }
+    .stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 24px;
+    }
+    .stat {
+      padding: 16px; border-radius: 20px; background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .stat strong { display: block; font-size: 24px; margin-bottom: 8px; }
+    .stat span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .hero-side { padding: 22px; display: grid; gap: 14px; background: var(--panel2); }
+    .panel-title { font-size: 12px; text-transform: uppercase; letter-spacing: .15em; color: var(--amber); }
+    .pipeline {
+      display: grid; gap: 10px; padding: 16px; border-radius: 22px; background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .step {
+      display: flex; justify-content: space-between; gap: 14px; padding: 12px 14px;
+      border-radius: 14px; background: rgba(8, 16, 28, 0.72); border: 1px solid rgba(255,255,255,0.05);
+    }
+    .step em { font-style: normal; color: var(--muted); font-size: 13px; }
+    .step strong { display: block; margin-bottom: 4px; }
+    .section { margin-top: 28px; }
+    .section h2 { font-size: clamp(26px, 3.5vw, 40px); margin: 0 0 10px; }
+    .section p.sub { color: var(--muted); max-width: 68ch; line-height: 1.7; margin: 0 0 18px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .offer {
+      padding: 22px; border-radius: 24px; background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .offer h3 { margin: 0 0 8px; font-size: 22px; }
+    .price { font-size: 30px; font-weight: 800; color: var(--lime); margin: 10px 0 14px; }
+    .offer ul { margin: 0; padding-left: 18px; color: var(--muted); line-height: 1.7; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08); color: var(--muted); font-size: 12px;
+    }
+    .quote {
+      margin-top: 16px; padding: 18px; border-radius: 20px; border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(101,214,255,0.08), rgba(255,255,255,0.03));
+      color: var(--text);
+    }
+    .footer {
+      margin-top: 28px; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px;
+    }
+    .contact, .notes {
+      padding: 22px; border-radius: 24px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    }
+    .contact code, .notes code {
+      display: inline-block; padding: 2px 8px; border-radius: 8px; background: rgba(255,255,255,0.08);
+      color: var(--text);
+    }
+    .small { color: var(--muted); font-size: 14px; line-height: 1.7; }
+    @media (max-width: 980px) {
+      .hero, .grid, .footer, .stats { grid-template-columns: 1fr; }
+      .topbar { position: static; }
+      h1 { max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="mark"></div>
+        <div>
+          <strong>ANCHOR</strong>
+          <span>Proof-gated smart-contract validation</span>
+        </div>
+      </div>
+      <div class="links">
+        <a href="#offers">Offers</a>
+        <a href="#how">How it works</a>
+        <a href="#contact">Buy</a>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="card hero-main">
+        <div class="eyebrow">Buyer-ready smart-contract security</div>
+        <h1>Less noise. Faster proof. Clear yes/no decisions.</h1>
+        <p class="lede">
+          ANCHOR turns raw scanner output and GitHub discovery into scoped triage, proof-backed validation,
+          and a report a buyer can act on. It is built for teams that want fewer false positives and a tighter
+          path from suspicion to evidence.
+        </p>
+        <div class="actions">
+          <a class="btn primary" href="https://github.com/sponsors/timeless-hayoka" target="_blank" rel="noopener noreferrer">Sponsor / Buy support</a>
+          <a class="btn secondary" href="#offers">See packages</a>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <strong>24h</strong>
+            <span>Discovery to first buyer-ready triage brief</span>
+          </div>
+          <div class="stat">
+            <strong>3 lanes</strong>
+            <span>Authorization, upgradeability, and accounting / oracle review</span>
+          </div>
+          <div class="stat">
+            <strong>Proof gate</strong>
+            <span>Only claims with evidence move forward</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card hero-side" id="how">
+        <div class="panel-title">Validation pipeline</div>
+        <div class="pipeline">
+          <div class="step"><div><strong>1. Watcher</strong><em>Ranks public repo signals and produces a short list.</em></div><span class="badge">Discovery</span></div>
+          <div class="step"><div><strong>2. Trinity</strong><em>Validates the shortlist with proof-gated evidence and run history.</em></div><span class="badge">Validation</span></div>
+          <div class="step"><div><strong>3. Offer</strong><em>Turns the validated output into a paid brief, sprint, or monthly retainer.</em></div><span class="badge">Revenue</span></div>
+        </div>
+        <div class="quote">
+          <strong>Positioning:</strong> scoped smart-contract triage and proof-backed validation for teams that want to buy a decision, not a dump of alerts.
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="offers">
+      <h2>Packages</h2>
+      <p class="sub">The fastest path to cash is a narrow, easy-to-buy service with a fixed outcome. These are priced so a team can say yes without procurement drama.</p>
+      <div class="grid">
+        <div class="offer">
+          <span class="badge">Starter</span>
+          <h3>Discovery Sprint</h3>
+          <div class="price">$2,500</div>
+          <ul>
+            <li>48-hour target shortlist from watcher output</li>
+            <li>Scope review and buyer-facing summary</li>
+            <li>One proof-backed validation path per target</li>
+            <li>Delivery: concise memo + next-step recommendation</li>
+          </ul>
+        </div>
+        <div class="offer">
+          <span class="badge">Most popular</span>
+          <h3>Validation Retainer</h3>
+          <div class="price">$3,000 / mo</div>
+          <ul>
+            <li>Weekly ranked watchlist</li>
+            <li>Upgrade / auth / accounting lanes</li>
+            <li>Proof-backed triage notes</li>
+            <li>Priority response for new findings</li>
+          </ul>
+        </div>
+        <div class="offer">
+          <span class="badge">High-touch</span>
+          <h3>Target Deep Dive</h3>
+          <div class="price">$7,500+</div>
+          <ul>
+            <li>Single target, single buyer, single result</li>
+            <li>Manual review plus validation trace</li>
+            <li>Reproduction-ready report</li>
+            <li>Works well for audit shops or bounty operators</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>What the buyer gets</h2>
+      <p class="sub">Not a vague “research update.” A tight artifact that reduces decision time.</p>
+      <div class="grid">
+        <div class="offer">
+          <h3>Signal</h3>
+          <p class="small">A short list of targets ranked by explicit surface, freshness, and proof potential.</p>
+        </div>
+        <div class="offer">
+          <h3>Evidence</h3>
+          <p class="small">Screenshots, run notes, and validation state tied to the actual discovery / Trinity pipeline.</p>
+        </div>
+        <div class="offer">
+          <h3>Decision</h3>
+          <p class="small">A clear next action: ignore, watch, investigate, or buy a deeper review.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer" id="contact">
+      <div class="contact">
+        <h2>Buy now</h2>
+        <p class="small">
+          Fastest option: sponsor the work through GitHub Sponsors and note the package you want in the message.
+          If you want a direct engagement, open with the package name and target scope.
+        </p>
+        <p class="small">
+          GitHub Sponsors: <a href="https://github.com/sponsors/timeless-hayoka">github.com/sponsors/timeless-hayoka</a>
+        </p>
+        <p class="small">
+          If a buyer needs a custom scope, lead with: <code>Discovery Sprint</code>, <code>Validation Retainer</code>, or <code>Target Deep Dive</code>.
+        </p>
+      </div>
+      <div class="notes">
+        <h2>Why this works</h2>
+        <p class="small">
+          The watcher already produces ranked targets. Trinity already validates. That means the product can be sold
+          as an evidence-backed service immediately, without waiting for a larger platform rewrite.
+        </p>
+        <p class="small">
+          Next operational move: publish the page, pin the offer in the README, and send the first ten direct outreach messages.
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

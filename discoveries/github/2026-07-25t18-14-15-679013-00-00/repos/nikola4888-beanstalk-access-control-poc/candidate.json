@@ -1,0 +1,141 @@
+{
+  "full_name": "nikola4888/beanstalk-access-control-poc",
+  "html_url": "https://github.com/nikola4888/beanstalk-access-control-poc",
+  "description": "Proof of Concept demonstrating zero-address admin vulnerability in BeanstalkERC20 smart contract for Immunefi bug bounty.",
+  "stars": 0,
+  "forks": 0,
+  "open_issues": 0,
+  "pushed_at": "2025-07-15T23:21:46Z",
+  "updated_at": "2025-07-15T23:21:50Z",
+  "archived": false,
+  "fork": false,
+  "language": "Shell",
+  "topics": [],
+  "docs_present": false,
+  "readme_excerpt": "",
+  "priority_score": 70,
+  "authorization_state": "Public repo / no confirmed bounty scope",
+  "review_state": "Passive-only",
+  "suggested_posture": "Passive review only until scope is confirmed",
+  "likely_surface": [],
+  "security_signals": [
+    "SECURITY.md absent",
+    "CodeQL absent",
+    "Semgrep absent",
+    "Slither absent",
+    "tests/fuzzing not obvious",
+    "dependency manifests absent",
+    "no audit/advisory language found",
+    "release cadence: inactive"
+  ],
+  "dependency_manifests": [],
+  "workflow_tools": [],
+  "release_cadence": "inactive",
+  "evidence_sources": [
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/nikola4888/beanstalk-access-control-poc",
+      "note": "repository metadata"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/nikola4888/beanstalk-access-control-poc/readme",
+      "note": "README"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/nikola4888/beanstalk-access-control-poc/contents",
+      "note": "root listing"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/nikola4888/beanstalk-access-control-poc/contents/.github",
+      "note": ".github listing"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/nikola4888/beanstalk-access-control-poc/contents/.github/workflows",
+      "note": "workflow listing"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/nikola4888/beanstalk-access-control-poc/releases?per_page=5",
+      "note": "releases"
+    },
+    {
+      "type": "file",
+      "path": "README.md",
+      "note": "README text"
+    }
+  ],
+  "score": 5,
+  "recommendation": "skip",
+  "reasons": [
+    "repo is not archived",
+    "no open issues visible",
+    "README missing or empty",
+    "smart-contract surface is explicit",
+    "tests or fuzzing are explicit",
+    "6 query terms matched"
+  ],
+  "signals": [
+    {
+      "name": "active",
+      "value": "not archived",
+      "weight": 2
+    },
+    {
+      "name": "issues",
+      "value": "no open issues",
+      "weight": -1
+    },
+    {
+      "name": "docs",
+      "value": "README missing or empty",
+      "weight": -1
+    },
+    {
+      "name": "fresh",
+      "value": "updated 374 days ago",
+      "weight": 0
+    },
+    {
+      "name": "maturity",
+      "value": "no stars",
+      "weight": -1
+    },
+    {
+      "name": "surface",
+      "value": "smart-contract surface",
+      "weight": 2
+    },
+    {
+      "name": "testing-depth",
+      "value": "tests or fuzzing are explicit",
+      "weight": 2
+    },
+    {
+      "name": "relevance",
+      "value": "6 keyword hits",
+      "weight": 4
+    },
+    {
+      "name": "surface-gap",
+      "value": "no docs, workflows, or manifests",
+      "weight": -2
+    }
+  ],
+  "query_matches": [
+    "access",
+    "bounty",
+    "bug",
+    "contract",
+    "control",
+    "smart"
+  ],
+  "issue_angles": [
+    "authorization boundary review",
+    "permission gate review",
+    "role and owner path review"
+  ]
+}

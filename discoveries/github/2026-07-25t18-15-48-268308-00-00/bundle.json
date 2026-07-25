@@ -1,0 +1,991 @@
+{
+  "generated_at": "2026-07-25T18:15:48.267914+00:00",
+  "profile": "upgrade",
+  "profile_label": "Upgradeability",
+  "queries": [
+    "upgradeable proxy initializer uups smart contract",
+    "solidity proxy admin implementation upgrade",
+    "bug bounty upgradeability smart contract"
+  ],
+  "query_terms": [
+    "admin",
+    "bounty",
+    "bug",
+    "contract",
+    "implementation",
+    "initializer",
+    "proxy",
+    "smart",
+    "solidity",
+    "upgrade",
+    "upgradeability",
+    "upgradeable",
+    "uups"
+  ],
+  "source_queries": [
+    {
+      "type": "search",
+      "url": "https://api.github.com/search/repositories?q=upgradeable%20proxy%20initializer%20uups%20smart%20contract%20fork%3Afalse%20archived%3Afalse",
+      "note": "search query used for candidate discovery"
+    },
+    {
+      "type": "search",
+      "url": "https://api.github.com/search/repositories?q=solidity%20proxy%20admin%20implementation%20upgrade%20fork%3Afalse%20archived%3Afalse",
+      "note": "search query used for candidate discovery"
+    },
+    {
+      "type": "search",
+      "url": "https://api.github.com/search/repositories?q=bug%20bounty%20upgradeability%20smart%20contract%20fork%3Afalse%20archived%3Afalse",
+      "note": "search query used for candidate discovery"
+    }
+  ],
+  "settings": {
+    "limit": 5,
+    "per_query": 25,
+    "include_forks": false,
+    "include_archived": false,
+    "fetch_readmes": true
+  },
+  "summary": {
+    "total_candidates": 6,
+    "selected": 5,
+    "join": 0,
+    "watch": 5,
+    "skip": 0
+  },
+  "candidates": [
+    {
+      "full_name": "Prasanna6725/Production-Grade-Upgradeable-Smart-Contract-System",
+      "html_url": "https://github.com/Prasanna6725/Production-Grade-Upgradeable-Smart-Contract-System",
+      "description": "Built a production-grade upgradeable smart contract system that implements a TokenVault protocol using the UUPS (Universal Upgradeable Proxy Standard) pattern. Your implementation must handle complex upgrade scenarios including storage layout management, access control during upgrades, initialization security, and cross-version state migration.",
+      "stars": 0,
+      "forks": 0,
+      "open_issues": 0,
+      "pushed_at": "2026-01-15T06:57:26Z",
+      "updated_at": "2026-01-15T06:57:30Z",
+      "archived": false,
+      "fork": false,
+      "language": "JavaScript",
+      "topics": [],
+      "docs_present": true,
+      "readme_excerpt": "# Production-Grade Upgradeable Smart Contract System",
+      "priority_score": 100,
+      "authorization_state": "Explicitly authorized bounty / audit scope",
+      "review_state": "Explicitly authorized bounty / audit scope",
+      "suggested_posture": "Local clone analysis allowed and scope-limited review is encouraged",
+      "likely_surface": [
+        "smart-contract logic",
+        "upgradeability",
+        "access control",
+        "external calls"
+      ],
+      "security_signals": [
+        "SECURITY.md absent",
+        "CodeQL absent",
+        "Semgrep absent",
+        "Slither absent",
+        "tests/fuzzing not obvious",
+        "dependency manifests absent",
+        "audit/advisory language present",
+        "release cadence: inactive"
+      ],
+      "dependency_manifests": [],
+      "workflow_tools": [],
+      "release_cadence": "inactive",
+      "evidence_sources": [
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Prasanna6725/Production-Grade-Upgradeable-Smart-Contract-System",
+          "note": "repository metadata"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Prasanna6725/Production-Grade-Upgradeable-Smart-Contract-System/readme",
+          "note": "README"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Prasanna6725/Production-Grade-Upgradeable-Smart-Contract-System/contents",
+          "note": "root listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Prasanna6725/Production-Grade-Upgradeable-Smart-Contract-System/contents/.github",
+          "note": ".github listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Prasanna6725/Production-Grade-Upgradeable-Smart-Contract-System/contents/.github/workflows",
+          "note": "workflow listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Prasanna6725/Production-Grade-Upgradeable-Smart-Contract-System/releases?per_page=5",
+          "note": "releases"
+        },
+        {
+          "type": "file",
+          "path": "README.md",
+          "note": "README text"
+        }
+      ],
+      "score": 28,
+      "recommendation": "watch",
+      "reasons": [
+        "repo is not archived",
+        "no open issues visible",
+        "README present",
+        "README looks substantive",
+        "updated within the last year",
+        "audit or bounty language is visible",
+        "smart-contract surface is explicit",
+        "access control surface is explicit",
+        "upgradeability surface is explicit",
+        "external-call surface is explicit",
+        "accounting or rounding surface is explicit",
+        "tests or fuzzing are explicit",
+        "upgrade crawler profile match",
+        "upgrade and initializer review",
+        "10 query terms matched"
+      ],
+      "signals": [
+        {
+          "name": "active",
+          "value": "not archived",
+          "weight": 2
+        },
+        {
+          "name": "issues",
+          "value": "no open issues",
+          "weight": -1
+        },
+        {
+          "name": "docs",
+          "value": "README present",
+          "weight": 2
+        },
+        {
+          "name": "docs-depth",
+          "value": "README looks substantive",
+          "weight": 1
+        },
+        {
+          "name": "fresh",
+          "value": "updated 191 days ago",
+          "weight": 2
+        },
+        {
+          "name": "maturity",
+          "value": "no stars",
+          "weight": -1
+        },
+        {
+          "name": "security-context",
+          "value": "audit or bounty language",
+          "weight": 3
+        },
+        {
+          "name": "surface",
+          "value": "smart-contract surface",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "access control",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "upgradeability",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "external calls",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "accounting or rounding",
+          "weight": 1
+        },
+        {
+          "name": "testing-depth",
+          "value": "tests or fuzzing are explicit",
+          "weight": 2
+        },
+        {
+          "name": "profile-match",
+          "value": "upgrade profile match",
+          "weight": 3
+        },
+        {
+          "name": "relevance",
+          "value": "10 keyword hits",
+          "weight": 4
+        },
+        {
+          "name": "language",
+          "value": "JavaScript",
+          "weight": 1
+        }
+      ],
+      "query_matches": [
+        "admin",
+        "contract",
+        "implementation",
+        "initializer",
+        "proxy",
+        "smart",
+        "solidity",
+        "upgrade",
+        "upgradeable",
+        "uups"
+      ],
+      "issue_angles": [
+        "upgrade and initializer review",
+        "proxy boundary review",
+        "implementation slot review"
+      ]
+    },
+    {
+      "full_name": "Hrishikesh369/Upgradeable-Smart-Contracts",
+      "html_url": "https://github.com/Hrishikesh369/Upgradeable-Smart-Contracts",
+      "description": "Implementation of UUPS where a proxy holds state while implementations (BoxV1\u2192BoxV2) provide/upgrade logic; deploy script creates proxy and initializes it; upgrade script swaps implementation. Delegatecall example: A runs B\u2019s code but stores results in A.",
+      "stars": 1,
+      "forks": 0,
+      "open_issues": 0,
+      "pushed_at": "2026-02-07T13:03:23Z",
+      "updated_at": "2026-02-07T13:05:13Z",
+      "archived": false,
+      "fork": false,
+      "language": "Solidity",
+      "topics": [
+        "erc1967",
+        "ethereum",
+        "smart-contracts",
+        "solidity",
+        "uups-upgradeable-contract"
+      ],
+      "docs_present": true,
+      "readme_excerpt": "# Upgradeable Smart Contracts",
+      "priority_score": 100,
+      "authorization_state": "Public repo / no confirmed bounty scope",
+      "review_state": "Local clone analysis allowed",
+      "suggested_posture": "Local clone analysis allowed",
+      "likely_surface": [
+        "smart-contract logic",
+        "upgradeability",
+        "access control",
+        "external calls",
+        "tests / fuzzing / CI"
+      ],
+      "security_signals": [
+        "SECURITY.md absent",
+        "CodeQL absent",
+        "Semgrep absent",
+        "Slither absent",
+        "tests/fuzzing present",
+        "dependency manifests absent",
+        "no audit/advisory language found",
+        "release cadence: inactive"
+      ],
+      "dependency_manifests": [],
+      "workflow_tools": [],
+      "release_cadence": "inactive",
+      "evidence_sources": [
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Hrishikesh369/Upgradeable-Smart-Contracts",
+          "note": "repository metadata"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Hrishikesh369/Upgradeable-Smart-Contracts/readme",
+          "note": "README"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Hrishikesh369/Upgradeable-Smart-Contracts/contents",
+          "note": "root listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Hrishikesh369/Upgradeable-Smart-Contracts/contents/.github",
+          "note": ".github listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Hrishikesh369/Upgradeable-Smart-Contracts/contents/.github/workflows",
+          "note": "workflow listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Hrishikesh369/Upgradeable-Smart-Contracts/releases?per_page=5",
+          "note": "releases"
+        },
+        {
+          "type": "file",
+          "path": "README.md",
+          "note": "README text"
+        }
+      ],
+      "score": 26,
+      "recommendation": "watch",
+      "reasons": [
+        "repo is not archived",
+        "no open issues visible",
+        "README present",
+        "README looks substantive",
+        "updated within the last year",
+        "smart-contract surface is explicit",
+        "access control surface is explicit",
+        "upgradeability surface is explicit",
+        "external-call surface is explicit",
+        "tests or fuzzing are explicit",
+        "upgrade crawler profile match",
+        "upgrade and initializer review",
+        "8 query terms matched",
+        "1 relevant topic(s)"
+      ],
+      "signals": [
+        {
+          "name": "active",
+          "value": "not archived",
+          "weight": 2
+        },
+        {
+          "name": "issues",
+          "value": "no open issues",
+          "weight": -1
+        },
+        {
+          "name": "docs",
+          "value": "README present",
+          "weight": 2
+        },
+        {
+          "name": "docs-depth",
+          "value": "README looks substantive",
+          "weight": 1
+        },
+        {
+          "name": "fresh",
+          "value": "updated 168 days ago",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "smart-contract surface",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "access control",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "upgradeability",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "external calls",
+          "weight": 2
+        },
+        {
+          "name": "testing-depth",
+          "value": "tests or fuzzing are explicit",
+          "weight": 2
+        },
+        {
+          "name": "profile-match",
+          "value": "upgrade profile match",
+          "weight": 3
+        },
+        {
+          "name": "relevance",
+          "value": "8 keyword hits",
+          "weight": 4
+        },
+        {
+          "name": "topics",
+          "value": "1 matched topics",
+          "weight": 1
+        },
+        {
+          "name": "language",
+          "value": "Solidity",
+          "weight": 1
+        }
+      ],
+      "query_matches": [
+        "contract",
+        "implementation",
+        "proxy",
+        "smart",
+        "solidity",
+        "upgrade",
+        "upgradeable",
+        "uups"
+      ],
+      "issue_angles": [
+        "upgrade and initializer review",
+        "proxy boundary review",
+        "implementation slot review"
+      ]
+    },
+    {
+      "full_name": "Ashritagogula/upgradeable-token-vault-uups",
+      "html_url": "https://github.com/Ashritagogula/upgradeable-token-vault-uups",
+      "description": "Build Production-Grade Upgradeable Smart Contract System using the UUPS Proxy Pattern. Implements a multi-version TokenVault protocol (V1\u2013V3) with secure initialization, role-based access control, storage layout management, state preservation across upgrades, and comprehensive testing using Hardhat and OpenZeppelin Upgradeable Contracts.",
+      "stars": 0,
+      "forks": 0,
+      "open_issues": 0,
+      "pushed_at": "2026-01-04T05:34:07Z",
+      "updated_at": "2026-01-04T05:34:11Z",
+      "archived": false,
+      "fork": false,
+      "language": "JavaScript",
+      "topics": [],
+      "docs_present": true,
+      "readme_excerpt": "# Build Production-Grade Upgradeable Smart Contract System with UUPS Proxy Pattern",
+      "priority_score": 100,
+      "authorization_state": "Explicitly authorized bounty / audit scope",
+      "review_state": "Explicitly authorized bounty / audit scope",
+      "suggested_posture": "Local clone analysis allowed and scope-limited review is encouraged",
+      "likely_surface": [
+        "smart-contract logic",
+        "upgradeability",
+        "access control",
+        "parsing / serialization"
+      ],
+      "security_signals": [
+        "SECURITY.md absent",
+        "CodeQL absent",
+        "Semgrep absent",
+        "Slither absent",
+        "tests/fuzzing not obvious",
+        "dependency manifests absent",
+        "audit/advisory language present",
+        "release cadence: inactive"
+      ],
+      "dependency_manifests": [],
+      "workflow_tools": [],
+      "release_cadence": "inactive",
+      "evidence_sources": [
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Ashritagogula/upgradeable-token-vault-uups",
+          "note": "repository metadata"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Ashritagogula/upgradeable-token-vault-uups/readme",
+          "note": "README"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Ashritagogula/upgradeable-token-vault-uups/contents",
+          "note": "root listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Ashritagogula/upgradeable-token-vault-uups/contents/.github",
+          "note": ".github listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Ashritagogula/upgradeable-token-vault-uups/contents/.github/workflows",
+          "note": "workflow listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Ashritagogula/upgradeable-token-vault-uups/releases?per_page=5",
+          "note": "releases"
+        },
+        {
+          "type": "file",
+          "path": "README.md",
+          "note": "README text"
+        }
+      ],
+      "score": 26,
+      "recommendation": "watch",
+      "reasons": [
+        "repo is not archived",
+        "no open issues visible",
+        "README present",
+        "README looks substantive",
+        "updated within the last year",
+        "audit or bounty language is visible",
+        "smart-contract surface is explicit",
+        "access control surface is explicit",
+        "upgradeability surface is explicit",
+        "accounting or rounding surface is explicit",
+        "tests or fuzzing are explicit",
+        "upgrade crawler profile match",
+        "upgrade and initializer review",
+        "10 query terms matched"
+      ],
+      "signals": [
+        {
+          "name": "active",
+          "value": "not archived",
+          "weight": 2
+        },
+        {
+          "name": "issues",
+          "value": "no open issues",
+          "weight": -1
+        },
+        {
+          "name": "docs",
+          "value": "README present",
+          "weight": 2
+        },
+        {
+          "name": "docs-depth",
+          "value": "README looks substantive",
+          "weight": 1
+        },
+        {
+          "name": "fresh",
+          "value": "updated 202 days ago",
+          "weight": 2
+        },
+        {
+          "name": "maturity",
+          "value": "no stars",
+          "weight": -1
+        },
+        {
+          "name": "security-context",
+          "value": "audit or bounty language",
+          "weight": 3
+        },
+        {
+          "name": "surface",
+          "value": "smart-contract surface",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "access control",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "upgradeability",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "accounting or rounding",
+          "weight": 1
+        },
+        {
+          "name": "testing-depth",
+          "value": "tests or fuzzing are explicit",
+          "weight": 2
+        },
+        {
+          "name": "profile-match",
+          "value": "upgrade profile match",
+          "weight": 3
+        },
+        {
+          "name": "relevance",
+          "value": "10 keyword hits",
+          "weight": 4
+        },
+        {
+          "name": "language",
+          "value": "JavaScript",
+          "weight": 1
+        }
+      ],
+      "query_matches": [
+        "admin",
+        "contract",
+        "implementation",
+        "initializer",
+        "proxy",
+        "smart",
+        "solidity",
+        "upgrade",
+        "upgradeable",
+        "uups"
+      ],
+      "issue_angles": [
+        "upgrade and initializer review",
+        "proxy boundary review",
+        "implementation slot review"
+      ]
+    },
+    {
+      "full_name": "Chujimafa/proxy-_-UUPS-upgradeable-smart-contract",
+      "html_url": "https://github.com/Chujimafa/proxy-_-UUPS-upgradeable-smart-contract",
+      "description": "This project demonstrates a simple UUPS (Universal Upgradeable Proxy Standard) pattern using Foundry, OpenZeppelin, and Solidity. It includes deploying an initial logic contract (BoxV1), upgrading it to a new version (BoxV2), and testing the full upgrade workflow.",
+      "stars": 0,
+      "forks": 0,
+      "open_issues": 0,
+      "pushed_at": "2025-08-04T14:43:22Z",
+      "updated_at": "2025-08-04T14:44:10Z",
+      "archived": false,
+      "fork": false,
+      "language": "Solidity",
+      "topics": [],
+      "docs_present": true,
+      "readme_excerpt": "# \ud83e\uddf1 UUPS Upgradeable Smart Contract Demo",
+      "priority_score": 100,
+      "authorization_state": "Public repo / no confirmed bounty scope",
+      "review_state": "Local clone analysis allowed",
+      "suggested_posture": "Local clone analysis allowed",
+      "likely_surface": [
+        "smart-contract logic",
+        "upgradeability",
+        "access control",
+        "external calls",
+        "tests / fuzzing / CI"
+      ],
+      "security_signals": [
+        "SECURITY.md absent",
+        "CodeQL absent",
+        "Semgrep absent",
+        "Slither absent",
+        "tests/fuzzing present",
+        "dependency manifests absent",
+        "no audit/advisory language found",
+        "release cadence: inactive"
+      ],
+      "dependency_manifests": [],
+      "workflow_tools": [],
+      "release_cadence": "inactive",
+      "evidence_sources": [
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Chujimafa/proxy-_-UUPS-upgradeable-smart-contract",
+          "note": "repository metadata"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Chujimafa/proxy-_-UUPS-upgradeable-smart-contract/readme",
+          "note": "README"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Chujimafa/proxy-_-UUPS-upgradeable-smart-contract/contents",
+          "note": "root listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Chujimafa/proxy-_-UUPS-upgradeable-smart-contract/contents/.github",
+          "note": ".github listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Chujimafa/proxy-_-UUPS-upgradeable-smart-contract/contents/.github/workflows",
+          "note": "workflow listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Chujimafa/proxy-_-UUPS-upgradeable-smart-contract/releases?per_page=5",
+          "note": "releases"
+        },
+        {
+          "type": "file",
+          "path": "README.md",
+          "note": "README text"
+        }
+      ],
+      "score": 24,
+      "recommendation": "watch",
+      "reasons": [
+        "repo is not archived",
+        "no open issues visible",
+        "README present",
+        "README looks substantive",
+        "updated within the last year",
+        "smart-contract surface is explicit",
+        "access control surface is explicit",
+        "upgradeability surface is explicit",
+        "external-call surface is explicit",
+        "tests or fuzzing are explicit",
+        "upgrade crawler profile match",
+        "upgrade and initializer review",
+        "9 query terms matched"
+      ],
+      "signals": [
+        {
+          "name": "active",
+          "value": "not archived",
+          "weight": 2
+        },
+        {
+          "name": "issues",
+          "value": "no open issues",
+          "weight": -1
+        },
+        {
+          "name": "docs",
+          "value": "README present",
+          "weight": 2
+        },
+        {
+          "name": "docs-depth",
+          "value": "README looks substantive",
+          "weight": 1
+        },
+        {
+          "name": "fresh",
+          "value": "updated 355 days ago",
+          "weight": 2
+        },
+        {
+          "name": "maturity",
+          "value": "no stars",
+          "weight": -1
+        },
+        {
+          "name": "surface",
+          "value": "smart-contract surface",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "access control",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "upgradeability",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "external calls",
+          "weight": 2
+        },
+        {
+          "name": "testing-depth",
+          "value": "tests or fuzzing are explicit",
+          "weight": 2
+        },
+        {
+          "name": "profile-match",
+          "value": "upgrade profile match",
+          "weight": 3
+        },
+        {
+          "name": "relevance",
+          "value": "9 keyword hits",
+          "weight": 4
+        },
+        {
+          "name": "language",
+          "value": "Solidity",
+          "weight": 1
+        }
+      ],
+      "query_matches": [
+        "contract",
+        "implementation",
+        "initializer",
+        "proxy",
+        "smart",
+        "solidity",
+        "upgrade",
+        "upgradeable",
+        "uups"
+      ],
+      "issue_angles": [
+        "upgrade and initializer review",
+        "proxy boundary review",
+        "implementation slot review"
+      ]
+    },
+    {
+      "full_name": "Manirider/Token-Vault-uups",
+      "html_url": "https://github.com/Manirider/Token-Vault-uups",
+      "description": "Upgradeable TokenVault smart contracts using UUPS proxy pattern with secure initialization, role-based access control, and upgrade-safe storage design.",
+      "stars": 0,
+      "forks": 0,
+      "open_issues": 0,
+      "pushed_at": "2026-07-02T17:13:20Z",
+      "updated_at": "2026-07-02T17:13:25Z",
+      "archived": false,
+      "fork": false,
+      "language": "JavaScript",
+      "topics": [],
+      "docs_present": true,
+      "readme_excerpt": "# Token-Vault-uups",
+      "priority_score": 100,
+      "authorization_state": "Public repo / no confirmed bounty scope",
+      "review_state": "Local clone analysis allowed",
+      "suggested_posture": "Local clone analysis allowed",
+      "likely_surface": [
+        "smart-contract logic",
+        "upgradeability",
+        "access control"
+      ],
+      "security_signals": [
+        "SECURITY.md absent",
+        "CodeQL absent",
+        "Semgrep absent",
+        "Slither absent",
+        "tests/fuzzing not obvious",
+        "dependency manifests absent",
+        "no audit/advisory language found",
+        "release cadence: inactive"
+      ],
+      "dependency_manifests": [],
+      "workflow_tools": [],
+      "release_cadence": "inactive",
+      "evidence_sources": [
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Manirider/Token-Vault-uups",
+          "note": "repository metadata"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Manirider/Token-Vault-uups/readme",
+          "note": "README"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Manirider/Token-Vault-uups/contents",
+          "note": "root listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Manirider/Token-Vault-uups/contents/.github",
+          "note": ".github listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Manirider/Token-Vault-uups/contents/.github/workflows",
+          "note": "workflow listing"
+        },
+        {
+          "type": "api",
+          "url": "https://api.github.com/repos/Manirider/Token-Vault-uups/releases?per_page=5",
+          "note": "releases"
+        },
+        {
+          "type": "file",
+          "path": "README.md",
+          "note": "README text"
+        }
+      ],
+      "score": 23,
+      "recommendation": "watch",
+      "reasons": [
+        "repo is not archived",
+        "no open issues visible",
+        "README present",
+        "README looks substantive",
+        "recently updated",
+        "smart-contract surface is explicit",
+        "access control surface is explicit",
+        "upgradeability surface is explicit",
+        "accounting or rounding surface is explicit",
+        "tests or fuzzing are explicit",
+        "upgrade crawler profile match",
+        "upgrade and initializer review",
+        "10 query terms matched"
+      ],
+      "signals": [
+        {
+          "name": "active",
+          "value": "not archived",
+          "weight": 2
+        },
+        {
+          "name": "issues",
+          "value": "no open issues",
+          "weight": -1
+        },
+        {
+          "name": "docs",
+          "value": "README present",
+          "weight": 2
+        },
+        {
+          "name": "docs-depth",
+          "value": "README looks substantive",
+          "weight": 1
+        },
+        {
+          "name": "fresh",
+          "value": "updated 23 days ago",
+          "weight": 3
+        },
+        {
+          "name": "maturity",
+          "value": "no stars",
+          "weight": -1
+        },
+        {
+          "name": "surface",
+          "value": "smart-contract surface",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "access control",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "upgradeability",
+          "weight": 2
+        },
+        {
+          "name": "surface",
+          "value": "accounting or rounding",
+          "weight": 1
+        },
+        {
+          "name": "testing-depth",
+          "value": "tests or fuzzing are explicit",
+          "weight": 2
+        },
+        {
+          "name": "profile-match",
+          "value": "upgrade profile match",
+          "weight": 3
+        },
+        {
+          "name": "relevance",
+          "value": "10 keyword hits",
+          "weight": 4
+        },
+        {
+          "name": "language",
+          "value": "JavaScript",
+          "weight": 1
+        }
+      ],
+      "query_matches": [
+        "admin",
+        "bug",
+        "contract",
+        "implementation",
+        "proxy",
+        "smart",
+        "solidity",
+        "upgrade",
+        "upgradeable",
+        "uups"
+      ],
+      "issue_angles": [
+        "upgrade and initializer review",
+        "proxy boundary review",
+        "implementation slot review"
+      ]
+    }
+  ]
+}

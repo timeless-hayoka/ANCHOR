@@ -1,0 +1,193 @@
+{
+  "full_name": "omniologynow-rgb/omniology-contract",
+  "html_url": "https://github.com/omniologynow-rgb/omniology-contract",
+  "description": "Omniology's Solana smart contract \u2014 Anchor Rust source, tests, and security documentation. AI agent contest platform on Solana mainnet.",
+  "stars": 0,
+  "forks": 0,
+  "open_issues": 0,
+  "pushed_at": "2026-07-18T20:42:28Z",
+  "updated_at": "2026-07-18T20:42:30Z",
+  "archived": false,
+  "fork": false,
+  "language": "TypeScript",
+  "topics": [
+    "ai-agents",
+    "anchor",
+    "contests",
+    "smart-contract",
+    "solana"
+  ],
+  "docs_present": true,
+  "readme_excerpt": "# Omniology Contest Pool \u2014 Solana Smart Contract",
+  "priority_score": 100,
+  "authorization_state": "Explicitly authorized bounty / audit scope",
+  "review_state": "Explicitly authorized bounty / audit scope",
+  "suggested_posture": "Local clone analysis allowed and scope-limited review is encouraged",
+  "likely_surface": [
+    "smart-contract logic",
+    "upgradeability",
+    "access control",
+    "external calls",
+    "parsing / serialization"
+  ],
+  "security_signals": [
+    "SECURITY.md absent",
+    "CodeQL absent",
+    "Semgrep absent",
+    "Slither absent",
+    "tests/fuzzing not obvious",
+    "dependency manifests absent",
+    "audit/advisory language present",
+    "release cadence: inactive"
+  ],
+  "dependency_manifests": [],
+  "workflow_tools": [],
+  "release_cadence": "inactive",
+  "evidence_sources": [
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/omniologynow-rgb/omniology-contract",
+      "note": "repository metadata"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/omniologynow-rgb/omniology-contract/readme",
+      "note": "README"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/omniologynow-rgb/omniology-contract/contents",
+      "note": "root listing"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/omniologynow-rgb/omniology-contract/contents/.github",
+      "note": ".github listing"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/omniologynow-rgb/omniology-contract/contents/.github/workflows",
+      "note": "workflow listing"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/omniologynow-rgb/omniology-contract/releases?per_page=5",
+      "note": "releases"
+    },
+    {
+      "type": "file",
+      "path": "README.md",
+      "note": "README text"
+    }
+  ],
+  "score": 26,
+  "recommendation": "watch",
+  "reasons": [
+    "repo is not archived",
+    "no open issues visible",
+    "README present",
+    "README looks substantive",
+    "recently updated",
+    "audit or bounty language is visible",
+    "smart-contract surface is explicit",
+    "access control surface is explicit",
+    "upgradeability surface is explicit",
+    "external-call surface is explicit",
+    "accounting or rounding surface is explicit",
+    "oracle or input-validation surface is explicit",
+    "tests or fuzzing are explicit",
+    "3 query terms matched"
+  ],
+  "signals": [
+    {
+      "name": "active",
+      "value": "not archived",
+      "weight": 2
+    },
+    {
+      "name": "issues",
+      "value": "no open issues",
+      "weight": -1
+    },
+    {
+      "name": "docs",
+      "value": "README present",
+      "weight": 2
+    },
+    {
+      "name": "docs-depth",
+      "value": "README looks substantive",
+      "weight": 1
+    },
+    {
+      "name": "fresh",
+      "value": "updated 6 days ago",
+      "weight": 3
+    },
+    {
+      "name": "maturity",
+      "value": "no stars",
+      "weight": -1
+    },
+    {
+      "name": "security-context",
+      "value": "audit or bounty language",
+      "weight": 3
+    },
+    {
+      "name": "surface",
+      "value": "smart-contract surface",
+      "weight": 2
+    },
+    {
+      "name": "surface",
+      "value": "access control",
+      "weight": 2
+    },
+    {
+      "name": "surface",
+      "value": "upgradeability",
+      "weight": 2
+    },
+    {
+      "name": "surface",
+      "value": "external calls",
+      "weight": 2
+    },
+    {
+      "name": "surface",
+      "value": "accounting or rounding",
+      "weight": 1
+    },
+    {
+      "name": "surface",
+      "value": "oracle or input validation",
+      "weight": 1
+    },
+    {
+      "name": "testing-depth",
+      "value": "tests or fuzzing are explicit",
+      "weight": 2
+    },
+    {
+      "name": "relevance",
+      "value": "3 keyword hits",
+      "weight": 3
+    },
+    {
+      "name": "language",
+      "value": "TypeScript",
+      "weight": 1
+    }
+  ],
+  "query_matches": [
+    "contract",
+    "security",
+    "smart"
+  ],
+  "issue_angles": [
+    "testing/invariants",
+    "docs/workflow clarity",
+    "regression harness or machine-readable output"
+  ]
+}

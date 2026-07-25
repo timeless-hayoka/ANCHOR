@@ -1,0 +1,185 @@
+{
+  "full_name": "tiancaijb366-pixel/foundry-security-tests",
+  "html_url": "https://github.com/tiancaijb366-pixel/foundry-security-tests",
+  "description": "Practical Foundry security testing cookbook \u2014 runnable Solidity tests for fuzzing, invariant testing, and smart contract vulnerability patterns.",
+  "stars": 0,
+  "forks": 0,
+  "open_issues": 0,
+  "pushed_at": "2026-07-23T02:44:31Z",
+  "updated_at": "2026-07-23T02:44:35Z",
+  "archived": false,
+  "fork": false,
+  "language": "Solidity",
+  "topics": [],
+  "docs_present": true,
+  "readme_excerpt": "# Foundry Security Tests \u2014 Fuzz, Invariant & Security Testing Cookbook",
+  "priority_score": 100,
+  "authorization_state": "Explicitly authorized bounty / audit scope",
+  "review_state": "Explicitly authorized bounty / audit scope",
+  "suggested_posture": "Local clone analysis allowed and scope-limited review is encouraged",
+  "likely_surface": [
+    "smart-contract logic",
+    "access control",
+    "external calls",
+    "tests / fuzzing / CI"
+  ],
+  "security_signals": [
+    "SECURITY.md absent",
+    "CodeQL absent",
+    "Semgrep absent",
+    "Slither absent",
+    "tests/fuzzing present",
+    "dependency manifests absent",
+    "audit/advisory language present",
+    "release cadence: inactive"
+  ],
+  "dependency_manifests": [],
+  "workflow_tools": [],
+  "release_cadence": "inactive",
+  "evidence_sources": [
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/tiancaijb366-pixel/foundry-security-tests",
+      "note": "repository metadata"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/tiancaijb366-pixel/foundry-security-tests/readme",
+      "note": "README"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/tiancaijb366-pixel/foundry-security-tests/contents",
+      "note": "root listing"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/tiancaijb366-pixel/foundry-security-tests/contents/.github",
+      "note": ".github listing"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/tiancaijb366-pixel/foundry-security-tests/contents/.github/workflows",
+      "note": "workflow listing"
+    },
+    {
+      "type": "api",
+      "url": "https://api.github.com/repos/tiancaijb366-pixel/foundry-security-tests/releases?per_page=5",
+      "note": "releases"
+    },
+    {
+      "type": "file",
+      "path": "README.md",
+      "note": "README text"
+    }
+  ],
+  "score": 26,
+  "recommendation": "watch",
+  "reasons": [
+    "repo is not archived",
+    "no open issues visible",
+    "README present",
+    "README looks substantive",
+    "recently updated",
+    "audit or bounty language is visible",
+    "smart-contract surface is explicit",
+    "access control surface is explicit",
+    "external-call surface is explicit",
+    "accounting or rounding surface is explicit",
+    "oracle or input-validation surface is explicit",
+    "tests or fuzzing are explicit",
+    "8 query terms matched"
+  ],
+  "signals": [
+    {
+      "name": "active",
+      "value": "not archived",
+      "weight": 2
+    },
+    {
+      "name": "issues",
+      "value": "no open issues",
+      "weight": -1
+    },
+    {
+      "name": "docs",
+      "value": "README present",
+      "weight": 2
+    },
+    {
+      "name": "docs-depth",
+      "value": "README looks substantive",
+      "weight": 1
+    },
+    {
+      "name": "fresh",
+      "value": "updated 2 days ago",
+      "weight": 3
+    },
+    {
+      "name": "maturity",
+      "value": "no stars",
+      "weight": -1
+    },
+    {
+      "name": "security-context",
+      "value": "audit or bounty language",
+      "weight": 3
+    },
+    {
+      "name": "surface",
+      "value": "smart-contract surface",
+      "weight": 2
+    },
+    {
+      "name": "surface",
+      "value": "access control",
+      "weight": 2
+    },
+    {
+      "name": "surface",
+      "value": "external calls",
+      "weight": 2
+    },
+    {
+      "name": "surface",
+      "value": "accounting or rounding",
+      "weight": 1
+    },
+    {
+      "name": "surface",
+      "value": "oracle or input validation",
+      "weight": 1
+    },
+    {
+      "name": "testing-depth",
+      "value": "tests or fuzzing are explicit",
+      "weight": 2
+    },
+    {
+      "name": "relevance",
+      "value": "8 keyword hits",
+      "weight": 4
+    },
+    {
+      "name": "language",
+      "value": "Solidity",
+      "weight": 1
+    }
+  ],
+  "query_matches": [
+    "contract",
+    "foundry",
+    "fuzzing",
+    "invariant",
+    "security",
+    "smart",
+    "solidity",
+    "testing"
+  ],
+  "issue_angles": [
+    "testing/invariants",
+    "docs/workflow clarity",
+    "regression harness or machine-readable output"
+  ]
+}
