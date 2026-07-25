@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse, RedirectResponse
 
 from anchor_cli import load_outcome_entries
+from github_discovery import latest_discovery_overview
 from anchor_scripts import allowed_script_names, load_script_registry, registry_summary
 from anchor_sarif import build_research_loop
 from anchor_sarif.parser import Finding
@@ -41,6 +42,7 @@ PROJECT_ROOT = Path(os.getenv("ANCHOR_PROJECT_ROOT", str(ROOT))).expanduser().re
 DEMO_ROOT = Path(os.getenv("ANCHOR_DEMO_ROOT", str(ROOT / "demo"))).expanduser().resolve()
 BENCHMARKS_ROOT = ROOT / "benchmarks"
 BENCHMARK_MANIFEST = BENCHMARKS_ROOT / "index.json"
+DISCOVERY_ROOT = ROOT / "discoveries" / "github"
 SIGNING_KEY_PATH = Path(os.getenv("ANCHOR_SIGNING_KEY_PATH", str(ROOT / "anchor_signing_key.pem"))).expanduser()
 DEFAULT_HOST = os.getenv("ANCHOR_SERVER_HOST", "127.0.0.1")
 DEFAULT_PORT = int(os.getenv("ANCHOR_SERVER_PORT", "8000"))
@@ -770,6 +772,7 @@ def _anchor_snapshot(limit: int = 8) -> dict[str, Any]:
         record_limit=max(10, limit),
         latest_n=max(3, min(limit, 8)),
     )
+    github_discovery = latest_discovery_overview(DISCOVERY_ROOT, limit=2)
     return {
         "identity": {"version": APP_VERSION, "service": "anchor", "release": f"ANCHOR {APP_VERSION}"},
         "history": {"runs": runs},
@@ -780,6 +783,7 @@ def _anchor_snapshot(limit: int = 8) -> dict[str, Any]:
         "research_loop": research_loop,
         "work_queue": work_queue,
         "evidence_summary": evidence_summary,
+        "github_discovery": github_discovery,
         "script_registry": registry_summary(),
         "scabench": adapt_scabench(latest),
     }
@@ -858,6 +862,11 @@ async def api_health() -> dict[str, Any]:
 @app.get("/api/anchor/session")
 async def api_anchor_session() -> dict[str, Any]:
     return {"authenticated": True, "release": f"ANCHOR {APP_VERSION}", "mode": "local"}
+
+
+@app.get("/api/github/discovery")
+async def api_github_discovery(limit: int = 2) -> dict[str, Any]:
+    return latest_discovery_overview(DISCOVERY_ROOT, limit=max(1, limit))
 
 
 @app.get("/api/anchor/snapshot")

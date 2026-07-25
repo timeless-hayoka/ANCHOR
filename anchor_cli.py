@@ -28,9 +28,11 @@ if str(ROOT) not in sys.path:
 from github_discovery import (
     copy_selection,
     check_selected_repo_scope,
+    compare_discovery_runs,
     run_selected_repo_hunt_plan,
     find_candidate,
     load_bundle,
+    latest_discovery_overview,
     render_summary as render_github_discovery_summary,
     run_github_discovery,
     select_repo_from_latest_bundle,
@@ -423,6 +425,11 @@ def create_parser() -> argparse.ArgumentParser:
     github_scope.add_argument("--output-root", default=str(ROOT / "discoveries" / "github"), help="Folder containing discovery bundles")
     github_scope.add_argument("--run-id", default="", help="Optional discovery run id; newest matching selection is used when omitted")
     github_scope.add_argument("--json", action="store_true", help="Emit the scope status as JSON instead of text")
+    github_compare = github_sub.add_parser("compare-runs", help="Compare two discovery runs and summarize the watcher delta")
+    github_compare.add_argument("run_a", help="Older discovery run id")
+    github_compare.add_argument("run_b", help="Newer discovery run id")
+    github_compare.add_argument("--output-root", default=str(ROOT / "discoveries" / "github"), help="Folder containing discovery bundles")
+    github_compare.add_argument("--json", action="store_true", help="Emit the comparison as JSON instead of text")
 
     return parser
 
@@ -1838,6 +1845,37 @@ def cmd_github_scope_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_github_compare_runs(args: argparse.Namespace) -> int:
+    output_root = Path(args.output_root)
+    try:
+        comparison = compare_discovery_runs(output_root / args.run_a, output_root / args.run_b)
+    except Exception as exc:
+        print(f"GitHub discovery comparison failed: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(comparison, indent=2))
+    else:
+        left = comparison.get("left", {})
+        right = comparison.get("right", {})
+        delta = comparison.get("delta", {})
+        print("GitHub Discovery Comparison")
+        print(f"- left run: {left.get('run_id', args.run_a)} ({left.get('profile_label', left.get('profile', 'unknown'))})")
+        print(f"- right run: {right.get('run_id', args.run_b)} ({right.get('profile_label', right.get('profile', 'unknown'))})")
+        print(f"- watch delta: {delta.get('watch', 0):+}")
+        print(f"- selected delta: {delta.get('selected', 0):+}")
+        print(f"- avg priority delta: {delta.get('avg_priority', 0):+}")
+        shared = comparison.get("shared_top_repos", []) or []
+        print(f"- shared top repos: {len(shared)}")
+        if shared:
+            for repo in shared[:5]:
+                print(f"  - {repo}")
+        takeaway = comparison.get("takeaway")
+        if takeaway:
+            print(f"- takeaway: {takeaway}")
+    return 0
+
+
 def cmd_benchmark_publish(args: argparse.Namespace) -> int:
     payload = load_manifest_payload()
     entries = payload.get("benchmarks", [])
@@ -2117,6 +2155,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_github_plan(args)
     if args.command == "github" and args.github_command == "scope-check":
         return cmd_github_scope_check(args)
+    if args.command == "github" and args.github_command == "compare-runs":
+        return cmd_github_compare_runs(args)
     if args.command == "benchmark" and args.benchmark_command == "publish":
         return cmd_benchmark_publish(args)
     if args.command == "benchmark":

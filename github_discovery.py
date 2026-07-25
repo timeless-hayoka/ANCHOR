@@ -8,6 +8,7 @@ import subprocess
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
@@ -1122,6 +1123,129 @@ def list_discovery_runs(output_root: Path = DEFAULT_OUTPUT_ROOT) -> list[Path]:
     runs = [path for path in output_root.iterdir() if path.is_dir()]
     runs.sort(key=lambda path: path.stat().st_mtime, reverse=True)
     return runs
+
+
+def discovery_overview(bundle: dict[str, Any], *, run_dir: Path | None = None) -> dict[str, Any]:
+    candidates = [candidate for candidate in (bundle.get("candidates", []) or []) if isinstance(candidate, dict)]
+    surfaces = Counter()
+    signals = Counter()
+    for candidate in candidates:
+        for surface in candidate.get("likely_surface", []) or []:
+            surfaces[str(surface)] += 1
+        for signal in candidate.get("security_signals", []) or []:
+            signals[str(signal)] += 1
+
+    top_candidate = candidates[0] if candidates else None
+    top_repos = [str(candidate.get("full_name", "")) for candidate in candidates[:5] if candidate.get("full_name")]
+    selected = int(bundle.get("summary", {}).get("selected", len(candidates)) or len(candidates))
+    total = int(bundle.get("summary", {}).get("total_candidates", len(candidates)) or len(candidates))
+    watch = int(bundle.get("summary", {}).get("watch", 0) or 0)
+    join = int(bundle.get("summary", {}).get("join", 0) or 0)
+    skip = int(bundle.get("summary", {}).get("skip", 0) or 0)
+    avg_priority = round(sum(int(candidate.get("priority_score", 0) or 0) for candidate in candidates) / len(candidates), 2) if candidates else 0.0
+
+    return {
+        "kind": "anchor.github_discovery",
+        "run_id": run_dir.name if run_dir is not None else None,
+        "generated_at": bundle.get("generated_at", ""),
+        "profile": bundle.get("profile", "general"),
+        "profile_label": bundle.get("profile_label", "General discovery"),
+        "queries": list(bundle.get("queries", []) or []),
+        "query_terms": list(bundle.get("query_terms", []) or []),
+        "selected": selected,
+        "total_candidates": total,
+        "join": join,
+        "watch": watch,
+        "skip": skip,
+        "watch_density": round(watch / max(selected, 1), 3),
+        "avg_priority": avg_priority,
+        "top_repos": top_repos,
+        "top_candidate": {
+            "full_name": top_candidate.get("full_name", "") if top_candidate else "",
+            "priority_score": int(top_candidate.get("priority_score", 0) or 0) if top_candidate else 0,
+            "recommendation": top_candidate.get("recommendation", "") if top_candidate else "",
+            "likely_surface": list(top_candidate.get("likely_surface", []) or []) if top_candidate else [],
+        }
+        if top_candidate
+        else None,
+        "surface_counts": dict(surfaces),
+        "security_signal_counts": dict(signals),
+    }
+
+
+def compare_discovery_overviews(
+    left: dict[str, Any],
+    right: dict[str, Any],
+) -> dict[str, Any]:
+    left_repos = set(left.get("top_repos", []) or [])
+    right_repos = set(right.get("top_repos", []) or [])
+    return {
+        "kind": "anchor.github_discovery.compare",
+        "left": left,
+        "right": right,
+        "delta": {
+            "selected": int(right.get("selected", 0) or 0) - int(left.get("selected", 0) or 0),
+            "total_candidates": int(right.get("total_candidates", 0) or 0) - int(left.get("total_candidates", 0) or 0),
+            "join": int(right.get("join", 0) or 0) - int(left.get("join", 0) or 0),
+            "watch": int(right.get("watch", 0) or 0) - int(left.get("watch", 0) or 0),
+            "skip": int(right.get("skip", 0) or 0) - int(left.get("skip", 0) or 0),
+            "watch_density": round(float(right.get("watch_density", 0) or 0) - float(left.get("watch_density", 0) or 0), 3),
+            "avg_priority": round(float(right.get("avg_priority", 0) or 0) - float(left.get("avg_priority", 0) or 0), 2),
+        },
+        "shared_top_repos": sorted(left_repos & right_repos),
+        "left_only_top_repos": sorted(left_repos - right_repos),
+        "right_only_top_repos": sorted(right_repos - left_repos),
+        "better_run": (
+            right.get("run_id")
+            if (int(right.get("watch", 0) or 0), float(right.get("avg_priority", 0) or 0), int(right.get("selected", 0) or 0))
+            >= (int(left.get("watch", 0) or 0), float(left.get("avg_priority", 0) or 0), int(left.get("selected", 0) or 0))
+            else left.get("run_id")
+        ),
+        "takeaway": (
+            "The newer run found more watch-worthy repos."
+            if int(right.get("watch", 0) or 0) > int(left.get("watch", 0) or 0)
+            else "The newer run did not improve watch volume."
+        ),
+    }
+
+
+def compare_discovery_runs(
+    left_run: Path,
+    right_run: Path,
+) -> dict[str, Any]:
+    left_bundle = load_bundle(left_run)
+    right_bundle = load_bundle(right_run)
+    left_overview = discovery_overview(left_bundle, run_dir=left_run)
+    right_overview = discovery_overview(right_bundle, run_dir=right_run)
+    comparison = compare_discovery_overviews(left_overview, right_overview)
+    comparison["runs"] = [left_run.name, right_run.name]
+    return comparison
+
+
+def latest_discovery_overview(
+    output_root: Path = DEFAULT_OUTPUT_ROOT,
+    *,
+    limit: int = 2,
+) -> dict[str, Any]:
+    runs = list_discovery_runs(output_root)
+    latest = []
+    for run_dir in runs[: max(1, limit)]:
+        try:
+            latest.append(discovery_overview(load_bundle(run_dir), run_dir=run_dir))
+        except Exception:
+            continue
+    payload: dict[str, Any] = {
+        "kind": "anchor.github_discovery.latest",
+        "output_root": display_path(output_root),
+        "runs": latest,
+    }
+    if len(latest) >= 2:
+        payload["comparison"] = compare_discovery_overviews(latest[1], latest[0])
+    elif len(latest) == 1:
+        payload["comparison"] = None
+    else:
+        payload["comparison"] = None
+    return payload
 
 
 def find_latest_run(output_root: Path = DEFAULT_OUTPUT_ROOT) -> Path | None:

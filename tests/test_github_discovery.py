@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 import sys
+import tempfile
 from email.message import Message
 from pathlib import Path
 from unittest import TestCase
@@ -295,6 +296,79 @@ class GitHubDiscoveryTests(TestCase):
             self.assertGreaterEqual(candidate.priority_score, 80)
             self.assertIn(f"{profile} crawler profile match", candidate.reasons)
             self.assertIn(expected_reason, candidate.reasons)
+
+    def test_discovery_overview_and_comparison_surface(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            left = root / "2026-07-24t10-00-00-000000-00-00"
+            right = root / "2026-07-25t10-00-00-000000-00-00"
+            left.mkdir()
+            right.mkdir()
+            left_bundle = {
+                "generated_at": "2026-07-24T10:00:00+00:00",
+                "profile": "general",
+                "profile_label": "General discovery",
+                "queries": ["general"],
+                "query_terms": ["general"],
+                "summary": {"selected": 2, "total_candidates": 2, "join": 0, "watch": 1, "skip": 1},
+                "candidates": [
+                    {
+                        "full_name": "owner/shared",
+                        "priority_score": 55,
+                        "recommendation": "watch",
+                        "likely_surface": ["access control", "external calls"],
+                        "security_signals": ["SECURITY.md absent"],
+                    },
+                    {
+                        "full_name": "owner/general-only",
+                        "priority_score": 44,
+                        "recommendation": "skip",
+                        "likely_surface": ["tests / fuzzing / CI"],
+                        "security_signals": ["tests/fuzzing present"],
+                    },
+                ],
+            }
+            right_bundle = {
+                "generated_at": "2026-07-25T10:00:00+00:00",
+                "profile": "upgrade",
+                "profile_label": "Upgradeability",
+                "queries": ["upgrade"],
+                "query_terms": ["upgrade"],
+                "summary": {"selected": 2, "total_candidates": 3, "join": 0, "watch": 2, "skip": 0},
+                "candidates": [
+                    {
+                        "full_name": "owner/shared",
+                        "priority_score": 66,
+                        "recommendation": "watch",
+                        "likely_surface": ["upgradeability", "access control"],
+                        "security_signals": ["SECURITY.md absent"],
+                    },
+                    {
+                        "full_name": "owner/upgrade-only",
+                        "priority_score": 64,
+                        "recommendation": "watch",
+                        "likely_surface": ["upgradeability", "external calls"],
+                        "security_signals": ["audit/advisory language present"],
+                    },
+                ],
+            }
+            (left / "bundle.json").write_text(json.dumps(left_bundle), encoding="utf-8")
+            (right / "bundle.json").write_text(json.dumps(right_bundle), encoding="utf-8")
+
+            left_overview = github_discovery.discovery_overview(left_bundle, run_dir=left)
+            right_overview = github_discovery.discovery_overview(right_bundle, run_dir=right)
+            comparison = github_discovery.compare_discovery_overviews(left_overview, right_overview)
+            latest = github_discovery.latest_discovery_overview(root, limit=2)
+            run_compare = github_discovery.compare_discovery_runs(left, right)
+
+        self.assertEqual(left_overview["run_id"], left.name)
+        self.assertEqual(right_overview["profile"], "upgrade")
+        self.assertEqual(comparison["delta"]["watch"], 1)
+        self.assertEqual(comparison["shared_top_repos"], ["owner/shared"])
+        self.assertIn("owner/upgrade-only", comparison["right_only_top_repos"])
+        self.assertEqual(len(latest["runs"]), 2)
+        self.assertIsNotNone(latest["comparison"])
+        self.assertEqual(run_compare["runs"], [left.name, right.name])
 
     def test_selection_copies_candidate_without_mutating_source_bundle(self):
         run_dir = Path(self._tmpdir())

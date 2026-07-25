@@ -157,6 +157,54 @@ def test_anchor_server_replays_after_cursor_and_ingests_events(monkeypatch: pyte
         assert case.json()["case_id"] == "case_live"
 
 
+def test_anchor_server_exposes_latest_github_discovery(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    server = load_server(monkeypatch, tmp_path)
+    discovery_root = tmp_path / "discoveries" / "github"
+    left = discovery_root / "2026-07-24t10-00-00-000000-00-00"
+    right = discovery_root / "2026-07-25t10-00-00-000000-00-00"
+    right.mkdir(parents=True)
+    left.mkdir()
+    left_bundle = {
+        "generated_at": "2026-07-24T10:00:00+00:00",
+        "profile": "general",
+        "profile_label": "General discovery",
+        "queries": ["general"],
+        "query_terms": ["general"],
+        "summary": {"selected": 1, "total_candidates": 1, "join": 0, "watch": 0, "skip": 1},
+        "candidates": [
+            {"full_name": "owner/general", "priority_score": 40, "recommendation": "skip", "likely_surface": ["docs"], "security_signals": []}
+        ],
+    }
+    right_bundle = {
+        "generated_at": "2026-07-25T10:00:00+00:00",
+        "profile": "upgrade",
+        "profile_label": "Upgradeability",
+        "queries": ["upgrade"],
+        "query_terms": ["upgrade"],
+        "summary": {"selected": 2, "total_candidates": 2, "join": 0, "watch": 2, "skip": 0},
+        "candidates": [
+            {"full_name": "owner/shared", "priority_score": 66, "recommendation": "watch", "likely_surface": ["upgradeability"], "security_signals": ["audit/advisory language present"]},
+            {"full_name": "owner/upgrade-only", "priority_score": 64, "recommendation": "watch", "likely_surface": ["upgradeability", "access control"], "security_signals": []},
+        ],
+    }
+    (left / "bundle.json").write_text(json.dumps(left_bundle), encoding="utf-8")
+    (right / "bundle.json").write_text(json.dumps(right_bundle), encoding="utf-8")
+    monkeypatch.setattr(server, "DISCOVERY_ROOT", discovery_root)
+
+    with TestClient(server.app) as client:
+        discovery = client.get("/api/github/discovery")
+        assert discovery.status_code == 200
+        body = discovery.json()
+        assert body["kind"] == "anchor.github_discovery.latest"
+        assert len(body["runs"]) == 2
+        assert body["comparison"]["delta"]["watch"] == 2
+        snapshot = client.get("/api/anchor/snapshot?limit=5")
+        assert snapshot.status_code == 200
+        snap = snapshot.json()
+        assert "github_discovery" in snap
+        assert snap["github_discovery"]["comparison"]["delta"]["watch"] == 2
+
+
 def test_knowledge_api_list_show_and_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     server = load_server(monkeypatch, tmp_path)
 
@@ -179,4 +227,3 @@ def test_knowledge_api_list_show_and_search(monkeypatch: pytest.MonkeyPatch, tmp
 
         missing = client.get("/api/knowledge/not-a-topic")
         assert missing.status_code == 404
-
