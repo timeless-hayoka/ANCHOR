@@ -10,7 +10,7 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE).
 
 **Portfolio architecture:** canonical ownership and data flow live in [timeless-hayoka/ARCHITECTURE.md](https://github.com/timeless-hayoka/timeless-hayoka/blob/main/ARCHITECTURE.md). ANCHOR owns benchmarks, outcome ledger, and evidence lifecycle.
 
-**Commercial offer:** [sales/index.html](sales/index.html) · [docs/COMMERCIAL_OFFER.md](docs/COMMERCIAL_OFFER.md)
+**Commercial offer:** [sales/index.html](sales/index.html) · [docs/COMMERCIAL_OFFER.md](docs/COMMERCIAL_OFFER.md) · [sales/outreach.md](sales/outreach.md)
 
 Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) · Philosophy: [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)
 
@@ -76,12 +76,13 @@ If you are new to ANCHOR, use this order:
 7. [knowledge/README.md](knowledge/README.md) - structured reference corpus (SARIF, evidence models, architecture)
 8. [targets/enzyme-blue.md](targets/enzyme-blue.md) - see the current real-world target note
 
-## Buy ANCHOR
+## Commercial Engagement
 
 If you want a scoped engagement, start with the commercial offer:
 
 - [Landing page](sales/index.html)
 - [Commercial brief](docs/COMMERCIAL_OFFER.md)
+- [Outreach template](sales/outreach.md)
 - GitHub Sponsors: https://github.com/sponsors/timeless-hayoka
 
 If you want the short public-facing wording for profiles and outreach, use [docs/PROFILE_COPY.md](docs/PROFILE_COPY.md).

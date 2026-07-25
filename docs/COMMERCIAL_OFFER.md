@@ -45,6 +45,12 @@ It is a decision service built on:
 2. Trinity validation
 3. proof-gated reporting
 
+## Suggested positioning
+
+Use this sentence when you introduce the offer:
+
+> ANCHOR delivers scoped smart-contract triage and proof-backed validation so your team can decide what to investigate, ignore, or escalate.
+
 ## Immediate next actions
 
 1. Publish the landing page.
