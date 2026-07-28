@@ -44,6 +44,15 @@ def test_apply_transition_rejects_missing_required_fields():
 
 
 def _promote_to_hypothesis(record: LeadRecord) -> LeadRecord:
+    """
+    Populate the required hypothesis fields and promote a lead record to the hypothesis state.
+    
+    Parameters:
+    	record (LeadRecord): The lead record to promote.
+    
+    Returns:
+    	LeadRecord: The transitioned lead record.
+    """
     record.claim = "claim"
     record.scope = "scope"
     record.mechanism = "mechanism"
