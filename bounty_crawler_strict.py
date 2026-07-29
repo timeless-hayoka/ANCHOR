@@ -94,13 +94,13 @@ class BountyProgramDetector:
             r"https://code4rena\.com/contests/[\w\-]+", re.I
         ),
         "sherlock": re.compile(
-            r"https://sherlock\.xyz/competitions/[\w\-]+", re.I
+            r"https://(sherlock\.xyz/competitions|audits\.sherlock\.xyz/contests|app\.sherlock\.xyz/audits/contests)/[\w\-]+", re.I
         ),
         "cantina": re.compile(
             r"https://cantina\.xyz/(competitions|audits)/[\w\-]+", re.I
         ),
         "codehawks": re.compile(
-            r"https://codehawks\.com/(competitions|audits)/[\w\-]+", re.I
+            r"https://(codehawks\.com|codehawks\.cyfrin\.io)/(competitions|audits|c)/[\w\-]+", re.I
         ),
     }
 
@@ -108,8 +108,8 @@ class BountyProgramDetector:
     REJECT_PATTERNS = {
         "educational": re.compile(r"educational|practice|learning|demo|example", re.I),
         "no_bounty": re.compile(r"no bounty|not for bounty|bounty not active", re.I),
-        "archived": re.compile(r"archived|deprecated|deprecated|no longer maintained", re.I),
-        "audit_planned": re.compile(r"audit\s+(?:is\s+)?planned|planned audit|pending audit|waiting for audit", re.I),
+        "archived": re.compile(r"archived|deprecated|no longer maintained", re.I),
+        "audit_planned": re.compile(r"audit\s+(?:is\s+|will\s+be\s+)?planned|planned\s+audit|pending audit|waiting for audit", re.I),
         "not_audited": re.compile(r"not audited|unaudited", re.I),
         "mainnet_blocked": re.compile(r"mainnet blocked|production blocked", re.I),
         "writeup": re.compile(r"security writeup|post-mortem|postmortem|incident report", re.I),

@@ -117,7 +117,9 @@ python3 target_forge.py discoveries/sentinel/verified_2026-07-24.jsonl \
     "repository": "https://github.com/yearn/yearn-v3",
     "authorized": true,
     "authorization_method": "official_page",
-    "verification_confidence": 0.85
+    "verification_confidence": 0.85,
+    "commit_sha": "7ff011a7ff5e69fb6ba0f2fa6e4ba4f1c0c9c1a0",
+    "rpc_env_var": "ETHEREUM_RPC_URL"
   },
   "scope": {
     "in_scope": {
@@ -136,7 +138,7 @@ python3 target_forge.py discoveries/sentinel/verified_2026-07-24.jsonl \
     "framework": "foundry",
     "fork_required": true,
     "fork_chain": "ethereum",
-    "rpc_endpoint": "https://eth-mainnet.alchemyapi.io/v2/...",
+    "rpc_endpoint": "${ETHEREUM_RPC_URL}",
     "live_transactions_allowed": false,
     "requires_funding": true,
     "constraints": ["use-mainnet-fork-for-historical-context"]

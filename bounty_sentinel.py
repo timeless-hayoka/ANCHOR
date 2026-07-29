@@ -19,7 +19,7 @@ import json
 import logging
 import urllib.request
 from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent
 DISCOVERIES_DIR = ROOT / "discoveries" / "scout"
 VERIFIED_DIR = ROOT / "discoveries" / "sentinel"
+VERIFICATION_TTL = timedelta(days=30)
 
 
 class VerificationMethod(StrEnum):
@@ -130,14 +131,17 @@ class ScopeSentinel:
             authorized = True
             reason = f"Verified via {verification_method.value}"
 
+        now = datetime.now(timezone.utc)
+        expires_at = (now + VERIFICATION_TTL).isoformat() if authorized else None
+
         return VerificationResult(
             target_id=target_id,
             authorized=authorized,
             method=verification_method,
             confidence=confidence,
             evidence=evidence,
-            verified_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=None,  # In real implementation, check scope expiry
+            verified_at=now.isoformat(),
+            expires_at=expires_at,
             reason=reason,
         )
 
