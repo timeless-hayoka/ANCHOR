@@ -137,8 +137,19 @@ class TargetForge:
         program_name = target.get("program_name", "")
         platform = target.get("platform", "")
         repository = target.get("repository_url", "")
-        framework = Framework(target.get("framework", "foundry"))
-        chain = Chain(target.get("chain", "ethereum"))
+
+        # Defensively handle framework and chain enums with fallbacks
+        try:
+            framework = Framework(target.get("framework", "foundry"))
+        except ValueError:
+            logger.warning(f"Unknown framework: {target.get('framework')}, defaulting to foundry")
+            framework = Framework.FOUNDRY
+
+        try:
+            chain = Chain(target.get("chain", "ethereum"))
+        except ValueError:
+            logger.warning(f"Unknown chain: {target.get('chain')}, defaulting to ethereum")
+            chain = Chain.ETHEREUM
 
         # Build scope from assets
         in_scope = {}
@@ -283,6 +294,7 @@ class TargetForge:
         logger.info(f"Forging {len(targets)} hunt packages")
 
         packages = []
+        failed = []
         for verification in targets:
             target_id = verification.get("target_id", "")
             if discovery_file:
@@ -290,9 +302,18 @@ class TargetForge:
             else:
                 target = {"target_id": target_id}
 
-            package = self.forge_package(target, verification)
-            packages.append(package)
-            logger.info(f"  Forged: {package.hunt_id}")
+            try:
+                package = self.forge_package(target, verification)
+                packages.append(package)
+                logger.info(f"  Forged: {package.hunt_id}")
+            except ValueError as e:
+                logger.error(f"  Failed to forge {target_id}: {e}")
+                failed.append((target_id, str(e)))
+
+        if failed:
+            logger.warning(f"Failed to forge {len(failed)} packages:")
+            for target_id, reason in failed:
+                logger.warning(f"  - {target_id}: {reason}")
 
         return packages
 

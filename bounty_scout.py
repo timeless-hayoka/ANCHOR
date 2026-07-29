@@ -404,6 +404,8 @@ def main():
                 discovery = scout.discover_code4rena()
                 output_path = scout.save_discovery(discovery)
                 all_discoveries.append((platform, output_path, discovery))
+            else:
+                logger.error(f"Platform {platform.value} not yet implemented")
     else:
         platform = BountyPlatform(args.platform)
         if platform == BountyPlatform.IMMUNEFI:
@@ -414,6 +416,10 @@ def main():
             discovery = scout.discover_code4rena()
             output_path = scout.save_discovery(discovery)
             all_discoveries.append((platform, output_path, discovery))
+        else:
+            print(f"Error: Platform '{platform.value}' is not yet implemented")
+            print(f"Supported platforms: {', '.join(p.value for p in [BountyPlatform.IMMUNEFI, BountyPlatform.CODE4RENA])}")
+            return 1
 
     # Summary
     total_discovered = sum(d[2].discovered_count for d in all_discoveries)
