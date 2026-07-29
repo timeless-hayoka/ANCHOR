@@ -128,6 +128,7 @@ class ImmunefiBountyClient:
     API_BASE = "https://immunefi.com/api"
 
     def __init__(self):
+        """Initialize Immunefi API client with User-Agent and Accept headers."""
         self.session_headers = {
             "User-Agent": "ANCHOR-BugBot-Scout/1.0",
             "Accept": "application/json",
@@ -177,6 +178,7 @@ class Code4RenaBountyClient:
     API_BASE = "https://code4rena.com/api"
 
     def __init__(self):
+        """Initialize Code4rena API client with User-Agent and Accept headers."""
         self.session_headers = {
             "User-Agent": "ANCHOR-BugBot-Scout/1.0",
             "Accept": "application/json",
@@ -224,6 +226,7 @@ class BountyScouter:
     """Main scout orchestration for discovering bounty programs."""
 
     def __init__(self, output_dir: Path | None = None):
+        """Initialize scout with output directory and platform clients."""
         self.output_dir = output_dir or DISCOVERIES_DIR
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -358,6 +361,7 @@ class BountyScouter:
 
 
 def main():
+    """Discover bounty programs from official platforms and save results."""
     parser = argparse.ArgumentParser(
         description="Scout: Discover authorized bounty programs",
     )

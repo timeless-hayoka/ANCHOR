@@ -188,6 +188,7 @@ class StrictBountyCrawler:
     """Conservative crawler: only authorizes programs with explicit bounty evidence."""
 
     def __init__(self, output_dir: Path | None = None):
+        """Initialize crawler with output directory and detector instance."""
         self.output_dir = output_dir or DISCOVERIES_DIR
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.detector = BountyProgramDetector()
@@ -257,6 +258,7 @@ class StrictBountyCrawler:
 
 
 def main():
+    """Scan repositories for explicit bounty program evidence and classify authorization."""
     parser = argparse.ArgumentParser(
         description="Strict bounty crawler: only finds authorized programs",
     )

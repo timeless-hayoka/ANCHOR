@@ -99,6 +99,7 @@ class TargetForge:
     """Normalizes verified targets into hunt packages."""
 
     def __init__(self, output_dir: Path | None = None):
+        """Initialize forge with output directory and hunt counter."""
         self.output_dir = output_dir or FORGE_DIR
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.hunt_counter = 0
@@ -346,6 +347,7 @@ class TargetForge:
 
 
 def main():
+    """Forge hunt packages from verified targets for Trinity ingestion."""
     parser = argparse.ArgumentParser(
         description="Forge: Normalize verified targets into hunt packages",
     )

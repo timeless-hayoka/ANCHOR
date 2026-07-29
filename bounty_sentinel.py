@@ -60,6 +60,7 @@ class ScopeSentinel:
     """Verification layer for discovered bounty targets."""
 
     def __init__(self, output_dir: Path | None = None):
+        """Initialize sentinel with output directory for verified and rejected results."""
         self.output_dir = output_dir or VERIFIED_DIR
         self.verified: list[VerificationResult] = []
         self.rejected: list[VerificationResult] = []
@@ -215,6 +216,7 @@ class ScopeSentinel:
 
 
 def main():
+    """Verify scope authorization for discovered targets and save results."""
     parser = argparse.ArgumentParser(
         description="Sentinel: Verify scope authorization for discovered targets",
     )
