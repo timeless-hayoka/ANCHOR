@@ -247,7 +247,7 @@ class TargetForge:
         if framework == Framework.FOUNDRY:
             constraints.append("foundry-install-required")
 
-        if "kyc" in str(target.get("kyc_required", "")).lower():
+        if target.get("kyc_required") is True:
             constraints.append("kyc-verification-recorded")
 
         return constraints

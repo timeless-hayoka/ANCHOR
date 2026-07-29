@@ -214,6 +214,7 @@ def test_negative_signals():
         ),
     ]
 
+    all_blocked = True
     for name, readme, description in test_cases:
         result = detector.classify_authorization(
             repo_owner="test",
@@ -221,7 +222,9 @@ def test_negative_signals():
             readme_content=readme,
             description="",
         )
-        status = "✓" if not result.is_authorized() else "✗"
+        blocked = not result.is_authorized()
+        all_blocked = all_blocked and blocked
+        status = "✓" if blocked else "✗"
         print(f"\n{status} {name}: {description}")
         print(f"  State: {result.state.value}")
         print(f"  Authorized: {result.is_authorized()}")
@@ -229,10 +232,9 @@ def test_negative_signals():
             print(f"  Blocked by: {', '.join(result.negative_signals)}")
 
     print("\n" + "=" * 80)
+    return all_blocked
 
 
 if __name__ == "__main__":
-    success = test_full_pipeline()
-    test_negative_signals()
-
+    success = test_full_pipeline() and test_negative_signals()
     sys.exit(0 if success else 1)
