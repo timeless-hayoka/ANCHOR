@@ -60,7 +60,7 @@ def test_full_pipeline():
             ],
             "out_of_scope_assets": [],
             "kyc_required": False,
-            "commit_sha": "abc123def456...",  # Will be resolved from GitHub API in production
+            "commit_sha": "7ff011a7ff5e69fb6ba0f2fa6e4ba4f1c0c9c1a0",  # Real 40-char hex SHA
         }
     ]
 

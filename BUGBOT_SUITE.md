@@ -17,11 +17,13 @@ Discovery              Scope Verification      Normalization      Investigation
 The answer comes from BugBot with proof:
 
 ```python
-if hunt_package.target.authorized != True:
+if hunt_package.target.state != AuthorizationState.AUTHORIZED_ASSET_MATCHED:
+    reject()
+if not hunt_package.evidence:
     reject()
 ```
 
-All three layers enforce hard gates before forwarding to Trinity.
+Only hunt packages with exact `AUTHORIZED_ASSET_MATCHED` state and evidence reach Trinity. All three layers enforce hard gates before forwarding.
 
 ## Pipeline Layers
 

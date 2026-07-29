@@ -17,11 +17,15 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import urllib.request
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
+
+ALLOWED_URL_SCHEMES = frozenset({"https"})
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +59,8 @@ class VerificationResult:
 class ScopeSentinel:
     """Verification layer for discovered bounty targets."""
 
-    def __init__(self):
+    def __init__(self, output_dir: Path | None = None):
+        self.output_dir = output_dir or VERIFIED_DIR
         self.verified: list[VerificationResult] = []
         self.rejected: list[VerificationResult] = []
 
@@ -81,10 +86,13 @@ class ScopeSentinel:
         authorized = False
         reason = ""
 
-        # Gate 1: Check platform URL is accessible
+        # Gate 1: Check platform URL is accessible (HTTPS only, no SSRF)
         try:
-            import urllib.request
-            urllib.request.urlopen(platform_url, timeout=10)
+            parsed = urlparse(platform_url)
+            if parsed.scheme not in ALLOWED_URL_SCHEMES or not parsed.hostname:
+                raise ValueError(f"disallowed platform URL scheme or format: {platform_url!r}")
+            with urllib.request.urlopen(platform_url, timeout=10):
+                pass
             evidence.append(platform_url)
             confidence += 0.2
         except Exception as e:
@@ -175,13 +183,13 @@ class ScopeSentinel:
 
     def save_verified(self, output_file: str | None = None) -> Path:
         """Save verified targets to file."""
-        VERIFIED_DIR.mkdir(parents=True, exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
         if not output_file:
             timestamp = datetime.now().isoformat()[:10]
             output_file = f"verified_{timestamp}.jsonl"
 
-        output_path = VERIFIED_DIR / output_file
+        output_path = self.output_dir / output_file
         with open(output_path, "w", encoding="utf-8") as f:
             for result in self.verified:
                 f.write(json.dumps(asdict(result)) + "\n")
@@ -191,13 +199,13 @@ class ScopeSentinel:
 
     def save_rejected(self, output_file: str | None = None) -> Path:
         """Save rejected targets to file for review."""
-        VERIFIED_DIR.mkdir(parents=True, exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
         if not output_file:
             timestamp = datetime.now().isoformat()[:10]
             output_file = f"rejected_{timestamp}.jsonl"
 
-        output_path = VERIFIED_DIR / output_file
+        output_path = self.output_dir / output_file
         with open(output_path, "w", encoding="utf-8") as f:
             for result in self.rejected:
                 f.write(json.dumps(asdict(result)) + "\n")
@@ -237,7 +245,7 @@ def main():
         print(f"Error: Discovery file not found: {args.discovery_file}")
         return 1
 
-    sentinel = ScopeSentinel()
+    sentinel = ScopeSentinel(output_dir=args.output_dir)
     authorized, rejected = sentinel.verify_all(args.discovery_file)
 
     verified_path = sentinel.save_verified()

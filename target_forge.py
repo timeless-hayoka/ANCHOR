@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from enum import StrEnum
@@ -79,8 +80,11 @@ class HuntPackage:
         # Hard gates for Trinity ingestion
         if not self.target.get("authorized"):
             raise ValueError("hunt_package.target.authorized must be True")
-        if not self.target.get("commit_sha"):
-            raise ValueError("hunt_package.target.commit_sha must be pinned")
+
+        commit_sha = str(self.target.get("commit_sha", "")).lower().strip()
+        if not re.fullmatch(r"[0-9a-f]{40}", commit_sha):
+            raise ValueError("hunt_package.target.commit_sha must be a full 40-char hex SHA")
+
         if not self.target.get("verification_confidence"):
             raise ValueError("hunt_package.target.verification_confidence must be recorded")
 

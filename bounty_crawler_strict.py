@@ -109,7 +109,7 @@ class BountyProgramDetector:
         "educational": re.compile(r"educational|practice|learning|demo|example", re.I),
         "no_bounty": re.compile(r"no bounty|not for bounty|bounty not active", re.I),
         "archived": re.compile(r"archived|deprecated|deprecated|no longer maintained", re.I),
-        "audit_planned": re.compile(r"audit planned|pending audit|waiting for audit", re.I),
+        "audit_planned": re.compile(r"audit\s+(?:is\s+)?planned|planned audit|pending audit|waiting for audit", re.I),
         "not_audited": re.compile(r"not audited|unaudited", re.I),
         "mainnet_blocked": re.compile(r"mainnet blocked|production blocked", re.I),
         "writeup": re.compile(r"security writeup|post-mortem|postmortem|incident report", re.I),
@@ -180,7 +180,7 @@ class BountyProgramDetector:
             state=state,
             evidence=evidence,
             negative_signals=negative_signals,
-            authorization_confidence=0.9 if evidence else 0.0,
+            authorization_confidence=0.9 if (evidence and not negative_signals) else 0.0,
         )
 
 
