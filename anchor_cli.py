@@ -167,6 +167,12 @@ def _resolve_project_path(raw: str | None, *, default: str | None = None, must_e
 
 
 def create_parser() -> argparse.ArgumentParser:
+    """
+    Build the command-line parser for the ANCHOR workflow entrypoint.
+    
+    Returns:
+        argparse.ArgumentParser: Configured parser with all supported commands and options.
+    """
     parser = argparse.ArgumentParser(prog="anchor", description="ANCHOR local workflow entrypoint")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -1458,6 +1464,14 @@ def cmd_strategy(args: argparse.Namespace) -> int:
 
 
 def cmd_work_queue(args: argparse.Namespace) -> int:
+    """Display the repository work queue as formatted text or JSON.
+    
+    Parameters:
+    	args (argparse.Namespace): Command-line arguments containing the ``json`` output-format flag.
+    
+    Returns:
+    	int: ``0`` after the work queue is displayed.
+    """
     queue = load_work_queue()
     if args.json:
         print(json.dumps(work_queue_summary(queue), indent=2))
@@ -1467,6 +1481,15 @@ def cmd_work_queue(args: argparse.Namespace) -> int:
 
 
 def cmd_lead_show(args: argparse.Namespace) -> int:
+    """
+    Display and validate a Trinity lead state record.
+    
+    Parameters:
+    	args (argparse.Namespace): Command-line arguments containing the record path and output format.
+    
+    Returns:
+    	int: `0` when the record is valid, otherwise `1`.
+    """
     path = Path(args.path)
     payload = json.loads(path.read_text(encoding="utf-8"))
     record = LeadRecord.from_dict(payload)
@@ -1479,6 +1502,11 @@ def cmd_lead_show(args: argparse.Namespace) -> int:
 
 
 def _knowledge_provider() -> KnowledgeProvider:
+    """Create the knowledge provider for the project's knowledge directory.
+    
+    Returns:
+    	KnowledgeProvider: A provider configured with the project's knowledge directory.
+    """
     return KnowledgeProvider(ROOT / "knowledge")
 
 
@@ -2082,6 +2110,15 @@ def cmd_codex_mcp(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """
+    Dispatch a command-line invocation to the corresponding command handler.
+    
+    Parameters:
+        argv (list[str] | None): Optional command-line arguments. When omitted, arguments are read from the process command line.
+    
+    Returns:
+        int: The handler's exit status, or 2 when no recognized command route is available.
+    """
     parser = create_parser()
     args = parser.parse_args(argv)
 
