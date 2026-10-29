@@ -75,6 +75,7 @@ STATES_REQUIRING_REVIEW = frozenset({"council_accepted", "report_ready"})
 
 
 def utcnow_iso() -> str:
+    """Return the current UTC time in ISO 8601 format."""
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -94,6 +95,12 @@ class LeadEvent:
     created_at: str = ""
 
     def to_dict(self) -> dict[str, Any]:
+        """
+        Serialize the lead event into a dictionary.
+        
+        Returns:
+        	dict[str, Any]: A dictionary containing the event fields, with evidence references represented as a list.
+        """
         return {
             "event_id": self.event_id,
             "lead_id": self.lead_id,
@@ -107,6 +114,15 @@ class LeadEvent:
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> LeadEvent:
+        """
+        Create a lead event from a serialized payload.
+        
+        Parameters:
+            payload (dict[str, Any]): Serialized event data.
+        
+        Returns:
+            LeadEvent: The reconstructed lead event.
+        """
         evidence_refs = payload.get("evidence_refs")
         return cls(
             event_id=str(payload.get("event_id") or ""),
@@ -140,6 +156,13 @@ class LeadRecord:
     events: list[LeadEvent] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
+        """
+        Serialize the lead record into a JSON-compatible dictionary.
+        
+        Returns:
+        	dict[str, Any]: A dictionary containing the record fields, schema version,
+        	references as lists, and serialized lifecycle events.
+        """
         return {
             "schema_version": SCHEMA_VERSION,
             "lead_id": self.lead_id,
@@ -162,6 +185,15 @@ class LeadRecord:
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> LeadRecord:
+        """
+        Create a lead record from a serialized payload.
+        
+        Parameters:
+        	payload (dict[str, Any]): Mapping containing lead record fields and optional event, evidence, and review data.
+        
+        Returns:
+        	LeadRecord: A populated lead record with defaults for missing or invalid collection fields.
+        """
         events_raw = payload.get("events")
         events = [LeadEvent.from_dict(item) for item in events_raw] if isinstance(events_raw, list) else []
         evidence_refs = payload.get("evidence_refs")
@@ -187,12 +219,29 @@ class LeadRecord:
 
 
 def can_transition(from_state: str, to_state: str) -> bool:
+    """
+    Determine whether a lead can move from one state to another.
+    
+    Parameters:
+        from_state (str): The lead's current state.
+        to_state (str): The proposed destination state.
+    
+    Returns:
+        bool: `true` if the destination state is allowed, `false` otherwise.
+    """
     return to_state in ALLOWED_TRANSITIONS.get(from_state, frozenset())
 
 
 def validate_lead(record: LeadRecord) -> list[str]:
-    """Return a list of validation error strings; empty means the record is
-    internally consistent for the state it currently claims to be in."""
+    """
+    Validate a lead record against its state, scope, identity, rubric, evidence, and review requirements.
+    
+    Parameters:
+        record (LeadRecord): The lead record to validate.
+    
+    Returns:
+        list[str]: Validation error messages, or an empty list when the record is consistent.
+    """
     errors: list[str] = []
 
     if record.state not in LEAD_STATES:
@@ -232,8 +281,24 @@ def apply_transition(
     evidence_refs: list[str] | None = None,
     created_at: str | None = None,
 ) -> LeadRecord:
-    """Return a new LeadRecord advanced to to_state, or raise
-    LeadTransitionError if the transition or resulting state is invalid."""
+    """
+    Advance a lead record to a permitted target state while recording the transition.
+    
+    Parameters:
+        record (LeadRecord): The current lead record.
+        to_state (str): The target lifecycle state.
+        actor (str): The person or system performing the transition.
+        reason (str): The reason for the transition.
+        event_id (str): The identifier for the transition event.
+        evidence_refs (list[str] | None): Evidence references associated with the transition.
+        created_at (str | None): Timestamp for the transition; the current UTC time is used when omitted.
+    
+    Returns:
+        LeadRecord: A new record with the target state, updated timestamps, evidence references, and transition event.
+    
+    Raises:
+        LeadTransitionError: If the target state or transition is invalid, or the resulting record fails validation.
+    """
     if to_state not in LEAD_STATES:
         raise LeadTransitionError(f"unknown target state '{to_state}'")
     if not can_transition(record.state, to_state):
@@ -281,7 +346,15 @@ def apply_transition(
 
 
 def render_lead_state(record: LeadRecord) -> str:
-    """One-line, console/run-log friendly summary of a lead's current state."""
+    """
+    Format a lead's current state and validation status as a one-line summary.
+    
+    Parameters:
+        record (LeadRecord): Lead record to summarize.
+    
+    Returns:
+        str: A status line containing the lead ID, state, title, and either ``OK`` or the validation errors.
+    """
     errors = validate_lead(record)
     status = "OK" if not errors else f"INVALID ({'; '.join(errors)})"
     return f"[{record.lead_id}] {record.state} — {record.title} ({status})"
