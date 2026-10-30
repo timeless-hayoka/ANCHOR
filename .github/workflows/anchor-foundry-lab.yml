@@ -1,0 +1,39 @@
+name: ANCHOR Foundry lab proof
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'foundry-lab/**'
+      - '.github/workflows/anchor-foundry-lab.yml'
+permissions:
+  contents: read
+jobs:
+  isolated-foundry-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: foundry-lab
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Record toolchain and commit
+        run: |
+          mkdir -p evidence
+          forge --version | tee evidence/forge-version.txt
+          git rev-parse HEAD | tee evidence/commit.txt
+      - name: Execute isolated positive and negative controls
+        run: |
+          set -o pipefail
+          forge test -vvv 2>&1 | tee evidence/forge-test.log
+      - name: Upload proof logs even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchor-foundry-lab-evidence
+          path: foundry-lab/evidence/
+          retention-days: 30
+          if-no-files-found: warn
