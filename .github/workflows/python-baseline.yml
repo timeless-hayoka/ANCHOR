@@ -1,0 +1,40 @@
+name: Python baseline
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Environment
+        run: |
+          python --version
+          git rev-parse HEAD
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Capture installed dependencies
+        if: always()
+        run: python -m pip freeze > pip-freeze.txt
+      - name: Run tests
+        run: python -m pytest tests/ -q --junitxml=pytest-results.xml
+      - name: Upload results even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-baseline-evidence
+          path: |
+            pytest-results.xml
+            pip-freeze.txt
+          if-no-files-found: warn
+          retention-days: 14
