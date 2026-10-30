@@ -1,0 +1,76 @@
+name: ANCHOR continuous evidence
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: anchor-continuous-evidence
+  cancel-in-progress: false
+jobs:
+  baseline-and-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Record provenance
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/commit.txt
+          python --version > evidence/python-version.txt
+          python -m pip freeze > evidence/dependencies.txt
+      - name: Python regression suite
+        run: python -m pytest tests/ -q --junitxml=evidence/pytest-results.xml
+      - name: Known-findings SARIF benchmark
+        run: python anchor_cli.py benchmark sarif known-findings
+      - name: Collect benchmark reports
+        if: always()
+        run: |
+          mkdir -p evidence/benchmark
+          if [ -d benchmarks/sarif-known-findings/runs ]; then
+            cp -R benchmarks/sarif-known-findings/runs evidence/benchmark/
+          fi
+          if [ -f benchmarks/sarif-known-findings/REPORT.md ]; then
+            cp benchmarks/sarif-known-findings/REPORT.md evidence/benchmark/
+          fi
+      - name: Upload evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchor-regression-evidence
+          path: evidence/
+          retention-days: 30
+          if-no-files-found: warn
+  passive-discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Public metadata discovery only
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python anchor_cli.py github crawl --query "solidity foundry smart contract security" --query "defi solidity audit"
+      - name: Upload discovery candidates
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchor-passive-discovery
+          path: discoveries/github/
+          retention-days: 14
+          if-no-files-found: warn
