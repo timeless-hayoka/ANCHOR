@@ -226,8 +226,17 @@ def test_needs_manual_review_can_fall_back_to_hypothesis_or_advance():
 
     review_needed.impact_boundary = "impact boundary"
     review_needed.review_refs = ["reviews/council_review.md"]
+    # Manual review cannot bypass the independent Watcher proof gate.
+    with pytest.raises(LeadTransitionError, match="watcher"):
+        apply_transition(
+            review_needed, to_state="council_accepted", actor="council",
+            reason="attempt without watcher", event_id="evt_5"
+        )
+    review_needed.watcher_challenge = "Independent reviewer checked the reproduction and negative controls."
+    review_needed.watcher_refs = ["reviews/independent_watcher.md"]
+    review_needed.watcher_verdict = "validated"
     advanced = apply_transition(
-        review_needed, to_state="council_accepted", actor="council", reason="accepted after review", event_id="evt_5"
+        review_needed, to_state="council_accepted", actor="council", reason="accepted after review", event_id="evt_6"
     )
     assert advanced.state == "council_accepted"
 
