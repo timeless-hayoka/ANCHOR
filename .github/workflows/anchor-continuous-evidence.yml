@@ -31,6 +31,8 @@ jobs:
         run: python -m pytest tests/ -q --junitxml=evidence/pytest-results.xml
       - name: Known-findings SARIF benchmark
         run: python anchor_cli.py benchmark sarif known-findings
+      - name: Verify known-findings evidence gate
+        run: python scripts/verify_sarif_benchmark.py
       - name: Collect benchmark reports
         if: always()
         run: |
