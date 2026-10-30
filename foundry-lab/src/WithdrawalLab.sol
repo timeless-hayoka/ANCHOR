@@ -9,7 +9,7 @@ contract VulnerableWithdrawal {
         require(balances[msg.sender] >= amount, "insufficient");
         (bool ok,) = msg.sender.call{value: amount}("");
         require(ok, "transfer failed");
-        balances[msg.sender] -= amount;
+        balances[msg.sender] = 0; // intentionally unsafe state update after interaction
     }
 }
 
