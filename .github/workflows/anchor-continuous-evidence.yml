@@ -3,10 +3,16 @@ on:
   schedule:
     - cron: '17 9 * * *'
   workflow_dispatch:
+    inputs:
+      run_discovery:
+        description: 'Also run passive GitHub discovery (not needed to verify proof gate)'
+        type: boolean
+        required: false
+        default: false
 permissions:
   contents: read
 concurrency:
-  group: anchor-continuous-evidence
+  group: anchor-continuous-evidence-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   baseline-and-corpus:
@@ -52,6 +58,7 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
   passive-discovery:
+    if: github.event_name != 'workflow_dispatch' || inputs.run_discovery
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
