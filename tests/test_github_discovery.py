@@ -127,8 +127,8 @@ class GitHubDiscoveryTests(TestCase):
         with patch.object(github_discovery, "list_repo_contents", return_value=[{"name": "README.md"}]), patch.object(github_discovery, "read_repo_file", return_value="Bug bounty scope and security policy"), patch.object(github_discovery, "github_api_get_json", return_value=[]):
             signals = github_discovery.scan_public_signals("owner/project", "Bug bounty scope and security policy", token="dummy")
 
-        self.assertEqual(signals["authorization_state"], "Explicitly authorized bounty / audit scope")
-        self.assertEqual(signals["suggested_posture"], "Local clone analysis allowed and scope-limited review is encouraged")
+        self.assertEqual(signals["authorization_state"], "Public repo / no confirmed bounty scope")
+        self.assertEqual(signals["suggested_posture"], "Passive review only until scope is confirmed")
 
     def test_scoring_rewards_security_context_and_testing_depth(self):
         candidate = github_discovery.compute_repo_score(
@@ -465,8 +465,8 @@ class GitHubDiscoveryTests(TestCase):
             encoding="utf-8",
         )
         scope = github_discovery.evaluate_scope_confirmation(selected_dir)
-        self.assertEqual(scope["scope_status"], "AUTHORIZED")
-        self.assertEqual(scope["allowed_actions"], "planning and authorized analysis")
+        self.assertEqual(scope["scope_status"], "NOT AUTHORIZED")
+        self.assertEqual(scope["allowed_actions"], "planning only")
 
     def _tmpdir(self):
         import tempfile

@@ -308,7 +308,7 @@ To generate the constrained hunt plan for a selected repo:
 
 The plan command reads `selected/<repo>/selection.json` and `candidate.json`, then writes `hunt_plan.json` and `hunt_plan.md` next to the selected repo. It does not clone, scan, open issues, or contact maintainers.
 
-It also creates `scope_confirmation.md` as a human-filled gate. Until that file says `authorized`, the selected repo remains plan-only.
+It also creates `scope_confirmation.md` as a human-filled gate. The selected repo remains plan-only until its structured policy evidence, repository identity, approved revision, permitted actions and reviewer decision validate. A bare `authorized` marker is insufficient.
 
 To check the scope gate:
 
@@ -316,7 +316,7 @@ To check the scope gate:
 ./anchor github scope-check perimetersec/fuzzlib
 ```
 
-That command should report `Scope status: NOT AUTHORIZED` until `scope_confirmation.md` is filled in and the reviewer decision is `authorized`.
+That command reports `Scope status: NOT AUTHORIZED` and exits 1 until the structured evidence validates. Discovery scores and README keywords never grant authorization. See [Finder pipeline](docs/FINDER_PIPELINE.md) for scan outcomes, exit codes, scope fields and the handoff to the operational BugBot gate.
 
 ## Connect the console
 

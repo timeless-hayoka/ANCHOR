@@ -37,6 +37,10 @@ class TestSentinelFailClosed(unittest.TestCase):
 
     def setUp(self):
         self.sentinel = bounty_sentinel.ScopeSentinel()
+        # Unit tests must never depend on DNS or production platform responses.
+        network = patch("urllib.request.urlopen", side_effect=ConnectionError("unmocked request"))
+        network.start()
+        self.addCleanup(network.stop)
 
     @patch("urllib.request.urlopen")
     def test_rejects_missing_repository_url(self, mock_open):
@@ -122,8 +126,10 @@ class TestSentinelFailClosed(unittest.TestCase):
         self.assertFalse(result.authorized)
         self.assertIn("inaccessible", result.reason.lower())
 
-    def test_rejects_mismatch_between_scope_and_repo(self):
-        """Scope page and repo disagree on version = reject."""
+    @patch("urllib.request.urlopen")
+    def test_rejects_mismatch_between_scope_and_repo(self, mock_open):
+        """Caller-supplied version claims cannot authorize a reachable program."""
+        mock_open.return_value.__enter__.return_value.read.return_value = b"<html>Program</html>"
         result = self.sentinel.verify_target(
             target_id="disagree",
             platform_url="https://protocol.local/scope",
@@ -201,8 +207,19 @@ class TestSentinelAcceptValid(unittest.TestCase):
         mock_response.read.return_value = b"<html>Valid program</html>"
         mock_open.return_value.__enter__.return_value = mock_response
 
+        import tempfile
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        confirmation_path = Path(temporary.name) / "confirmation.md"
+        confirmation_path.write_text(
+            (ROOT / "tests/fixtures/scope_confirmation_valid.md").read_text()
+            .replace("target_id: dvd-local-lab", "target_id: yearn-v3")
+            .replace("identity_status: local_fixture_unpinned", "identity_status: verified_repo\ntarget_repo_url: https://github.com/yearn/yearn-v3")
+            .replace("evidence_path: tests/fixtures/scope_evidence.md", f"evidence_path: {ROOT / 'tests/fixtures/scope_evidence.md'}")
+        )
         result = self.sentinel.verify_target(
             target_id="yearn-v3",
+            confirmation_path=confirmation_path,
             platform_url="https://immunefi.com/bug-bounty/yearn-v3",
             repository_url="https://github.com/yearn/yearn-v3",
             in_scope_assets=[
@@ -215,6 +232,22 @@ class TestSentinelAcceptValid(unittest.TestCase):
 
         self.assertTrue(result.authorized)
         self.assertGreaterEqual(result.confidence, 0.7)
+        self.assertLessEqual(result.expires_at, "2027-06-30T12:00:00+00:00")
+        discovery = Path(temporary.name) / "discovery.jsonl"
+        discovery.write_text(__import__("json").dumps({
+            "target_id": "yearn-v3",
+            "platform_url": "https://immunefi.com/bug-bounty/yearn-v3",
+            "repository_url": "https://github.com/yearn/yearn-v3",
+            "in_scope_assets": [{"identifier": "0x4D75"}],
+        }) + "\n")
+        confirmation_path.rename(Path(temporary.name) / "yearn-v3.md")
+        approved, rejected = self.sentinel.verify_all(discovery, confirmation_dir=Path(temporary.name))
+        self.assertEqual(len(approved), 1)
+        self.assertEqual(rejected, [])
+        approved, rejected = self.sentinel.verify_all(discovery)
+        self.assertEqual(approved, [])
+        self.assertEqual(len(rejected), 1)
+
 
     @patch("urllib.request.urlopen")
     def test_evidence_recorded_with_authorization(self, mock_open):
@@ -230,9 +263,8 @@ class TestSentinelAcceptValid(unittest.TestCase):
             in_scope_assets=[{"identifier": "0x4D75..."}],
         )
 
-        if result.authorized:
-            self.assertGreater(len(result.evidence), 0)
-            self.assertIn("immunefi.com", result.evidence[0])
+        self.assertFalse(result.authorized)
+        self.assertIn("cannot authorize", result.reason)
 
 
 class TestSentinelEvidencePredicates(unittest.TestCase):

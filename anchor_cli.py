@@ -1752,7 +1752,7 @@ def cmd_github_crawl(args: argparse.Namespace) -> int:
     else:
         print(render_github_discovery_summary(bundle, run_dir=run_dir))
         print(f"\nDiscovery bundle written to: {run_dir}")
-    return 0
+    return 2 if bundle.get("summary", {}).get("incomplete", 0) else 0
 
 
 def cmd_github_profile_crawl(args: argparse.Namespace, profile: str) -> int:
@@ -1776,7 +1776,7 @@ def cmd_github_profile_crawl(args: argparse.Namespace, profile: str) -> int:
     else:
         print(render_github_discovery_summary(bundle, run_dir=run_dir))
         print(f"\nDiscovery bundle written to: {run_dir}")
-    return 0
+    return 2 if bundle.get("summary", {}).get("incomplete", 0) else 0
 
 
 def cmd_github_select(args: argparse.Namespace) -> int:
@@ -1854,7 +1854,7 @@ def cmd_github_scope_check(args: argparse.Namespace) -> int:
         print(f"Allowed actions: {scope['allowed_actions']}")
         print(f"Scope file: {selected_dir / 'scope_confirmation.md'}")
         print(f"Discovery run: {run_dir.name}")
-    return 0
+    return 0 if scope["scope_status"] == "AUTHORIZED" else 1
 
 
 def cmd_benchmark_publish(args: argparse.Namespace) -> int:
