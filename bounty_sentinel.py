@@ -73,6 +73,7 @@ class ScopeSentinel:
         repository_url: str,
         in_scope_assets: list[dict[str, Any]],
         verification_method: VerificationMethod = VerificationMethod.OFFICIAL_PAGE,
+        confirmation_path: Path | None = None,
     ) -> VerificationResult:
         """Verify that a target is authorized for hunting.
 
@@ -126,13 +127,34 @@ class ScopeSentinel:
             reason = "No in-scope assets defined"
             logger.warning(f"[{target_id}] {reason}")
 
-        # Gate 4: Set authorized if all gates pass
+        # Reachability and caller-supplied strings are discovery signals, not a grant.
         if confidence >= 0.7:
-            authorized = True
-            reason = f"Verified via {verification_method.value}"
+            reason = "Scope evidence requires review; discovery confidence cannot authorize analysis"
+            if confirmation_path is not None:
+                from bugbot.scope_confirmation import build_scope_grant_from_confirmation
+                from bugbot.scope import validate_grant_for_request, default_anchor_root
+                try:
+                    grant, error = build_scope_grant_from_confirmation(confirmation_path, anchor_root=default_anchor_root())
+                    if grant is None:
+                        reason = error or "Invalid scope evidence"
+                    elif grant.identity_status != "verified_repo" or grant.target_repo_url != repository_url:
+                        reason = "Scope evidence repository identity does not match"
+                    else:
+                        denial = validate_grant_for_request(grant, target_id=target_id, target_ref=grant.target_ref, action="analysis")
+                        authorized = denial is None
+                        reason = str(denial) if denial else f"Verified scope evidence via {verification_method.value}"
+                        if authorized:
+                            evidence.append(str(confirmation_path))
+                except (OSError, ValueError, TypeError, KeyError) as exc:
+                    reason = f"Invalid scope evidence: {exc}"
 
         now = datetime.now(timezone.utc)
-        expires_at = (now + VERIFICATION_TTL).isoformat() if authorized else None
+        expires_at = None
+        if authorized:
+            expiry = now + VERIFICATION_TTL
+            if grant.expires_at is not None:
+                expiry = min(expiry, grant.expires_at)
+            expires_at = expiry.isoformat()
 
         return VerificationResult(
             target_id=target_id,
@@ -158,7 +180,7 @@ class ScopeSentinel:
                     targets.append(json.loads(line))
         return targets
 
-    def verify_all(self, discovery_file: Path) -> tuple[list[VerificationResult], list[VerificationResult]]:
+    def verify_all(self, discovery_file: Path, *, confirmation_dir: Path | None = None) -> tuple[list[VerificationResult], list[VerificationResult]]:
         """Verify all targets in a discovery file."""
         targets = self.load_discovered_targets(discovery_file)
         logger.info(f"Verifying {len(targets)} targets from {discovery_file.name}")
@@ -166,12 +188,16 @@ class ScopeSentinel:
         authorized = []
         rejected = []
 
+        from github_discovery import safe_slug
+
         for target in targets:
+            confirmation = confirmation_dir / (safe_slug(str(target.get("target_id", ""))) + ".md") if confirmation_dir else None
             result = self.verify_target(
                 target_id=target.get("target_id", ""),
                 platform_url=target.get("platform_url", ""),
                 repository_url=target.get("repository_url", ""),
                 in_scope_assets=target.get("in_scope_assets", []),
+                confirmation_path=confirmation,
             )
 
             if result.authorized:
@@ -229,6 +255,7 @@ def main():
         type=Path,
         help="Scout discovery JSONL file",
     )
+    parser.add_argument("--confirmation-dir", type=Path, help="Operator-reviewed scope records, named <slugged-target-id>.md")
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -252,7 +279,7 @@ def main():
         return 1
 
     sentinel = ScopeSentinel(output_dir=args.output_dir)
-    authorized, rejected = sentinel.verify_all(args.discovery_file)
+    authorized, rejected = sentinel.verify_all(args.discovery_file, confirmation_dir=args.confirmation_dir)
 
     verified_path = sentinel.save_verified()
     rejected_path = sentinel.save_rejected()

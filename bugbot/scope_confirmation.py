@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -54,6 +55,8 @@ def _parse_frontmatter_block(text: str) -> dict[str, Any]:
         key, value = line.split(":", 1)
         key = key.strip()
         value = value.strip()
+        if key in data:
+            raise ValueError(f"duplicate frontmatter field: {key}")
         current_key = key
         if not value:
             data[key] = []
@@ -86,11 +89,20 @@ def _normalize_confirmation_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if missing:
         raise ValueError(f"scope confirmation missing required fields: {', '.join(missing)}")
 
+    for field in _REQUIRED_CONFIRMATION_FIELDS:
+        if field not in {"permitted_actions", "prohibited_actions"}:
+            if not isinstance(payload[field], str) or not payload[field].strip():
+                raise ValueError(f"{field} must be a nonempty string")
+    if payload["schema_version"] != "1.0":
+        raise ValueError("unsupported scope schema_version")
+
     reviewer = str(payload["reviewer_decision"]).strip().lower()
     if reviewer != REVIEWER_DECISION_AUTHORIZED:
         raise ValueError(f"reviewer_decision must be {REVIEWER_DECISION_AUTHORIZED!r}")
 
     reviewed_at = parse_utc_datetime(str(payload["reviewed_at"]))
+    if reviewed_at > datetime.now(timezone.utc):
+        raise ValueError("review date is in the future")
     expires_raw = payload.get("expires_at")
     expires_at = parse_utc_datetime(str(expires_raw)) if expires_raw not in (None, "") else None
 

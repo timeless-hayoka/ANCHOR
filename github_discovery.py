@@ -171,7 +171,9 @@ class GitHubRateLimitError(GitHubDiscoveryError):
 
 
 class GitHubAPIError(GitHubDiscoveryError):
-    pass
+    def __init__(self, message: str, *, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 @dataclass
@@ -307,7 +309,7 @@ def get_github_token() -> str | None:
         return None
 
 
-def github_api_get_json(path: str, params: dict[str, Any] | None = None, token: str | None = None) -> dict[str, Any]:
+def github_api_get_json(path: str, params: dict[str, Any] | None = None, token: str | None = None, *, expected_type: type = dict) -> Any:
     url = f"https://api.github.com{path}"
     if params:
         query = urllib.parse.urlencode([(key, value) for key, value in params.items() if value is not None], doseq=True)
@@ -327,7 +329,7 @@ def github_api_get_json(path: str, params: dict[str, Any] | None = None, token: 
             payload = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         details = exc.read().decode("utf-8", errors="replace")
-        if exc.code in {403, 429} and "rate" in details.lower():
+        if exc.code == 429 or (exc.code == 403 and ("rate" in details.lower() or (exc.headers and exc.headers.get("X-RateLimit-Remaining") == "0"))):
             reset_header = exc.headers.get("X-RateLimit-Reset") if exc.headers else None
             retry_after_header = exc.headers.get("Retry-After") if exc.headers else None
             raise GitHubRateLimitError(
@@ -335,14 +337,14 @@ def github_api_get_json(path: str, params: dict[str, Any] | None = None, token: 
                 reset_at=str(reset_header) if reset_header else None,
                 retry_after=int(retry_after_header) if retry_after_header and retry_after_header.isdigit() else None,
             ) from exc
-        raise GitHubAPIError(f"GitHub API request failed for {path}: {exc.code} {details}") from exc
-    except urllib.error.URLError as exc:
+        raise GitHubAPIError(f"GitHub API request failed for {path}: {exc.code} {details}", status_code=exc.code) from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
         raise GitHubAPIError(f"GitHub API request failed for {path}: {exc}") from exc
     try:
         data = json.loads(payload)
     except json.JSONDecodeError as exc:
         raise GitHubAPIError(f"Malformed JSON payload from {path}") from exc
-    if not isinstance(data, dict):
+    if not isinstance(data, expected_type):
         raise GitHubAPIError(f"Unexpected JSON payload shape from {path}")
     return data
 
@@ -365,7 +367,7 @@ def github_api_get_text(path: str, token: str | None = None) -> str:
         if exc.code == 404:
             return ""
         details = exc.read().decode("utf-8", errors="replace")
-        if exc.code in {403, 429} and "rate" in details.lower():
+        if exc.code == 429 or (exc.code == 403 and ("rate" in details.lower() or (exc.headers and exc.headers.get("X-RateLimit-Remaining") == "0"))):
             reset_header = exc.headers.get("X-RateLimit-Reset") if exc.headers else None
             retry_after_header = exc.headers.get("Retry-After") if exc.headers else None
             raise GitHubRateLimitError(
@@ -373,31 +375,30 @@ def github_api_get_text(path: str, token: str | None = None) -> str:
                 reset_at=str(reset_header) if reset_header else None,
                 retry_after=int(retry_after_header) if retry_after_header and retry_after_header.isdigit() else None,
             ) from exc
-        raise GitHubAPIError(f"GitHub API request failed for {path}: {exc.code} {details}") from exc
-    except urllib.error.URLError as exc:
+        raise GitHubAPIError(f"GitHub API request failed for {path}: {exc.code} {details}", status_code=exc.code) from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
         raise GitHubAPIError(f"GitHub API request failed for {path}: {exc}") from exc
 
 
 def github_api_get_listing(path: str, token: str | None = None) -> list[dict[str, Any]]:
-    payload = github_api_get_json(path, token=token)
-    if isinstance(payload, list):
-        return [item for item in payload if isinstance(item, dict)]
-    return []
+    payload = github_api_get_json(path, token=token, expected_type=list)
+    if any(not isinstance(item, dict) for item in payload):
+        raise GitHubAPIError(f"Unexpected listing entry from {path}")
+    return payload
 
 
 def list_repo_contents(full_name: str, path: str = "", token: str | None = None) -> list[dict[str, Any]]:
     suffix = f"/{path}" if path else ""
     try:
         return github_api_get_listing(f"/repos/{full_name}/contents{suffix}", token=token)
-    except Exception:
-        return []
+    except GitHubAPIError as exc:
+        if exc.status_code == 404:
+            return []
+        raise
 
 
 def read_repo_file(full_name: str, path: str, token: str | None = None) -> str:
-    try:
-        return github_api_get_text(f"/repos/{full_name}/contents/{path}", token=token)
-    except Exception:
-        return ""
+    return github_api_get_text(f"/repos/{full_name}/contents/{path}", token=token)
 
 
 def scan_workflow_tools(workflow_text: str) -> list[str]:
@@ -442,7 +443,7 @@ def scan_public_signals(full_name: str, readme: str, token: str | None = None, s
 
     security_paths = []
     for candidate in (".github/SECURITY.md", "SECURITY.md", ".github/security.md", "security.md"):
-        if candidate.split("/")[-1] in root_names or candidate.split("/")[-1] in github_names:
+        if candidate.split("/")[-1] in (github_names if candidate.startswith(".github/") else root_names):
             security_paths.append(candidate)
 
     dependency_manifests = [
@@ -482,11 +483,7 @@ def scan_public_signals(full_name: str, readme: str, token: str | None = None, s
     semgrep_present = any("semgrep" in tool.lower() for tool in workflow_tools)
     slither_present = any("slither" in tool.lower() for tool in workflow_tools)
     foundry_present = any(term in (readme or "").lower() for term in ("foundry", "forge"))
-    release_list = []
-    try:
-        release_list = github_api_get_json(f"/repos/{full_name}/releases?per_page=5", token=token)
-    except Exception:
-        release_list = []
+    release_list = github_api_get_listing(f"/repos/{full_name}/releases?per_page=5", token=token)
     last_release = ""
     if isinstance(release_list, list) and release_list:
         first_release = release_list[0] if isinstance(release_list[0], dict) else {}
@@ -530,22 +527,10 @@ def scan_public_signals(full_name: str, readme: str, token: str | None = None, s
     security_signals.append("audit/advisory language present" if audit_mentions else "no audit/advisory language found")
     security_signals.append(f"release cadence: {release_cadence}")
 
-    if audit_mentions:
-        authorization_state = "Explicitly authorized bounty / audit scope"
-        review_state = "Explicitly authorized bounty / audit scope"
-        suggested_posture = "Local clone analysis allowed and scope-limited review is encouraged"
-    elif security_paths or codeql_present or tests_present or workflow_tools:
-        authorization_state = "Public repo / no confirmed bounty scope"
-        review_state = "Needs scope confirmation"
-        suggested_posture = "Passive review only until scope is confirmed"
-    elif dependency_manifests or readme.strip():
-        authorization_state = "Public repo / no confirmed bounty scope"
-        review_state = "Local clone analysis allowed"
-        suggested_posture = "Local clone analysis allowed"
-    else:
-        authorization_state = "Public repo / no confirmed bounty scope"
-        review_state = "Passive-only"
-        suggested_posture = "Passive review only until scope is confirmed"
+    # Discovery signals rank research interest; they cannot grant authorization.
+    authorization_state = "Public repo / no confirmed bounty scope"
+    review_state = "Needs scope confirmation"
+    suggested_posture = "Passive review only until scope is confirmed"
 
     return {
         "security_paths": security_paths,
@@ -852,12 +837,6 @@ def compute_repo_score(
     else:
         candidate.recommendation = "skip"
 
-    if candidate.priority_score >= 80 and candidate.review_state == "Needs scope confirmation":
-        candidate.review_state = "Local clone analysis allowed"
-        candidate.suggested_posture = "Local clone analysis allowed"
-    if candidate.priority_score < 40 and candidate.review_state == "Needs scope confirmation":
-        candidate.suggested_posture = "Passive review only until scope is confirmed"
-
     return candidate
 
 
@@ -903,6 +882,8 @@ def discover_repositories(
     token: str | None = None,
     fetch_readmes: bool = True,
 ) -> dict[str, Any]:
+    if not 1 <= limit <= 100 or not 1 <= per_query <= 100:
+        raise GitHubDiscoveryError("limit and per_query must be between 1 and 100")
     token = token or get_github_token()
     profile_config = get_profile_config(profile)
     default_queries = list(profile_config.get("default_queries", [])) if profile_config else list(DEFAULT_SEARCH_QUERIES)
@@ -927,19 +908,21 @@ def discover_repositories(
                 existing["stargazers_count"] = max(int(existing.get("stargazers_count") or 0), int(item.get("stargazers_count") or 0))
 
     candidates: list[RepoCandidate] = []
+    enrichment: dict[str, dict[str, Any]] = {}
     for full_name in search_order:
         item = search_hits[full_name]
         details = dict(item)
         readme = ""
         public_signals: dict[str, Any] = {}
+        enrichment[full_name] = {"scan_status": "metadata_only", "scan_errors": []}
         if fetch_readmes:
             try:
                 details = fetch_repo_details(full_name, token=token)
                 readme = fetch_repo_readme(full_name, token=token)
                 public_signals = scan_public_signals(full_name, readme, token=token)
-            except Exception:
-                details = dict(item)
-                readme = ""
+                enrichment[full_name]["scan_status"] = "complete"
+            except GitHubDiscoveryError as exc:
+                enrichment[full_name] = {"scan_status": "incomplete", "scan_errors": [{"type": type(exc).__name__, "message": str(exc)}]}
         candidate = compute_repo_score(details, readme, query_terms, public_signals=public_signals, profile=profile)
         candidates.append(candidate)
 
@@ -967,13 +950,14 @@ def discover_repositories(
             "fetch_readmes": fetch_readmes,
         },
         "summary": {
+            "incomplete": sum(1 for item in enrichment.values() if item["scan_status"] == "incomplete"),
             "total_candidates": len(candidates),
             "selected": len(selected),
             "join": sum(1 for candidate in selected if candidate.recommendation == "join"),
             "watch": sum(1 for candidate in selected if candidate.recommendation == "watch"),
             "skip": sum(1 for candidate in selected if candidate.recommendation == "skip"),
         },
-        "candidates": [candidate.to_dict() | {"issue_angles": issue_angles_for_repo(candidate, profile=profile)} for candidate in selected],
+        "candidates": [candidate.to_dict() | enrichment[candidate.full_name] | {"issue_angles": issue_angles_for_repo(candidate, profile=profile)} for candidate in selected],
     }
     return bundle
 
@@ -1000,6 +984,8 @@ def render_candidate_block(candidate: dict[str, Any]) -> str:
         f"Repo: {candidate.get('full_name', 'unknown')}",
         "",
         f"Why it is interesting: {candidate.get('description', '') or 'No description provided'}",
+        f"Scan status: {candidate.get('scan_status', 'unknown')}",
+        f"Scan errors: {json.dumps(candidate.get('scan_errors', []))}",
         f"Authorization state: {candidate.get('authorization_state', 'Public repo / no confirmed bounty scope')}",
         f"Suggested posture: {candidate.get('suggested_posture', 'Passive review only until scope is confirmed')}",
         f"Priority score: {candidate.get('priority_score', 0)}/100",
@@ -1054,6 +1040,7 @@ def render_summary(bundle: dict[str, Any], run_dir: Path | None = None) -> str:
         f"- generated_at: `{bundle.get('generated_at', 'unknown')}`",
         f"- profile: `{bundle.get('profile', 'general')}`",
         f"- queries: `{'; '.join(bundle.get('queries', []) or [])}`",
+        f"- incomplete scans: `{bundle.get('summary', {}).get('incomplete', 0)}`",
         f"- selected: `{bundle.get('summary', {}).get('selected', 0)}`",
         f"- join: `{bundle.get('summary', {}).get('join', 0)}`",
         f"- watch: `{bundle.get('summary', {}).get('watch', 0)}`",
@@ -1499,6 +1486,22 @@ def render_scope_confirmation_template(candidate: dict[str, Any], selection: dic
     selected_at = str(selection.get("selected_at", ""))
     source_url = str(candidate.get("html_url", "")).strip()
     return (
+        "---\n"
+        "schema_version: 1.0\n"
+        f"target_id: {repo}\n"
+        f"target_repo_url: https://github.com/{repo}\n"
+        "target_ref: \n"
+        "scope_policy_url: \n"
+        "permitted_actions:\n"
+        "  - analysis\n"
+        "prohibited_actions:\n"
+        "  - production interaction\n"
+        "disclosure_channel: \n"
+        "reviewer_decision: unclear\n"
+        "reviewed_at: \n"
+        "evidence_url: \n"
+        "evidence_path: \n"
+        "---\n\n"
         "# Scope Confirmation\n\n"
         f"- Repo: `{repo}`\n"
         f"- Selected from run: `{selected_from_run}`\n"
@@ -1525,7 +1528,7 @@ def render_scope_confirmation_template(candidate: dict[str, Any], selection: dic
         "- \n"
         "\n"
         "## Reviewer decision\n"
-        "reviewer_decision: \n"
+        "Set reviewer_decision in the frontmatter after reviewing the evidence.\n"
         "- `authorized`\n"
         "- `not authorized`\n"
         "- `unclear`\n"
@@ -1539,18 +1542,11 @@ def render_scope_confirmation_template(candidate: dict[str, Any], selection: dic
 
 
 def parse_scope_decision(text: str) -> str:
-    patterns = [
-        r"(?im)^\s*(?:[-*]\s*)?reviewer_decision\s*:\s*(authorized|not authorized|unclear)\s*$",
-        r"(?im)^\s*(?:[-*]\s*)?reviewer decision\s*:\s*(authorized|not authorized|unclear)\s*$",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            return match.group(1).strip().lower()
-    match = re.search(r"(?im)^\s*-\s*`?(authorized|not authorized|unclear)`?\s*$", text)
-    if match:
-        return match.group(1).strip().lower()
-    return "unclear"
+    decisions = re.findall(
+        r"(?im)^\s*(?:[-*]\s*)?reviewer[_ ]decision\s*:\s*(authorized|not authorized|unclear)\s*$",
+        text,
+    )
+    return decisions[0].lower() if len(decisions) == 1 else "unclear"
 
 
 def evaluate_scope_confirmation(selected_dir: Path) -> dict[str, Any]:
@@ -1565,9 +1561,28 @@ def evaluate_scope_confirmation(selected_dir: Path) -> dict[str, Any]:
         }
     text = scope_path.read_text(encoding="utf-8")
     decision = parse_scope_decision(text)
-    status = "AUTHORIZED" if decision == "authorized" else "NOT AUTHORIZED"
-    reason = "reviewer_decision is authorized" if decision == "authorized" else f"reviewer_decision is {decision}"
-    allowed_actions = "planning and authorized analysis" if decision == "authorized" else "planning only"
+    reason = f"reviewer_decision is {decision}"
+    authorized = False
+    if decision == "authorized":
+        from bugbot.scope_confirmation import build_scope_grant_from_confirmation
+        from bugbot.scope import validate_grant_for_request
+        try:
+            selection = load_selection(selected_dir)
+            grant, error = build_scope_grant_from_confirmation(scope_path, anchor_root=ROOT)
+            if grant is None:
+                reason = error or "scope evidence is invalid"
+            elif grant.identity_status != "verified_repo":
+                reason = "selected GitHub repository requires verified_repo identity"
+            elif grant.target_repo_url != f"https://github.com/{selection['repo']}":
+                reason = "target repository URL does not match selection"
+            else:
+                denial = validate_grant_for_request(grant, target_id=selection["repo"], target_ref=grant.target_ref, action="analysis")
+                authorized = denial is None
+                reason = str(denial) if denial else "validated scope evidence matches selected repository"
+        except (OSError, ValueError, KeyError, TypeError, GitHubDiscoveryError) as exc:
+            reason = f"scope evidence invalid: {exc}"
+    status = "AUTHORIZED" if authorized else "NOT AUTHORIZED"
+    allowed_actions = "planning and authorized analysis" if authorized else "planning only"
     return {
         "scope_status": status,
         "reason": reason,
@@ -1597,7 +1612,7 @@ def ensure_scope_confirmation(selected_dir: Path) -> Path:
 
 def require_authorized_scope(selected_dir: Path) -> dict[str, Any]:
     scope = evaluate_scope_confirmation(selected_dir)
-    if scope["reviewer_decision"] != "authorized":
+    if scope["scope_status"] != "AUTHORIZED":
         raise GitHubDiscoveryError(
             f"Scope status: {scope['scope_status']}\nReason: {scope['reason']}\nAllowed actions: {scope['allowed_actions']}"
         )
