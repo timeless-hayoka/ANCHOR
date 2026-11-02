@@ -28,6 +28,12 @@ jobs:
         run: python -m pip freeze > pip-freeze.txt
       - name: Run tests
         run: python -m pytest tests/ -q --junitxml=pytest-results.xml
+      - name: Finder authorization regression
+        run: python -m pytest tests/test_github_discovery.py tests/test_finder_pipeline.py tests/test_bounty_sentinel_validation.py -q
+      - name: Generate known-findings evidence
+        run: python anchor_cli.py benchmark sarif known-findings
+      - name: Verify benchmark proof gate
+        run: python scripts/verify_sarif_benchmark.py
       - name: Upload results even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -36,5 +42,37 @@ jobs:
           path: |
             pytest-results.xml
             pip-freeze.txt
+            benchmarks/sarif-known-findings/runs/
+          if-no-files-found: warn
+          retention-days: 14
+  foundry-lab-proofs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: timeless-hayoka/damn-vulnerable-defi
+          ref: 1fceebd31fe097eb00d8b44ad50e5fd62a3606b0
+          submodules: recursive
+          path: .validation-dvd
+          persist-credentials: false
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.7
+      - name: Execute six pinned lab proofs
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p evidence
+          git -C .validation-dvd rev-parse HEAD > evidence/lab-commit.txt
+          forge --version > evidence/forge-version.txt
+          forge test --root .validation-dvd --match-path 'test/{abi-smuggling,backdoor,naive-receiver,side-entrance,truster,unstoppable}/*.t.sol' -vv 2>&1 | tee evidence/foundry.log
+      - name: Preserve lab evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundry-lab-evidence
+          path: evidence/
           if-no-files-found: warn
           retention-days: 14

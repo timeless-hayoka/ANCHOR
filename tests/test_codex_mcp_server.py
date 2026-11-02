@@ -19,7 +19,7 @@ codex_mcp_server = load_module("codex_mcp_server", "codex_mcp_server.py")
 
 def test_repo_status_snapshot_includes_workspace_health():
     snapshot = codex_mcp_server.repo_status()
-    assert snapshot["root"].endswith("/ANCHOR")
+    assert Path(snapshot["root"]).resolve() == ROOT
     assert isinstance(snapshot["top_level_entries"], list)
     assert snapshot["git"]["ok"] in {True, False}
     assert "latest_published_benchmark" in snapshot
