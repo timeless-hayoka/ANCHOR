@@ -917,8 +917,9 @@ def discover_repositories(
         if fetch_readmes:
             try:
                 details = fetch_repo_details(full_name, token=token)
-                readme = fetch_repo_readme(full_name, token=token)
-                public_signals = scan_public_signals(full_name, readme, token=token)
+                enriched_full_name = str(details.get("full_name") or full_name)
+                readme = fetch_repo_readme(enriched_full_name, token=token)
+                public_signals = scan_public_signals(enriched_full_name, readme, token=token)
                 scan["scan_status"] = "complete"
             except GitHubDiscoveryError as exc:
                 scan = {"scan_status": "incomplete", "scan_errors": [{"type": type(exc).__name__, "message": str(exc)}]}
