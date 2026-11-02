@@ -60,9 +60,11 @@ class FinderPipelineTests(unittest.TestCase):
         renamed = {'full_name': 'new/name', 'html_url': 'https://github.com/new/name'}
         with patch.object(finder, 'search_repositories', return_value=[original]), \
              patch.object(finder, 'fetch_repo_details', return_value=renamed), \
-             patch.object(finder, 'fetch_repo_readme', return_value='Security policy'), \
-             patch.object(finder, 'scan_public_signals', return_value={}):
+             patch.object(finder, 'fetch_repo_readme', return_value='Security policy') as readme_mock, \
+             patch.object(finder, 'scan_public_signals', return_value={}) as signals_mock:
             bundle = finder.discover_repositories(['test'], token='dummy')
+        readme_mock.assert_called_once_with('new/name', token='dummy')
+        signals_mock.assert_called_once_with('new/name', 'Security policy', token='dummy')
         self.assertEqual(bundle['candidates'][0]['full_name'], 'new/name')
         self.assertEqual(bundle['candidates'][0]['scan_status'], 'complete')
 
