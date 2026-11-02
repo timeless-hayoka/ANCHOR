@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 import urllib.error
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -54,6 +55,17 @@ class FinderPipelineTests(unittest.TestCase):
             self.assertIn('quota exhausted', (run / 'repos/a-b/summary.md').read_text())
             self.assertEqual(json.loads((run / 'bundle.json').read_text()), bundle)
 
+    def test_renamed_repository_preserves_enrichment(self):
+        original = {'full_name': 'old/name', 'html_url': 'https://github.com/old/name'}
+        renamed = {'full_name': 'new/name', 'html_url': 'https://github.com/new/name'}
+        with patch.object(finder, 'search_repositories', return_value=[original]), \
+             patch.object(finder, 'fetch_repo_details', return_value=renamed), \
+             patch.object(finder, 'fetch_repo_readme', return_value='Security policy'), \
+             patch.object(finder, 'scan_public_signals', return_value={}):
+            bundle = finder.discover_repositories(['test'], token='dummy')
+        self.assertEqual(bundle['candidates'][0]['full_name'], 'new/name')
+        self.assertEqual(bundle['candidates'][0]['scan_status'], 'complete')
+
     def test_score_cannot_upgrade_scope(self):
         candidate = finder.compute_repo_score(
             {'full_name': 'a/b', 'language': 'Solidity', 'topics': ['security', 'foundry'], 'open_issues_count': 10},
@@ -102,6 +114,8 @@ class FinderPipelineTests(unittest.TestCase):
             evidence = root / 'policy.md'
             evidence.write_text('Synthetic policy fixture for a/b; analysis allowed.')
             confirmation = (Path(__file__).parent / 'fixtures/scope_confirmation_valid.md').read_text()
+            expiry = (datetime.now(timezone.utc) + timedelta(days=365)).replace(microsecond=0).isoformat()
+            confirmation = confirmation.replace('2027-06-30T12:00:00+00:00', expiry)
             confirmation = confirmation.replace('target_id: dvd-local-lab', 'target_id: a/b').replace('identity_status: local_fixture_unpinned', 'identity_status: verified_repo\ntarget_repo_url: https://github.com/a/b').replace('evidence_path: tests/fixtures/scope_evidence.md', f'evidence_path: {evidence}')
             scope_path = selected / 'scope_confirmation.md'
             scope_path.write_text(confirmation)
@@ -122,7 +136,7 @@ class FinderPipelineTests(unittest.TestCase):
                 ('target_id: a/b', 'target_id: other/repo'),
                 ('https://github.com/a/b', 'https://github.com/other/repo'),
                 ('  - analysis', '  - planning'),
-                ('2027-06-30T12:00:00+00:00', '2020-06-30T12:00:00+00:00'),
+                (expiry, '2020-06-30T12:00:00+00:00'),
                 ('2026-06-30T12:00:00+00:00', '2099-06-30T12:00:00+00:00'),
                 (f'evidence_path: {evidence}', f'evidence_path: {root}/missing'),
             ):
