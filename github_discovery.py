@@ -907,27 +907,27 @@ def discover_repositories(
                 existing = search_hits[full_name]
                 existing["stargazers_count"] = max(int(existing.get("stargazers_count") or 0), int(item.get("stargazers_count") or 0))
 
-    candidates: list[RepoCandidate] = []
-    enrichment: dict[str, dict[str, Any]] = {}
+    candidate_enrichments: list[tuple[RepoCandidate, dict[str, Any]]] = []
     for full_name in search_order:
         item = search_hits[full_name]
         details = dict(item)
         readme = ""
         public_signals: dict[str, Any] = {}
-        enrichment[full_name] = {"scan_status": "metadata_only", "scan_errors": []}
+        scan = {"scan_status": "metadata_only", "scan_errors": []}
         if fetch_readmes:
             try:
                 details = fetch_repo_details(full_name, token=token)
-                readme = fetch_repo_readme(full_name, token=token)
-                public_signals = scan_public_signals(full_name, readme, token=token)
-                enrichment[full_name]["scan_status"] = "complete"
+                enriched_full_name = str(details.get("full_name") or full_name)
+                readme = fetch_repo_readme(enriched_full_name, token=token)
+                public_signals = scan_public_signals(enriched_full_name, readme, token=token)
+                scan["scan_status"] = "complete"
             except GitHubDiscoveryError as exc:
-                enrichment[full_name] = {"scan_status": "incomplete", "scan_errors": [{"type": type(exc).__name__, "message": str(exc)}]}
+                scan = {"scan_status": "incomplete", "scan_errors": [{"type": type(exc).__name__, "message": str(exc)}]}
         candidate = compute_repo_score(details, readme, query_terms, public_signals=public_signals, profile=profile)
-        candidates.append(candidate)
+        candidate_enrichments.append((candidate, scan))
 
-    candidates.sort(key=lambda candidate: (candidate.score, candidate.stars, candidate.open_issues), reverse=True)
-    selected = candidates[:limit]
+    candidate_enrichments.sort(key=lambda pair: (pair[0].score, pair[0].stars, pair[0].open_issues), reverse=True)
+    selected = candidate_enrichments[:limit]
     bundle = {
         "generated_at": utcnow_iso(),
         "profile": profile or "general",
@@ -950,14 +950,14 @@ def discover_repositories(
             "fetch_readmes": fetch_readmes,
         },
         "summary": {
-            "incomplete": sum(1 for item in enrichment.values() if item["scan_status"] == "incomplete"),
-            "total_candidates": len(candidates),
+            "incomplete": sum(1 for _, scan in candidate_enrichments if scan["scan_status"] == "incomplete"),
+            "total_candidates": len(candidate_enrichments),
             "selected": len(selected),
-            "join": sum(1 for candidate in selected if candidate.recommendation == "join"),
-            "watch": sum(1 for candidate in selected if candidate.recommendation == "watch"),
-            "skip": sum(1 for candidate in selected if candidate.recommendation == "skip"),
+            "join": sum(1 for candidate, _ in selected if candidate.recommendation == "join"),
+            "watch": sum(1 for candidate, _ in selected if candidate.recommendation == "watch"),
+            "skip": sum(1 for candidate, _ in selected if candidate.recommendation == "skip"),
         },
-        "candidates": [candidate.to_dict() | enrichment[candidate.full_name] | {"issue_angles": issue_angles_for_repo(candidate, profile=profile)} for candidate in selected],
+        "candidates": [candidate.to_dict() | scan | {"issue_angles": issue_angles_for_repo(candidate, profile=profile)} for candidate, scan in selected],
     }
     return bundle
 
