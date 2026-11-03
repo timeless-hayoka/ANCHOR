@@ -49,6 +49,28 @@ def convert_test_file(contents: str, cases: list[tuple[str, str, str | None, str
             raise ValueError(f"unterminated test body: {old}")
         body = contents[start:end]
         body = body.replace(signature, "function " + new + "(", 1)
+        if old == "testFail_BurnByOthers":
+            # The original test fails in its token-balance setup before the
+            # access-control assertion. Replace only this ephemeral test body
+            # with a focused unauthorized burn call.
+            if "udnerlyingToken.mint" not in body or "eToken.burn(" not in body:
+                raise ValueError("unexpected original burn-control test")
+            body = (
+                "function " + new + "() public {\n"
+                '    address alice = makeAddr("ALICE");\n'
+                "    vm.prank(alice);\n"
+                "    vm.expectRevert();\n"
+                "    eToken.burn(alice, 1, 1);\n"
+                "}"
+            )
+            insertion = None
+        elif old in {"testFail_initReserveByAlice", "testFail_setRewardsByOthers"}:
+            stale = 'vm.expectRevert(bytes("Ownable: caller is not the owner !"));'
+            if body.count(stale) != 1:
+                raise ValueError(f"unexpected Ownable revert expectation: {old}")
+            body = body.replace(
+                stale, 'vm.expectRevert(bytes("Ownable: caller is not the owner"));'
+            )
         if insertion is not None:
             if body.count(insertion) != 1:
                 raise ValueError(f"missing expected revert target in: {old}")
