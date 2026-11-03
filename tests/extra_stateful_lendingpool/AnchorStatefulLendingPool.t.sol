@@ -77,6 +77,34 @@ contract AnchorStatefulLendingPoolTest is Test {
         assertEq(reserve.balanceOf(bob), 800_000 + bobRecovered);
     }
 
+    /// @notice Randomized, bounded multi-user round trip: no borrowed assets,
+    /// no time warp, no interest accrual. This checks the pinned revision only.
+    function testFuzz_TwoUserAccountingRoundTrip(
+        uint256 aliceDeposit,
+        uint256 bobDeposit
+    ) public {
+        aliceDeposit = bound(aliceDeposit, 1001, 1_000_000);
+        bobDeposit = bound(bobDeposit, 1001, 1_000_000);
+
+        uint256 aliceShares = _deposit(alice, aliceDeposit);
+        uint256 bobShares = _deposit(bob, bobDeposit);
+
+        assertEq(aliceShares, aliceDeposit - 1000);
+        assertEq(bobShares, bobDeposit);
+        assertEq(eToken.totalSupply(), aliceDeposit + bobDeposit);
+        assertEq(reserve.balanceOf(address(eToken)), aliceDeposit + bobDeposit);
+
+        uint256 aliceRecovered = _redeem(alice, aliceShares);
+        uint256 bobRecovered = _redeem(bob, bobShares);
+
+        assertEq(aliceRecovered, aliceShares);
+        assertEq(bobRecovered, bobShares);
+        assertEq(eToken.totalSupply(), 1000);
+        assertEq(reserve.balanceOf(address(eToken)), 1000);
+        assertEq(reserve.balanceOf(alice), 1_000_000 - 1000);
+        assertEq(reserve.balanceOf(bob), 1_000_000);
+    }
+
     function test_NonOwnerCannotInitializeAdditionalReserve() public {
         MockedMintableERC20 extra = new MockedMintableERC20("MORE", "MORE");
         vm.prank(alice);
