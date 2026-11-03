@@ -21,7 +21,7 @@ METADATA = bytes.fromhex("a10001")  # deliberately not used as a valid CBOR suff
 VALID_META = bytes.fromhex("a100010003")
 ONCHAIN = BASE + VALID_META
 RECOMPILED = BASE + bytes.fromhex("a100020003")
-SHA = mod.sha(ONCHAIN)
+SHA = mod.hashlib.sha256(("0x" + ONCHAIN.hex()).encode("utf-8")).hexdigest()
 RPC = {
     "state": "RPC_MATCHES_PROVIDER_ONCHAIN",
     "chain_id": "10",
