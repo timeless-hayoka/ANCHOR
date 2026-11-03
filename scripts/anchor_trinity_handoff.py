@@ -43,7 +43,7 @@ def read_json(path: Path) -> Any:
     return json.loads(raw.decode("utf-8"))
 
 
-def prepare_handoff(readiness: Any, source_evidence: Any, build_evidence: Any = None) -> dict[str, Any]:
+def prepare_handoff(readiness: Any, source_evidence: Any, build_evidence: Any = None, rpc_evidence: Any = None) -> dict[str, Any]:
     """Validate provenance and emit a Trinity *signal only* on success.
 
     A valid handoff can be BLOCKED: that is expected for incomplete research.
@@ -142,6 +142,38 @@ def prepare_handoff(readiness: Any, source_evidence: Any, build_evidence: Any = 
         else:
             raise ValueError("unsupported build evidence state")
 
+    rpc_state = "NOT_SUPPLIED"
+    if rpc_evidence is not None:
+        if not isinstance(rpc_evidence, dict):
+            raise ValueError("RPC evidence must be an object")
+        rpc_state = rpc_evidence.get("state")
+        if rpc_state not in (
+            "RPC_MATCHES_PROVIDER_ONCHAIN", "RPC_PROVIDER_BYTECODE_MISMATCH",
+            "NOT_ATTESTED",
+        ):
+            raise ValueError("unsupported RPC evidence state")
+        if rpc_state in ("RPC_MATCHES_PROVIDER_ONCHAIN", "RPC_PROVIDER_BYTECODE_MISMATCH"):
+            if (
+                str(rpc_evidence.get("chain_id")) != chain_id
+                or str(rpc_evidence.get("address", "")).lower() != address.lower()
+            ):
+                raise ValueError("RPC attestation refers to a different deployment")
+            if rpc_evidence.get("full_deployment_equivalence") != "NOT_PROVEN":
+                raise ValueError("RPC attestation must not claim full deployed equivalence")
+            if rpc_evidence.get("transaction_broadcast") is not False:
+                raise ValueError("RPC attestation must be read-only")
+            provider_sha = rpc_evidence.get("provider_onchain_sha256")
+            rpc_sha = rpc_evidence.get("rpc_onchain_sha256")
+            if not all(
+                isinstance(value, str) and re.fullmatch(r"[0-9a-fA-F]{64}", value)
+                for value in (provider_sha, rpc_sha)
+            ):
+                raise ValueError("RPC attestation hashes malformed")
+            if (provider_sha.lower() == rpc_sha.lower()) != (
+                rpc_state == "RPC_MATCHES_PROVIDER_ONCHAIN"
+            ):
+                raise ValueError("RPC attestation status contradicts its hashes")
+
     key = f"{target_id.lower()}|{target_ref.lower()}|{chain_id}|{address.lower()}"
     lead_id = "anchor_" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:20]
     record = LeadRecord(
@@ -171,6 +203,8 @@ def prepare_handoff(readiness: Any, source_evidence: Any, build_evidence: Any = 
             "source_evidence_sha256": canonical_digest(source_evidence),
             "build_evidence_sha256": canonical_digest(build_evidence) if build_evidence is not None else None,
             "build_state": build_state,
+            "rpc_evidence_sha256": canonical_digest(rpc_evidence) if rpc_evidence is not None else None,
+            "rpc_state": rpc_state,
             "source_status": source_status,
             "source_runtime_match": source_evidence.get("reported_runtime_match"),
             "readiness_status": status,
@@ -212,12 +246,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--readiness", required=True, type=Path)
     parser.add_argument("--source-evidence", required=True, type=Path)
     parser.add_argument("--build-evidence", type=Path, help="Optional isolated compiler report")
+    parser.add_argument("--rpc-evidence", type=Path, help="Optional read-only onchain bytecode report")
     parser.add_argument("--output", type=Path, help="Create new handoff JSON; never overwrite")
     args = parser.parse_args(argv)
     try:
         payload = prepare_handoff(
             read_json(args.readiness), read_json(args.source_evidence),
             read_json(args.build_evidence) if args.build_evidence else None,
+            read_json(args.rpc_evidence) if args.rpc_evidence else None,
         )
         if args.output is not None:
             write_new_file(args.output, payload)
