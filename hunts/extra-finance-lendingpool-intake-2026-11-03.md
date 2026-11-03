@@ -61,6 +61,17 @@ GitHub Actions run [41642082384](https://github.com/timeless-hayoka/ANCHOR/actio
 
 No bytecode equivalence, production-level issue, or novel bug is claimed. Next: compare Etherscan's Optimism verified build metadata and all included source units, or determine whether Sourcify reports a non-exact runtime match. Use an isolated fork only after establishing the appropriate deployed-code mirror.
 
+## Sourcify verified-source delta — independently observed 2026-11-03
+
+A subsequent isolated GitHub Actions read-only verification produced a non-exact Sourcify runtime verification (`runtimeMatch: match`) but **the pinned GitHub `LendingPool.sol` did not equal Sourcify's verified `LendingPool.sol`**. Evidence:
+- GitHub pinned file: SHA-256 `f6150adb79b54d439b931633ab2aa606621b03ba157b26b62476ca5f8ac51f14`, 833 lines.
+- Sourcify verified source: SHA-256 `9e1a6cf5930e2477aab0022536be39ab4bb7e1fbb6953b31cf90429f6205bf6f`, 820 lines.
+- Bounded line-oriented comparison found **12 distinct changed regions**. An example early region is source lines 185 versus verified lines 182-189; several additional regions overlap public LendingPool entry-point and accounting sections. This is *not* proof that the changed lines alter behavior or introduce exploitable security defects.
+- Evidence workflow: [GitHub Actions 41642968123](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41642968123); results are captured in uploaded `extra-lendingpool-source-evidence` artifact.
+- Classification: `NOT_VERIFIED` **for the pinned repo file**; Sourcify itself reports a non-exact runtime verification for the deployed source.
+
+**Consequence:** Do not use the pinned GitHub checkout as an unquestioned production-equivalent source mirror. Obtain the verified source tree, reconcile version and compiler settings, and reproduce on an isolated fork before drawing conclusions or submitting a report. The timestamp and credit-known-issue discrepancies might reflect source drift, but no causal chain or novelty has been established.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
