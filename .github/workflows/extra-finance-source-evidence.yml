@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'scripts/check_extra_lendingpool_source.py'
+      - 'scripts/extra_verified_source_hunk_review.py'
+      - 'tests/test_extra_verified_source_hunk_review.py'
       - 'tests/test_extra_lendingpool_source_verifier.py'
       - 'hunts/extra-finance-lendingpool-intake-2026-11-03.md'
       - '.github/workflows/extra-finance-source-evidence.yml'
@@ -46,6 +48,21 @@ jobs:
             echo "::warning::Source file matched a nonexact Sourcify runtime verification; full bytecode equivalence remains unverified."
           else
             echo "::warning::Sourcify source comparison unavailable/mismatched (exit $code); do not promote source equivalence."
+          fi
+      - name: Validate bounded hunk report
+        run: python -m unittest discover -s tests -p test_extra_verified_source_hunk_review.py -q
+      - name: Capture changed source lines for manual review
+        shell: bash
+        run: |
+          set +e
+          python scripts/extra_verified_source_hunk_review.py \
+            --source .source-extrafi/contracts/lendingpool/LendingPool.sol \
+            > evidence/extra-lendingpool-hunk-review.json
+          code=$?
+          set -e
+          cat evidence/extra-lendingpool-hunk-review.json
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::Verified-source hunk review unavailable; evidence incomplete."
           fi
       - name: Upload source comparison evidence
         if: always()

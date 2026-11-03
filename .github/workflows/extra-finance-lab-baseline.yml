@@ -1,0 +1,54 @@
+name: Extra Finance isolated Foundry baseline
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/extra-finance-lab-baseline.yml'
+      - 'scripts/extra_legacy_test_adapter.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pinned-upstream-lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout upstream pinned source and testing submodules
+        uses: actions/checkout@v4
+        with:
+          repository: ExtraFi/extra-contracts
+          ref: a66e925d78ee5c990eb2bafa5009cebcbeafe42d
+          path: .source-extrafi
+          submodules: recursive
+          persist-credentials: false
+      - name: Verify pinned source commit
+        run: test "$(git -C .source-extrafi rev-parse HEAD)" = "a66e925d78ee5c990eb2bafa5009cebcbeafe42d"
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.7
+      - name: Run existing upstream isolated LendingPool tests
+        shell: bash
+        env:
+          FOUNDRY_ETH_RPC_URL: ''
+          ETH_RPC_URL: ''
+        run: |
+          set -o pipefail
+          mkdir -p evidence
+          forge --version > evidence/forge-version.txt
+          git -C .source-extrafi rev-parse HEAD > evidence/upstream-commit.txt
+          # No fork URL, deployment keys or broadcast flags. Only tests.
+          # Copy-only compatibility conversion of five legacy negative tests.
+          # Transformations are guarded by exact pinned test signatures and
+          # executed only in the ephemeral CI checkout.
+          python scripts/extra_legacy_test_adapter.py --checkout .source-extrafi
+          echo "Legacy negative tests adapted to explicit revert expectations" > evidence/negative-controls.txt
+          forge test --root .source-extrafi --match-path 'tests/lending-pool/*.t.sol' \
+            --match-test '^test_' -vv 2>&1 | tee evidence/extra-lendingpool-tests.log
+      - name: Preserve lab evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extra-finance-pinned-foundry-baseline
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 14

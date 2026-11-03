@@ -128,6 +128,48 @@ GitHub Actions [run 41647727141](https://github.com/timeless-hayoka/ANCHOR/actio
 
 The classifier removes whitespace and comments, but preserves Solidity-like tokens and literals; it is not an AST verifier, compiler equivalence proof, or exploit test. The live source's Sourcify runtime verification remains **non-exact**. None of these differences should be promoted beyond a research hypothesis until confirmed against an appropriate deployed-code mirror and audit history.
 
+## Verified source: exact changed statements (2026-11-03)
+
+The read-only source-review workflow [run 41649997589](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41649997589) retrieved Sourcify's verified-source listing for OP Mainnet, `runtimeMatch: match` (non-exact). The pinned GitHub and Sourcify sources differ in **12 line hunks** and **13 lexical token hunks**. Exact review of the 12 line hunks provides these conservative conclusions:
+
+| Path | Difference | Interpretation |
+| --- | --- | --- |
+| File header | SPDX MIT in pinned GitHub vs GPL-3.0 in Sourcify | License/source provenance difference; not security impact. |
+| Import | `../address-registry/AddressRegistry.sol` vs `../AddressRegistry.sol` | Different source layout; build settings and dependency resolution matter. |
+| Initial supply | Pinned GitHub has `MINIMUM_ETOKEN_AMOUNT = 1000`, dead address, and first-share locking; Sourcify source lacks that block | Matches the publicly disclosed first depositor inflation issue family. Must be treated as a known issue. |
+| `redeem`, `unStakeAndWithdraw` | Sourcify adds `payable` plus `avoidUsingNativeEther` | The modifier requires zero `msg.value`, so payable alone is **not** evidence of an ETH-acceptance vulnerability. |
+| `repay` | Pinned GitHub caps repayment against both position debt and reserve total borrows; Sourcify caps against position debt only, with subtraction after credit handling | Repayment accounting is a published known-issue area. Analyze aggregate versus position debt, but do not submit duplicate mechanism. |
+| `setBorrowingRateConfig` | Pinned GitHub additionally validates utilization thresholds and updates reserve state/rates | Owner-authorized configuration and user impact unproven; specification and deployed runtime needed. |
+| `setReserveFeeRate` | Pinned GitHub updates reserve state and rates around fee change; Sourcify assigns fee directly | Owner-authorized fee setting; potential accounting timing differences remain a hypothesis, not an impact claim. |
+
+**Source provenance gate:** The Sourcify runtime verification is `match`, not `exact_match`; source files are not identical to the pinned GitHub revision. Do not call the pinned revision a deployed equivalent. The source review script is a textual comparison; there is no Foundry reproduction or novel impact demonstrated from these differences.
+
+The branch also adds `.github/workflows/extra-finance-lab-baseline.yml` to run the upstream repository's existing LendingPool, eToken and staking Foundry tests in isolation, without fork RPC credentials or broadcast. Existing upstream tests are useful for environment and baseline checks **only**, not a proof against the deployed Sourcify version.
+
+## Isolated Foundry upstream baseline — verified 2026-11-03
+
+[GitHub Actions run 41650590053](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41650590053) successfully compiled the *pinned GitHub revision* `a66e925d78ee5c990eb2bafa5009cebcbeafe42d` with its Forge-configured Solidity compiler `0.8.20`. In isolated CI with no fork RPC or broadcast, the compatible positive test suites returned:
+- `ExtraInterestBearingToken.t.sol`: **2 passed**.
+- `LendingPool.t.sol`: **3 passed**.
+- `StakingRewards.t.sol`: **4 passed**.
+- **Total 9 passed / 0 failed**.
+
+**Limitation:** Five historical tests named `testFail*` were *excluded*, not passed. Current Forge rejects that obsolete convention; the CI job records them separately in the `legacy-testfail-tests.txt` artifact. Those negative controls still require explicit modernization. Neither the nine positive tests nor compiler success establish that the source matches the Sourcify-verified Optimism runtime.
+
+**Immediate next tasks:** build modern negative controls using `vm.expectRevert` in an isolated forkless harness, confirm the relevant authorization and insufficient-share failures, and then repeat against correctly matched deployed-source input. No production interaction.
+
+## Full pinned Foundry baseline with modernized negative controls
+
+Run [41651290826](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41651290826) compiled pinned commit `a66e925d78ee5c990eb2bafa5009cebcbeafe42d` and executed all existing LendingPool, eToken and staking tests inside a non-broadcast CI environment:
+
+- **14 passed, 0 failed, 0 skipped**, across three test suites.
+- Exactly five `testFail*` functions were converted to modern `test_RevertWhen*` form in an **ephemeral checkout only**, using `scripts/extra_legacy_test_adapter.py`. The adapter does not change the protocol repository on GitHub.
+- The first attempted modernization honestly produced 11 passed / 3 failed due to two stale `Ownable` revert-message expectations and one flawed pre-assertion burn test setup. All were corrected in the scoped ephemeral adapter before the passing run.
+- CI preserves pinned-source provenance, Forge version and test output.
+- The current branch also includes adapter self-tests. Revalidate the final commit's CI independently before merging.
+
+**Important:** This is a passing test baseline for the *pinned repository*, not the verified Optimism implementation. Because Sourcify's verified `LendingPool.sol` differs in executable tokens, this result does **not** establish that the deployed version passes identical checks. Existing test cases also do not cover the full economic invariant space. Novel vulnerability evidence remains **NONE**.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
