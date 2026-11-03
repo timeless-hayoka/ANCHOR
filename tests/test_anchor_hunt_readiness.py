@@ -95,6 +95,7 @@ def test_source_mismatch_and_nonexact_runtime_fail_closed(tmp_path: Path):
         {"address": "0x" + "1" * 40},
         {"matched_source_paths": []},
         {"source_sha256": ""},
+        {"matched_source_paths": "contracts/lendingpool/LendingPool.sol"},
     ):
         result = check(tmp_path, scope_confirmation=confirmation, source_evidence={**SOURCE, **changed})
         assert result["status"] == "BLOCKED", changed
@@ -107,6 +108,7 @@ def test_target_ref_and_incomplete_scan_block(tmp_path: Path):
         {"target_ref": "main"},
         {"target_ref": "0" * 40},
         {"discovery": {"candidates": [{"full_name": TARGET, "scan_status": "incomplete"}]}},
+        {"discovery": {"candidates": [{"full_name": TARGET, "scan_status": "complete", "scan_errors": ["timeout"]}]}},
     ):
         result = check(tmp_path, scope_confirmation=confirmation, **changed)
         assert result["status"] == "BLOCKED", changed
