@@ -39,6 +39,22 @@ The official Immunefi information page lists these as known (as of the 2026-09-1
 
 **Do not submit these mechanisms as new findings.** Their variations need rigorous distinction and reproduction to overcome duplicate risk. Published PeckShield and BlockSec audit reports are referenced by the bounty; unfixed issues contained in them are ineligible. Those PDF findings have **not** been fully triaged in this intake.
 
+## Reproducible read-only source comparison
+
+The branch now includes `scripts/check_extra_lendingpool_source.py`, which asks Sourcify v2 for the **Optimism chain 10** target and compares the pinned `LendingPool.sol` source text. This is a read-only public metadata request, not interaction with the onchain contract.
+
+```bash
+# From an ExtraFi/extra-contracts checkout at a66e925d78ee5c990eb2bafa5009cebcbeafe42d:
+python /path/to/ANCHOR/scripts/check_extra_lendingpool_source.py \
+  --source contracts/lendingpool/LendingPool.sol
+# Or use a captured Sourcify API v2 JSON response without any network:
+python /path/to/ANCHOR/scripts/check_extra_lendingpool_source.py \
+  --source contracts/lendingpool/LendingPool.sol \
+  --snapshot sourcify-lendingpool-op.json
+```
+
+`PINNED_SOURCE_MATCH` means one source file agrees with a chain-specific Sourcify exact-runtime-verified source entry; it **does not** establish that the complete GitHub repository or its Foundry build reproduces the deployed bytecode. Missing metadata, non-exact runtime verification, failed requests, wrong network/address, or different source content yield `NOT_VERIFIED` (exit 2). The independent source comparison has **not yet produced a verified result for this target**; the current environment could not retrieve the exact onchain proof. The unit tests use fabricated snapshots only.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
