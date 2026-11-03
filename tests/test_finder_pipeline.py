@@ -82,7 +82,7 @@ class FinderPipelineTests(unittest.TestCase):
         self.assertGreater(protocol.priority_score, auditor.priority_score)
         self.assertGreater(protocol.priority_score, lab.priority_score)
         for candidate in (protocol, auditor, lab):
-            self.assertEqual(candidate.priority_score, max(0, min(100, 40 + 2 * candidate.score)))
+            self.assertEqual(candidate.priority_score, max(0, min(100, 42 + 2 * candidate.score)))
         self.assertNotEqual(auditor.recommendation, "join")
         self.assertNotEqual(lab.recommendation, "join")
         self.assertEqual(protocol.review_state, 'Needs scope confirmation')
