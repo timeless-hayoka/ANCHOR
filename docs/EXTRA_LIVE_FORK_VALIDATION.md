@@ -39,6 +39,16 @@ The fourth test, `test_LocalForkNonOwnerCannotInitializeReserve`, simulates an *
 
 This tests one access-control boundary against real deployed code and real starting storage. It does **not** demonstrate a bypass or exploit, and does not prove authorization safety for every administrative method, proxy or reserve state.
 
+## Bounty research negative control: stranger borrow/repay (2026-11-03)
+
+[GitHub Actions run 41701896193](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41701896193) ran **5/5 local fork tests, 0 failures** against OP Mainnet **block 159067350**. The new `test_LocalForkUnknownAccountCannotBorrowOrRepayExistingDebt` selected a fresh unwhitelisted test account and attempted `borrow(account, 1, 1)` and `repay(account, 1, 1)` **inside the isolated EVM fork only**. Both reverted, and the real reserve's readback liquidity, outstanding borrowing, next-reserve and next-debt counters were unchanged.
+
+**Hypothesis status: NEGATIVE / NO BYPASS REPRODUCED.** This test does not establish a reportable issue or prove every possible vault or debt authorization edge. No public contract transaction was broadcast. The account used was not whitelisted and no program admin permission was assumed.
+
+Current Extra Finance <https://immunefi.com/bug-bounty/extrafinance/information/> (last updated September 16, 2026) publishes four excluded known LendingPool issue families: initial-share inflation, debt/position rounding causing repayment failures, stale timestamp on first borrowing, and over-repayment increasing vault credit. These known issues must not be relabeled as novel findings. The program explicitly requires local-fork testing, permits neither direct mainnet testing nor indiscriminate attack automation, and requires a PoC for accepted reports.
+
+**Bounty next gate:** choose a different externally reachable security invariant with a plausible accepted financial impact, demonstrate a FAIL on independent real-implementation controls in a local fork, then isolate the minimal reproduction and scope/duplicate checks before submission. The original Trinity lead remains a research signal.
+
 ## Conclusions and boundaries
 
 The deployed contract, actual registry and sampled live reserves are reachable; getters function consistently in a pinned-block fork. This provides real-state, source-independent confirmation beyond the synthetic reserve tests in PRs #42–#43.
