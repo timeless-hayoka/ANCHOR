@@ -170,6 +170,50 @@ Run [41651290826](https://github.com/timeless-hayoka/ANCHOR/actions/runs/4165129
 
 **Important:** This is a passing test baseline for the *pinned repository*, not the verified Optimism implementation. Because Sourcify's verified `LendingPool.sol` differs in executable tokens, this result does **not** establish that the deployed version passes identical checks. Existing test cases also do not cover the full economic invariant space. Novel vulnerability evidence remains **NONE**.
 
+## Actual Sourcify deployment metadata (2026-11-03)
+
+The new read-only `scripts/anchor_deployment_provenance.py` collected the real Sourcify v2 `fields=all` verification metadata in [Extra Finance evidence run 41657612177](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41657612177):
+
+- Deployment: chain `10`, target `0xbb505c54d71e9e599cb8435b4f0ceec05fc71cbd`.
+- `compilation.fullyQualifiedName`: `contracts/lendingpool/LendingPool.sol:LendingPool`.
+- **Compiler: `0.8.18+commit.87f61d96`**; optimization enabled, **200 runs**.
+- Sourcify lists **33 verified source files**; `LendingPool.sol` SHA-256 is `9e1a6cf5930e2477aab0022536be39ab4bb7e1fbb6953b31cf90429f6205bf6f`.
+- `runtimeMatch: match` (not `exact_match`); the onchain and recompiled runtime bytecode in this provider's response were **not byte-identical**. This may be explained by permitted transformations/metadata and must **not** be called either an exploitable mismatch or independent bytecode parity.
+- Provider proxy-resolution reported `isProxy: false` for this address. This is a read-only provider classification, not a guarantee that all upstream integrations are non-upgradeable.
+- Independent chain-RPC bytecode attestation: **NOT PERFORMED**. Full source/build equivalence: **NOT PROVEN**.
+- The upstream repository's `foundry.toml` uses **0.8.20** and its Hardhat config uses **0.8.18**; only a compiler/build matched to the verified deployment can underpin production-equivalent tests.
+
+The associated ANCHOR handoff generated a deterministic Trinity `signal` with `BLOCKED_RESEARCH_SIGNAL`. No scope authorization, PoC, new vulnerability, or bounty claim has been produced.
+
+**Next research gate:** capture Sourcify's standard compiler input and transformation details, run an exact 0.8.18 isolated source build, then compare produced and independently obtained runtime bytecode with appropriate transformation handling before testing protocol invariants.
+
+## Verified-source compilation and Trinity evidence handoff (2026-11-03)
+
+[GitHub Actions run 41659197251](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41659197251) completed all of the following in an isolated, non-broadcast CI environment:
+
+- Fetched Sourcify's public verified-source compilation input for the OP Mainnet LendingPool.
+- Recompiled the **33 source files** with compiler **solc `0.8.18+commit.87f61d96`**, optimizer enabled with 200 runs.
+- Compared the resulting `LendingPool` runtime to Sourcify's **recompiled** runtime bytecode: **byte-identical** (provider-recompiled SHA-256 `8b048845dc91e9a5e62c9d727b3aaec097854a791d8d2c90268208898cb4f108`).
+- Checked the build's `LendingPool.sol` SHA-256 `9e1a6cf5930e2477aab0022536be39ab4bb7e1fbb6953b31cf90429f6205bf6f` against the verified-source evidence, and recorded `PROVIDER_RECOMPILE_MATCH_SOURCE_LINKED`.
+- Produced a valid Trinity `signal` handoff with **`BLOCKED_RESEARCH_SIGNAL`**, unknown scope status, no reproduction, and no vulnerability claim.
+- CI completed **8 compiler-preparation tests** and **19 Trinity handoff tests**, then asserted the live handoff did not self-authorize or promote a finding.
+
+This establishes a reproducible compilation matching **Sourcify's compilation**, not independent proof of bytecode equality with the actual live OP Mainnet runtime. Sourcify still reports `runtimeMatch: match` rather than `exact_match`, and its provider-reported onchain and recompiled bytecode are not byte-identical. The additional bytecode differences need transformation-aware comparison and separate read-only chain-RPC attestation before claiming deployed equivalence. The pinned GitHub repository remains a distinct revision and its 14/14 upstream tests must not be transferred to this verified build.
+
+**Next validation gate:** independently capture deployed runtime bytecode, handle Solidity metadata/library/immutable transformations without ignoring behavioral differences, then write Foundry controls against the verified 0.8.18 implementation and pass approved scope through the operator review gate.
+
+## Independent read-only deployed-bytecode hash confirmation (2026-11-03)
+
+[GitHub Actions run 41660031507](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41660031507) used the independently listed OP Mainnet public RPC `https://mainnet.optimism.io` and only `eth_chainId`, `eth_blockNumber`, and `eth_getCode` to check the real scoped address. It confirmed chain ID 10 and fetched contract code at recorded block **`0x97b0f28`**.
+
+The independently fetched RPC runtime SHA-256 and Sourcify's **onchain** runtime SHA-256 both equal:
+
+`647e7c9bf34efd611358b8123f08473f30b2f3c0e8250d6ed033484293764260`
+
+Result: **`RPC_MATCHES_PROVIDER_ONCHAIN`**. The scripted RPC test suite passed 4/4, including planted differing-bytecode and wrong-chain controls. No contract transaction was signed, sent or simulated on public infrastructure.
+
+**Important remaining delta:** Sourcify's **recompiled** runtime hash (`8b048845dc91e9a5e62c9d727b3aaec097854a791d8d2c90268208898cb4f108`) differs from its **onchain** runtime hash. The new solc 0.8.18 build matches the former; the independent public RPC matches the latter. This does not imply a vulnerability, but **full deployed-bytecode equivalence is not established** until all metadata/library/immutable transformations are accounted for and compiler settings/source provenance are independently reconciled. Trinity's lead remains at `signal` and the bounty scope review is not automatically authorized.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.

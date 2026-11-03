@@ -4,6 +4,14 @@ on:
     paths:
       - 'scripts/check_extra_lendingpool_source.py'
       - 'scripts/anchor_hunt_readiness.py'
+      - 'scripts/anchor_trinity_handoff.py'
+      - 'scripts/anchor_deployment_provenance.py'
+      - 'scripts/extra_verified_source_compile.py'
+      - 'scripts/extra_rpc_bytecode_attestation.py'
+      - 'tests/test_extra_rpc_bytecode_attestation.py'
+      - 'tests/test_extra_verified_source_compile.py'
+      - 'tests/test_anchor_deployment_provenance.py'
+      - 'tests/test_anchor_trinity_handoff.py'
       - 'tests/test_anchor_hunt_readiness.py'
       - 'scripts/extra_verified_source_hunk_review.py'
       - 'tests/test_extra_verified_source_hunk_review.py'
@@ -87,6 +95,73 @@ jobs:
             exit 1
           fi
           echo "::notice::Extra Finance readiness remains blocked pending complete scope and source evidence."
+      - name: Capture read-only deployed compiler provenance
+        shell: bash
+        run: |
+          set +e
+          python scripts/anchor_deployment_provenance.py \
+            --output evidence/extra-deployment-provenance.json
+          code=$?
+          set -e
+          echo "Sourcify provider provenance exit code: $code"
+          # Missing provider response is a negative evidence result, not an
+          # independently verified deployment or a bug. Keep the JSON artifact.
+          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
+            exit 1
+          fi
+      - name: Install evidence test dependency
+        run: python -m pip install 'pytest>=8,<10'
+      - name: Validate verified-build input tests
+        run: python -m pytest tests/test_extra_verified_source_compile.py -q
+      - name: Compile Sourcify source with pinned solc 0.8.18 (offline chain)
+        shell: bash
+        run: |
+          set +e
+          python scripts/extra_verified_source_compile.py \
+            --output evidence/extra-verified-build.json
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
+            exit 1
+          fi
+          echo "Sourcify build verification status exit code: $code"
+      - name: Validate read-only RPC attestation controls
+        run: python -m pytest tests/test_extra_rpc_bytecode_attestation.py -q
+      - name: Compare public OP runtime bytecode against Sourcify onchain digest
+        shell: bash
+        run: |
+          set +e
+          python scripts/extra_rpc_bytecode_attestation.py \
+            --provider evidence/extra-deployment-provenance.json \
+            --output evidence/extra-independent-bytecode.json
+          code=$?
+          set -e
+          echo "Independent read-only bytecode attestation exit code: $code"
+          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
+            exit 1
+          fi
+      - name: Validate Trinity handoff tests
+        run: python -m pytest tests/test_anchor_trinity_handoff.py -q
+      - name: Archive blocked research signal for Trinity
+        shell: bash
+        run: |
+          python scripts/anchor_trinity_handoff.py \
+            --readiness evidence/extra-hunt-readiness.json \
+            --source-evidence evidence/extra-lendingpool-source-verification.json \
+            --build-evidence evidence/extra-verified-build.json \
+            --rpc-evidence evidence/extra-independent-bytecode.json \
+            --output evidence/extra-trinity-signal.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path("evidence/extra-trinity-signal.json").read_text())
+          assert payload["handoff_status"] == "BLOCKED_RESEARCH_SIGNAL", payload["handoff_status"]
+          assert payload["lead"]["state"] == "signal"
+          assert payload["lead"]["scope_status"] == "unknown"
+          assert payload["finding"] == "NONE"
+          assert payload["authorization_grant_issued"] is False
+          print("Expected blocked Trinity research signal recorded; no finding promoted")
+          PY
       - name: Upload source comparison evidence
         if: always()
         uses: actions/upload-artifact@v4
