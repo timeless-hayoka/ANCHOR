@@ -36,7 +36,13 @@ jobs:
           forge --version > evidence/forge-version.txt
           git -C .source-extrafi rev-parse HEAD > evidence/upstream-commit.txt
           # No fork URL, deployment keys or broadcast flags. Only tests.
-          forge test --root .source-extrafi --match-path 'tests/lending-pool/*.t.sol' -vv 2>&1 | tee evidence/extra-lendingpool-tests.log
+          # Upstream uses legacy testFail* negative tests, which current Forge
+          # rejects. Run the compatible positive tests and record this gap.
+          grep -R -E 'function[[:space:]]+testFail' .source-extrafi/tests/lending-pool \
+            > evidence/legacy-testfail-tests.txt || true
+          echo "::warning::Legacy testFail* negative tests are excluded, not passed. See evidence/legacy-testfail-tests.txt."
+          forge test --root .source-extrafi --match-path 'tests/lending-pool/*.t.sol' \
+            --match-test '^test_' -vv 2>&1 | tee evidence/extra-lendingpool-tests.log
       - name: Preserve lab evidence
         if: always()
         uses: actions/upload-artifact@v4
