@@ -77,6 +77,14 @@ class FinderPipelineTests(unittest.TestCase):
         lab = finder.compute_repo_score({**base, 'full_name': 'org/security-lab'}, readme, ['solidity'])
         self.assertGreater(protocol.score, auditor.score)
         self.assertGreater(protocol.score, lab.score)
+        # Displayed priorities must distinguish similarly relevant repositories
+        # instead of pinning every candidate to 100.
+        self.assertGreater(protocol.priority_score, auditor.priority_score)
+        self.assertGreater(protocol.priority_score, lab.priority_score)
+        for candidate in (protocol, auditor, lab):
+            self.assertEqual(candidate.priority_score, max(0, min(100, 40 + 2 * candidate.score)))
+        self.assertNotEqual(auditor.recommendation, "join")
+        self.assertNotEqual(lab.recommendation, "join")
         self.assertEqual(protocol.review_state, 'Needs scope confirmation')
         for candidate in (auditor, lab):
             self.assertTrue(any(signal.name == 'repository-kind' for signal in candidate.signals))
