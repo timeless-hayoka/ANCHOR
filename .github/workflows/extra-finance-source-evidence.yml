@@ -9,6 +9,8 @@ on:
       - 'scripts/extra_verified_source_compile.py'
       - 'scripts/extra_rpc_bytecode_attestation.py'
       - 'scripts/extra_runtime_transform_reconciliation.py'
+      - 'scripts/extra_verified_runtime_fixture.py'
+      - 'tests/extra_runtime_lab/ExtraVerifiedRuntimeSmoke.t.sol'
       - 'tests/test_extra_runtime_transform_reconciliation.py'
       - 'tests/test_extra_rpc_bytecode_attestation.py'
       - 'tests/test_extra_verified_source_compile.py'
@@ -159,6 +161,29 @@ jobs:
           if [ "$code" -eq 2 ]; then
             echo "::warning::Runtime bytecode transformation reconciliation not proven; inspect evidence."
           fi
+      - name: Prepare independently verified deployed runtime local fixture
+        run: |
+          python scripts/extra_verified_runtime_fixture.py \
+            --rpc-evidence evidence/extra-independent-bytecode.json \
+            --outdir evidence/extra-local-runtime
+      - name: Install Foundry for isolated runtime smoke
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.7
+      - name: Run actual deployed bytecode in disposable Foundry EVM
+        shell: bash
+        run: |
+          mkdir -p .extra-runtime-lab/test
+          cp tests/extra_runtime_lab/ExtraVerifiedRuntimeSmoke.t.sol \
+            .extra-runtime-lab/test/ExtraVerifiedRuntimeSmoke.t.sol
+          printf '[profile.default]\\nsrc = "src"\\ntest = "test"\\nsolc_version = "0.8.18"\\n' \
+            > .extra-runtime-lab/foundry.toml
+          # The ~40 KiB runtime stays in a local env var; never echo it in logs.
+          runtime=$(cat evidence/extra-local-runtime/runtime.hex)
+          registry=$(python -c 'import json; print(json.load(open("evidence/extra-local-runtime/fixture.json"))["registry_address"])')
+          EXTRA_RUNTIME="$runtime" EXTRA_REGISTRY="$registry" \
+            forge test --root .extra-runtime-lab \
+              --match-test test_DeployedRuntimeReturnsImmutableRegistry -vv
       - name: Validate Trinity handoff tests
         run: python -m pytest tests/test_anchor_trinity_handoff.py -q
       - name: Archive blocked research signal for Trinity
