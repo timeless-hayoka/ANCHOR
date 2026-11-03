@@ -69,6 +69,8 @@ class ExtraSourceVerificationTests(unittest.TestCase):
         self.assertEqual(result["status"], "NOT_VERIFIED")
         self.assertEqual(result["reported_runtime_match"], "match")
         self.assertEqual(result["source_differences"][0]["first_different_line"], 3)
+        self.assertGreater(result["diff_hunk_count"], 0)
+        self.assertEqual(result["diff_hunks_first_12"][0]["kind"], "insert")
         self.assertEqual(result["verified_source_candidates"][0]["line_count"], 3)
         self.assertEqual(len(result["verified_source_candidates"][0]["sha256"]), 64)
         self.assertNotIn("modified", json.dumps(result))
