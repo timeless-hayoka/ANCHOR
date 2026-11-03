@@ -307,6 +307,36 @@ contract AnchorVerifiedStatefulTest {
         require(remainingDebt > 0, "partial repayment incorrectly closed debt");
     }
 
+    function test_VerifiedFullSettlementAfterInterestUsesAccruedDebt() public {
+        uint256 id = _prepareDebt();
+        uint256 startingLiquidity = token.balanceOf(pool.getETokenAddress(reserveId));
+        vm.prank(VAULT);
+        pool.borrow(VAULT, id, 100_000);
+
+        vm.warp(block.timestamp + 7 days);
+        (uint256 due,) = pool.getCurrentDebt(id);
+        require(due > 100_000, "interest must accrue before settlement");
+
+        // Fund the simulated vault's interest liability in this isolated lab.
+        // This is not a source of yield or a production transaction.
+        token.mint(VAULT, due - 100_000);
+        require(token.balanceOf(VAULT) == due, "vault has insufficient debt repayment assets");
+
+        vm.startPrank(VAULT);
+        token.approve(address(pool), due);
+        uint256 paid = pool.repay(VAULT, id, due);
+        vm.stopPrank();
+
+        require(paid == due, "full accrued debt repayment was not accepted");
+        (uint256 remainingDebt,) = pool.getCurrentDebt(id);
+        require(remainingDebt == 0, "full settlement left nonzero debt");
+        require(token.balanceOf(VAULT) == 0, "vault retained settlement funds");
+        require(
+            token.balanceOf(pool.getETokenAddress(reserveId)) == startingLiquidity + due - 100_000,
+            "reserve liquidity did not receive accrued interest"
+        );
+    }
+
     function test_VerifiedBorrowingInterestAccruesOverSevenDays() public {
         uint256 id = _prepareDebt();
         vm.prank(VAULT);
