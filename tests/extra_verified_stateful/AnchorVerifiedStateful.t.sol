@@ -4,7 +4,6 @@ pragma solidity 0.8.18;
 // All protocol imports resolve exclusively to the Sourcify-verified 0.8.18
 // source tree. The two minimal mocks below are laboratory dependencies.
 import "../../contracts/lendingpool/LendingPool.sol";
-import "../../contracts/address-registry/AddressRegistry.sol";
 import "../../contracts/libraries/helpers/AddressId.sol";
 
 interface VmAnchor {
@@ -53,6 +52,16 @@ contract AnchorMockERC20 {
     }
 }
 
+contract AnchorMockRegistry {
+    mapping(uint256 => address) internal entries;
+    function setAddress(uint256 id, address where) external {
+        entries[id] = where;
+    }
+    function getAddress(uint256 id) external view returns (address) {
+        return entries[id];
+    }
+}
+
 contract AnchorMockVaultFactory {
     mapping(uint256 => address) public vaults;
     function setVault(uint256 id, address who) external {
@@ -67,7 +76,7 @@ contract AnchorVerifiedStatefulTest {
     VmAnchor internal constant vm = VmAnchor(
         address(uint160(uint256(keccak256("hevm cheat code"))))
     );
-    AddressRegistry internal registry;
+    AnchorMockRegistry internal registry;
     LendingPool internal pool;
     AnchorMockERC20 internal token;
     AnchorMockVaultFactory internal factory;
@@ -79,7 +88,7 @@ contract AnchorVerifiedStatefulTest {
 
     function setUp() public {
         token = new AnchorMockERC20();
-        registry = new AddressRegistry(WETH);
+        registry = new AnchorMockRegistry();
         factory = new AnchorMockVaultFactory();
         registry.setAddress(AddressId.ADDRESS_ID_TREASURY, address(0x7EA5));
         registry.setAddress(AddressId.ADDRESS_ID_VAULT_FACTORY, address(factory));
