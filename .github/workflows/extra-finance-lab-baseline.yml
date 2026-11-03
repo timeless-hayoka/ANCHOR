@@ -4,6 +4,7 @@ on:
     paths:
       - '.github/workflows/extra-finance-lab-baseline.yml'
       - 'scripts/extra_legacy_test_adapter.py'
+      - 'tests/extra_stateful_lendingpool/AnchorStatefulLendingPool.t.sol'
   workflow_dispatch:
 permissions:
   contents: read
@@ -44,6 +45,20 @@ jobs:
           echo "Legacy negative tests adapted to explicit revert expectations" > evidence/negative-controls.txt
           forge test --root .source-extrafi --match-path 'tests/lending-pool/*.t.sol' \
             --match-test '^test_' -vv 2>&1 | tee evidence/extra-lendingpool-tests.log
+      - name: Run ANCHOR multi-user invariant controls against pinned upstream checkout
+        shell: bash
+        env:
+          FOUNDRY_ETH_RPC_URL: ''
+          ETH_RPC_URL: ''
+        run: |
+          set -o pipefail
+          cp tests/extra_stateful_lendingpool/AnchorStatefulLendingPool.t.sol \
+            .source-extrafi/tests/lending-pool/AnchorStatefulLendingPool.t.sol
+          echo "Target: pinned upstream ExtraFi a66e925d; NOT deployed Sourcify source" \
+            > evidence/stateful-test-scope.txt
+          forge test --root .source-extrafi \
+            --match-contract AnchorStatefulLendingPoolTest -vv \
+            2>&1 | tee evidence/anchor-stateful-invariants.log
       - name: Preserve lab evidence
         if: always()
         uses: actions/upload-artifact@v4
