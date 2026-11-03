@@ -337,6 +337,48 @@ contract AnchorVerifiedStatefulTest {
         );
     }
 
+    /// @dev Randomized time-dependent accounting without a real-chain fork.
+    /// The amount repaid is strictly below principal; no known full-repay
+    /// rounding mechanism is inferred from this property.
+    function testFuzz_VerifiedPartialSettlementAfterVariableInterest(
+        uint64 rawBorrow,
+        uint32 rawDays
+    ) public {
+        uint256 id = _prepareDebt();
+        uint256 borrowAmount = 20_000 + (uint256(rawBorrow) % 160_000);
+        uint256 elapsedDays = 1 + (uint256(rawDays) % 30);
+
+        vm.prank(VAULT);
+        pool.borrow(VAULT, id, borrowAmount);
+        vm.warp(block.timestamp + elapsedDays * 1 days);
+
+        (uint256 debtBefore, uint256 indexBefore) = pool.getCurrentDebt(id);
+        require(debtBefore >= borrowAmount, "time reduced outstanding principal");
+        uint256 liquidityBefore = token.balanceOf(pool.getETokenAddress(reserveId));
+        uint256 creditBefore = pool.credits(reserveId, VAULT);
+        uint256 partial = borrowAmount / 2;
+
+        vm.startPrank(VAULT);
+        token.approve(address(pool), partial);
+        uint256 paid = pool.repay(VAULT, id, partial);
+        vm.stopPrank();
+
+        require(paid == partial, "partial repayment differs from requested amount");
+        require(
+            token.balanceOf(pool.getETokenAddress(reserveId)) == liquidityBefore + paid,
+            "reserve partial repayment liquidity mismatch"
+        );
+        require(
+            pool.credits(reserveId, VAULT) == creditBefore + paid,
+            "partial repayment did not restore vault credit"
+        );
+
+        (uint256 debtAfter, uint256 indexAfter) = pool.getCurrentDebt(id);
+        require(indexAfter >= indexBefore, "borrowing index regressed");
+        require(debtAfter < debtBefore, "partial repayment failed to lower debt");
+        require(debtAfter > 0, "partial repayment unexpectedly erased debt");
+    }
+
     function test_VerifiedBorrowingInterestAccruesOverSevenDays() public {
         uint256 id = _prepareDebt();
         vm.prank(VAULT);
