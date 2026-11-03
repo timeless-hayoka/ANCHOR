@@ -20,7 +20,7 @@ contract ExtraVerifiedRuntimeSmokeTest {
         require(code.length > 100, "runtime unexpectedly small");
         require(expected != address(0), "missing expected immutable value");
 
-        address local = address(0x000000000000000000000000000000000000B0B0);
+        address local = address(uint160(0xb0b0));
         vm.etch(local, code);
         (bool success, bytes memory answer) = local.staticcall(
             abi.encodeWithSignature("addressRegistry()")
