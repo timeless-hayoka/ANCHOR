@@ -63,6 +63,16 @@ def analyze_snapshot(snapshot: Any, source_text: str) -> dict[str, Any]:
     if not possible:
         result["reason"] = "verified LendingPool.sol content unavailable"
         return result
+    # Distinguish wrong source revision from absent verification using hashes.
+    # Never print the entire verified source into public CI logs.
+    result["verified_source_candidates"] = [
+        {
+            "path": path,
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "line_count": len(text.splitlines()),
+        }
+        for path, text in sorted(possible)
+    ]
     matched = [path for path, text in possible if text == source_text]
     if not matched:
         result["reason"] = "verified LendingPool.sol text differs from local source"
