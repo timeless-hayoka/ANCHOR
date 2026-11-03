@@ -227,6 +227,16 @@ The isolated, non-broadcast Foundry job [41665195487](https://github.com/timeles
 
 These are *source-reconciliation and smoke-test milestones*, not exploit reproductions. No production transaction was sent; no Trinity finding was promoted; scope grant remains separate. Next: initialize protocol state on a verified-code local test harness and write accounting/authorization invariants distinct from the four already-disclosed known issue families.
 
+## Multi-user stateful LendingPool baseline — pinned GitHub code only (2026-11-03)
+
+[GitHub Actions run 41668053419](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41668053419) executed the original ExtraFi repo revision `a66e925d78ee5c990eb2bafa5009cebcbeafe42d` in a **forkless, isolated Foundry test environment**. ANCHOR's additional `AnchorStatefulLendingPool.t.sol` controls returned **6/6 passed**, including one **256-run** randomized test. The existing 14 adapted upstream tests also passed.
+
+The new checks cover two-user deposit-to-eToken share accounting, underlying reserve balance conservation, redemption of individually owned shares, residual locked initial shares, non-owner reserve initialization denial, missing ERC-20 allowance denial, and unauthorized redemption denial. The randomized test bounds each of two deposits from 1,001 to 1,000,000 token base units, with fixed block conditions and no outstanding borrow, checking both users' balances and post-redemption residuals across 256 generated inputs.
+
+**Boundary:** This demonstrates accounting and access controls for the *pinned GitHub contract revision*, which includes a 1,000-share first-depositor lock absent from Sourcify's verified deployed-source file. Therefore the lock/share baseline **must not be transferred to the deployed source** or described as proving a bounty vulnerability. The first-depositor inflation family is already disclosed by the bounty program. These tests do not yet exercise debt positions, liquidation, interest accrual, time warp, or deployed initialization semantics.
+
+**Next gate:** port the tested invariant structure to Solidity **0.8.18** and Sourcify's actual verified 33-file source tree, initialize isolated dependencies with explicit versions and immutable values, add borrower/debt/interest invariants, and only then discuss novel findings after known-issue and scope review. The Trinity record remains a `signal`, not a reproduced issue.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
