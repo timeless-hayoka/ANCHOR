@@ -57,8 +57,8 @@ def assess(
         matches = [row for row in candidates if isinstance(row, dict) and row.get("full_name") == target_id]
         if len(matches) != 1:
             blocked("discovery", "exactly one matching candidate required")
-        elif matches[0].get("scan_status") != "complete":
-            blocked("discovery", "candidate enrichment incomplete or metadata only")
+        elif matches[0].get("scan_status") != "complete" or matches[0].get("scan_errors"):
+            blocked("discovery", "candidate enrichment incomplete, errored or metadata only")
         else:
             passed("discovery", "complete passive metadata scan (not scope authorization)")
 
@@ -93,8 +93,12 @@ def assess(
         blocked("source_file", "source not exact-runtime verified or pinned file differs")
     elif source_evidence.get("reported_runtime_match") != "exact_match":
         blocked("source_file", "runtime verification is not exact")
-    elif not source_evidence.get("matched_source_paths"):
-        blocked("source_file", "no matched verified source paths recorded")
+    elif not (
+        isinstance(source_evidence.get("matched_source_paths"), list)
+        and source_evidence["matched_source_paths"]
+        and all(isinstance(path, str) and path.strip() for path in source_evidence["matched_source_paths"])
+    ):
+        blocked("source_file", "matched verified source paths missing or malformed")
     elif not re.fullmatch(r"[a-fA-F0-9]{64}", str(source_evidence.get("source_sha256", ""))):
         blocked("source_file", "missing pinned-source content hash")
     else:
