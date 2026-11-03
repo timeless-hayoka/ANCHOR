@@ -1,12 +1,14 @@
 """Offline regression tests for fail-closed Extra Finance source verification."""
 import importlib.util
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "check_extra_lendingpool_source.py"
+sys.path.insert(0, str(SCRIPT.parent))
 spec = importlib.util.spec_from_file_location("extra_source_verifier", SCRIPT)
 verifier = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(verifier)
@@ -74,6 +76,39 @@ class ExtraSourceVerificationTests(unittest.TestCase):
         self.assertEqual(result["verified_source_candidates"][0]["line_count"], 3)
         self.assertEqual(len(result["verified_source_candidates"][0]["sha256"]), 64)
         self.assertNotIn("modified", json.dumps(result))
+
+    def test_token_difference_classification_preserves_code_changes(self):
+        snapshot = {
+            **self.verified,
+            "sources": {"contracts/lendingpool/LendingPool.sol": {
+                "content": "// comment changed\\ncontract LendingPool { uint x = 1; }\\n"
+            }},
+        }
+        local = "// another comment\\ncontract LendingPool {uint x=2;}\\n"
+        result = verifier.analyze_snapshot(snapshot, local)
+        self.assertEqual(result["status"], "NOT_VERIFIED")
+        self.assertEqual(result["token_comparison"]["classification"], "TOKEN_DIFFERENT")
+        self.assertGreater(result["token_comparison"]["token_hunk_count"], 0)
+        self.assertEqual(result["token_comparison"]["security_conclusion"], "NONE")
+
+    def test_comment_only_changes_are_token_equivalent(self):
+        snapshot = {
+            **self.verified,
+            "sources": {"contracts/lendingpool/LendingPool.sol": {
+                "content": "// new comment\\ncontract LendingPool { uint x=1; }"
+            }},
+        }
+        local = "contract LendingPool {/*old*/uint x = 1;}"
+        result = verifier.analyze_snapshot(snapshot, local)
+        self.assertEqual(result["token_comparison"]["classification"], "TOKEN_EQUIVALENT")
+
+    def test_strings_containing_comment_delimiters_remain_tokens(self):
+        from extra_source_semantic_delta import compare_solidity_source
+        a = 'string constant X = "https://example.com/a/*b";'
+        b = 'string constant X = "https://example.com/a/*c";'
+        result = compare_solidity_source(a, b)
+        self.assertEqual(result["classification"], "TOKEN_DIFFERENT")
+        self.assertEqual(compare_solidity_source('contract A{/*unclosed', 'contract A{}')["classification"], "INDETERMINATE")
 
     def test_offline_cli_never_claims_verification_on_error(self):
         with tempfile.TemporaryDirectory() as directory:
