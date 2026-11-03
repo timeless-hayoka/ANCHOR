@@ -63,6 +63,16 @@ These two additional tests resolve the deployed vault via the actual public `Add
 
 **Next distinct research directions:** complex vault callbacks and cross-reserve debt paths, real reserve configuration versus synthetic assumptions, and multiple real-vault interactions. Each needs independent scope/duplicate review, a failing invariant with concrete impact, and reproducible local-fork evidence before any Trinity finding or bounty report.
 
+## Real cross-vault debt ownership boundary (2026-11-03)
+
+[GitHub Actions run 41718872413](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41718872413) passed **8/8 fork tests, zero failures** at OP Mainnet block **159070638**.
+
+The additional local-only test `test_LocalForkWhitelistedVaultCannotOperateAnotherVaultDebt` scans a bounded number of actual deployed debt IDs and factory vault IDs. It locates a debt position whose owner is a whitelisted onchain vault, and a **different**, also whitelisted onchain vault. It then simulates `borrow(otherVault, debtId, 1)` and `repay(otherVault, debtId, 1)` as that second vault inside the disposable fork.
+
+**Both cross-vault calls reverted.** The recorded original position owner, debt principal, reserve ID, competing vault credit, total reserve liquidity, and aggregate borrowing remained unchanged. No live-chain transaction was broadcast. The test asserts that the pool is not paused to avoid counting the pause guard as an owner-check success.
+
+**Research status: NEGATIVE / NO CROSS-VAULT DEBT OWNERSHIP BYPASS REPRODUCED.** This establishes one verified deployment snapshot and bounded pair of real whitelisted vaults, not all vaults, historical blocks, debt configurations, or a new in-scope financial loss. This evidence must not be promoted to a bounty report.
+
 ## Conclusions and boundaries
 
 The deployed contract, actual registry and sampled live reserves are reachable; getters function consistently in a pinned-block fork. This provides real-state, source-independent confirmation beyond the synthetic reserve tests in PRs #42–#43.
