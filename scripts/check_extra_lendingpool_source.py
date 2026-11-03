@@ -78,9 +78,10 @@ def analyze_snapshot(snapshot: Any, source_text: str) -> dict[str, Any]:
     result["matched_source_paths"] = sorted(matched)
     result["reason"] = (
         "single source file agrees with Sourcify's runtime-verified source; "
-        "non-exact runtime verification means the complete bytecode is not "
-        "proven identical. Full compilation inputs, libraries, immutables "
-        "and onchain bytecode still require independent comparison"
+        + ("runtime verification is exact; " if runtime_match == "exact_match"
+           else "runtime verification is non-exact; ")
+        + "full compilation inputs, libraries, immutables and onchain bytecode "
+        "still require independent comparison"
     )
     return result
 
