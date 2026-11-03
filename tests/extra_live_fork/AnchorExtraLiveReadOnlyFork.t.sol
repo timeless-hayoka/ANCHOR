@@ -4,11 +4,17 @@ pragma solidity 0.8.18;
 /// @notice Live OP Mainnet STATE read assertions executed only inside a
 ///         disposable, pinned-block Foundry fork. No impersonation, calls to
 ///         state-mutating methods, broadcasts, PoCs or new finding claims.
+interface VmAnchorFork {
+    function prank(address who) external;
+    function expectRevert() external;
+}
+
 interface IAnchorLiveLendingPool {
     function addressRegistry() external view returns (address);
     function nextReserveId() external view returns (uint256);
     function nextDebtPositionId() external view returns (uint256);
     function paused() external view returns (bool);
+    function initReserve(address asset) external;
     function getUnderlyingTokenAddress(uint256 reserveId) external view returns (address);
     function getETokenAddress(uint256 reserveId) external view returns (address);
     function totalLiquidityOfReserve(uint256 reserveId) external view returns (uint256);
@@ -29,6 +35,9 @@ contract AnchorExtraLiveReadOnlyForkTest {
 
     IAnchorLiveLendingPool internal constant POOL =
         IAnchorLiveLendingPool(TARGET);
+    VmAnchorFork internal constant vm = VmAnchorFork(
+        address(uint160(uint256(keccak256("hevm cheat code"))))
+    );
 
     function test_LiveForkIdentityAndActualDeploymentStorage() public {
         require(block.chainid == OP_CHAIN_ID, "must fork Optimism");
@@ -71,6 +80,24 @@ contract AnchorExtraLiveReadOnlyForkTest {
             emit log_named_uint("utilization_1e18", utilization);
             emit log_named_uint("borrowing_rate_1e18", borrowingRate);
         }
+    }
+
+    /// @notice SECURITY NEGATIVE CONTROL: execute one attempted owner-only
+    /// reserve initialization only inside the disposable local fork. The
+    /// external RPC remains strictly read-only and no tx is broadcast.
+    function test_LocalForkNonOwnerCannotInitializeReserve() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong network");
+        address unprivileged = address(uint160(0xA11CE));
+        uint256 reserveCounterBefore = POOL.nextReserveId();
+        address knownUnderlying = POOL.getUnderlyingTokenAddress(1);
+        require(knownUnderlying != address(0), "no known reserve asset");
+        vm.prank(unprivileged);
+        vm.expectRevert();
+        POOL.initReserve(knownUnderlying);
+        require(
+            POOL.nextReserveId() == reserveCounterBefore,
+            "unauthorized reserve initialization modified live-fork storage"
+        );
     }
 
     function test_LiveForkReadOnlyCallsAreDeterministic() public view {
