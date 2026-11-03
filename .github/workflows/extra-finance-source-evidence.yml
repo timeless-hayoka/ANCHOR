@@ -90,7 +90,9 @@ jobs:
           fi
           echo "::notice::Extra Finance readiness remains blocked pending complete scope and source evidence."
       - name: Validate Trinity handoff tests
-        run: python -m pytest tests/test_anchor_trinity_handoff.py -q
+        run: |
+          python -m pip install 'pytest>=8,<10'
+          python -m pytest tests/test_anchor_trinity_handoff.py -q
       - name: Archive blocked research signal for Trinity
         shell: bash
         run: |
