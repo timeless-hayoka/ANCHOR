@@ -18,6 +18,14 @@ interface IAnchorLiveLendingPool {
     function borrow(address onBehalfOf, uint256 debtId, uint256 amount) external;
     function repay(address onBehalfOf, uint256 debtId, uint256 amount) external returns (uint256);
     function borrowingWhiteList(address vault) external view returns (bool);
+    function getVault(uint256 vaultId) external view returns (address);
+    function credits(uint256 reserveId, address vault) external view returns (uint256);
+    function setCreditsOfVault(uint256 vaultId, uint256 reserveId, uint256 credit) external;
+    function enableVaultToBorrow(uint256 vaultId) external;
+    function disableVaultToBorrow(uint256 vaultId) external;
+    function freezeReserve(uint256 reserveId) external;
+    function unFreezeReserve(uint256 reserveId) external;
+
     function getUnderlyingTokenAddress(uint256 reserveId) external view returns (address);
     function getETokenAddress(uint256 reserveId) external view returns (address);
     function totalLiquidityOfReserve(uint256 reserveId) external view returns (uint256);
@@ -130,6 +138,62 @@ contract AnchorExtraLiveReadOnlyForkTest {
         require(POOL.nextDebtPositionId() == debtCounterBefore, "failed requests changed debt IDs");
         require(POOL.totalLiquidityOfReserve(reserveId) == liquidityBefore, "failed requests changed liquidity");
         require(POOL.totalBorrowsOfReserve(reserveId) == borrowsBefore, "failed requests changed borrow balance");
+    }
+
+    /// @notice Reject an ordinary account's attempt to increase the
+    /// existing onchain vault's borrowing budget. All attempted state
+    /// changes occur only in this disposable local Foundry fork.
+    function test_LocalForkNonOwnerCannotIncreaseExistingVaultCredits() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        uint256 reserveId = 1;
+        uint256 vaultId = 1;
+        address currentVault = POOL.getVault(vaultId);
+        require(currentVault != address(0) && currentVault.code.length > 0, "real vault missing");
+
+        address outsider = address(uint160(0xD00D));
+        uint256 beforeCredits = POOL.credits(reserveId, currentVault);
+        uint256 beforeLiquidity = POOL.totalLiquidityOfReserve(reserveId);
+        uint256 beforeBorrow = POOL.totalBorrowsOfReserve(reserveId);
+        bool beforeWhitelist = POOL.borrowingWhiteList(currentVault);
+
+        vm.prank(outsider);
+        vm.expectRevert();
+        POOL.setCreditsOfVault(vaultId, reserveId, beforeCredits + 1);
+
+        require(POOL.credits(reserveId, currentVault) == beforeCredits, "unauthorized credits modified");
+        require(POOL.borrowingWhiteList(currentVault) == beforeWhitelist, "whitelist changed on credit failure");
+        require(POOL.totalLiquidityOfReserve(reserveId) == beforeLiquidity, "liquidity changed on credit failure");
+        require(POOL.totalBorrowsOfReserve(reserveId) == beforeBorrow, "borrow totals changed on credit failure");
+    }
+
+    /// @notice Neither the whitelist nor a live reserve's admin flags
+    /// can be modified by a newly selected non-admin account.
+    function test_LocalForkNonOwnerCannotToggleVaultBorrowingAuthorization() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        uint256 vaultId = 1;
+        address vault = POOL.getVault(vaultId);
+        require(vault != address(0) && vault.code.length > 0, "real vault missing");
+        address outsider = address(uint160(0xD00D));
+        bool initiallyWhitelisted = POOL.borrowingWhiteList(vault);
+        uint256 beforeCredits = POOL.credits(1, vault);
+        uint256 beforeReserveCounter = POOL.nextReserveId();
+
+        vm.prank(outsider);
+        vm.expectRevert();
+        POOL.enableVaultToBorrow(vaultId);
+        vm.prank(outsider);
+        vm.expectRevert();
+        POOL.disableVaultToBorrow(vaultId);
+        vm.prank(outsider);
+        vm.expectRevert();
+        POOL.freezeReserve(1);
+        vm.prank(outsider);
+        vm.expectRevert();
+        POOL.unFreezeReserve(1);
+
+        require(POOL.borrowingWhiteList(vault) == initiallyWhitelisted, "vault authorization modified");
+        require(POOL.credits(1, vault) == beforeCredits, "vault credits modified");
+        require(POOL.nextReserveId() == beforeReserveCounter, "admin failure modified reserve IDs");
     }
 
     function test_LiveForkReadOnlyCallsAreDeterministic() public view {
