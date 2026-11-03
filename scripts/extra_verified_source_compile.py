@@ -146,7 +146,11 @@ def main(argv: list[str] | None = None) -> int:
         output = completed.stdout
         start = output.find("{")
         if completed.returncode != 0 or start < 0 or len(output) > 20_000_000:
-            raise ValueError("compiler execution failed or returned oversized output")
+            detail = completed.stderr[-450:].replace("\\n", " ")
+            raise ValueError(
+                f"compiler failed (returncode={completed.returncode}, "
+                f"stdout_bytes={len(output)}, stderr_tail={detail})"
+            )
         report = compare_compilation(json.loads(output[start:]), context)
     except (ValueError, TypeError, OSError, UnicodeError, subprocess.TimeoutExpired) as exc:
         report = {
