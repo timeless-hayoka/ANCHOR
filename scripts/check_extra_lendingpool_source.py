@@ -8,6 +8,7 @@ independently verified source listing at a chain-specific address.
 from __future__ import annotations
 
 import argparse
+import difflib
 import hashlib
 import json
 import sys
@@ -92,6 +93,23 @@ def analyze_snapshot(snapshot: Any, source_text: str) -> dict[str, Any]:
                 "verified_line_count": len(remote_lines),
             })
         result["source_differences"] = differences
+        # Report only bounded line ranges, never raw source or suspected attack
+        # paths. A changed line count alone does not establish logic drift.
+        first_verified_lines = sorted(possible)[0][1].splitlines()
+        opcodes = difflib.SequenceMatcher(
+            None, local_lines, first_verified_lines, autojunk=False
+        ).get_opcodes()
+        changes = [
+            {
+                "kind": tag,
+                "local_line_range": [i1 + 1, i2],
+                "verified_line_range": [j1 + 1, j2],
+            }
+            for tag, i1, i2, j1, j2 in opcodes
+            if tag != "equal"
+        ]
+        result["diff_hunk_count"] = len(changes)
+        result["diff_hunks_first_12"] = changes[:12]
         result["reason"] = "verified LendingPool.sol text differs from local source"
         return result
 
