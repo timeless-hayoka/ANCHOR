@@ -15,6 +15,9 @@ interface IAnchorLiveLendingPool {
     function nextDebtPositionId() external view returns (uint256);
     function paused() external view returns (bool);
     function initReserve(address asset) external;
+    function borrow(address onBehalfOf, uint256 debtId, uint256 amount) external;
+    function repay(address onBehalfOf, uint256 debtId, uint256 amount) external returns (uint256);
+    function borrowingWhiteList(address vault) external view returns (bool);
     function getUnderlyingTokenAddress(uint256 reserveId) external view returns (address);
     function getETokenAddress(uint256 reserveId) external view returns (address);
     function totalLiquidityOfReserve(uint256 reserveId) external view returns (uint256);
@@ -98,6 +101,35 @@ contract AnchorExtraLiveReadOnlyForkTest {
             POOL.nextReserveId() == reserveCounterBefore,
             "unauthorized reserve initialization modified live-fork storage"
         );
+    }
+
+    /// @notice This attempts state mutations *only inside a disposable local*
+    /// fork. The public RPC endpoint receives state reads only; no broadcast.
+    /// Fresh EOA has no whitelist entry, nor a privileged vault identity.
+    function test_LocalForkUnknownAccountCannotBorrowOrRepayExistingDebt() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong network");
+        address stranger = address(uint160(0x5A7A6E));
+        require(!POOL.borrowingWhiteList(stranger), "EOA unexpectedly whitelisted");
+
+        uint256 debtId = 1;
+        uint256 reserveId = 1;
+        uint256 reserveBefore = POOL.nextReserveId();
+        uint256 debtCounterBefore = POOL.nextDebtPositionId();
+        uint256 liquidityBefore = POOL.totalLiquidityOfReserve(reserveId);
+        uint256 borrowsBefore = POOL.totalBorrowsOfReserve(reserveId);
+
+        vm.prank(stranger);
+        vm.expectRevert();
+        POOL.borrow(stranger, debtId, 1);
+
+        vm.prank(stranger);
+        vm.expectRevert();
+        POOL.repay(stranger, debtId, 1);
+
+        require(POOL.nextReserveId() == reserveBefore, "failed requests changed reserve IDs");
+        require(POOL.nextDebtPositionId() == debtCounterBefore, "failed requests changed debt IDs");
+        require(POOL.totalLiquidityOfReserve(reserveId) == liquidityBefore, "failed requests changed liquidity");
+        require(POOL.totalBorrowsOfReserve(reserveId) == borrowsBefore, "failed requests changed borrow balance");
     }
 
     function test_LiveForkReadOnlyCallsAreDeterministic() public view {
