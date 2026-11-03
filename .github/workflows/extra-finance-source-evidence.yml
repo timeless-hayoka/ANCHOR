@@ -1,0 +1,55 @@
+name: Extra Finance source evidence
+on:
+  pull_request:
+    paths:
+      - 'scripts/check_extra_lendingpool_source.py'
+      - 'tests/test_extra_lendingpool_source_verifier.py'
+      - 'hunts/extra-finance-lendingpool-intake-2026-11-03.md'
+      - '.github/workflows/extra-finance-source-evidence.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout ANCHOR
+        uses: actions/checkout@v4
+      - name: Checkout pinned ExtraFi source
+        uses: actions/checkout@v4
+        with:
+          repository: ExtraFi/extra-contracts
+          ref: a66e925d78ee5c990eb2bafa5009cebcbeafe42d
+          path: .source-extrafi
+          persist-credentials: false
+      - name: Verify pinned upstream commit
+        run: |
+          test "$(git -C .source-extrafi rev-parse HEAD)" = "a66e925d78ee5c990eb2bafa5009cebcbeafe42d"
+      - name: Run offline verifier unit tests
+        run: python -m unittest discover -s tests -p test_extra_lendingpool_source_verifier.py -q
+      - name: Compare read-only public verified source
+        shell: bash
+        run: |
+          mkdir -p evidence
+          set +e
+          python scripts/check_extra_lendingpool_source.py \
+            --source .source-extrafi/contracts/lendingpool/LendingPool.sol \
+            > evidence/extra-lendingpool-source-verification.json
+          code=$?
+          set -e
+          printf '%s\n' "$code" > evidence/source-verifier-exit-code.txt
+          cat evidence/extra-lendingpool-source-verification.json
+          if [ "$code" -eq 0 ]; then
+            echo "Sourcify source file matched; full build/bytecode equivalence remains unverified."
+          else
+            echo "::warning::Sourcify verification unavailable/mismatch (exit $code); do not promote source equivalence."
+          fi
+      - name: Upload source comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extra-lendingpool-source-evidence
+          path: evidence/
+          retention-days: 14
+          if-no-files-found: warn
