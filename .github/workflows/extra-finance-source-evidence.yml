@@ -11,6 +11,7 @@ on:
       - 'scripts/extra_runtime_transform_reconciliation.py'
       - 'tests/test_extra_runtime_transform_reconciliation.py'
       - 'scripts/extra_verified_runtime_fixture.py'
+      - 'tests/test_extra_verified_runtime_fixture.py'
       - 'tests/extra_runtime_lab/ExtraVerifiedRuntimeSmoke.t.sol'
       - 'tests/test_extra_rpc_bytecode_attestation.py'
       - 'tests/test_extra_verified_source_compile.py'
@@ -161,6 +162,8 @@ jobs:
           if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
             exit 1
           fi
+      - name: Validate AST-to-immutable fixture mapping
+        run: python -m pytest tests/test_extra_verified_runtime_fixture.py -q
       - name: Prepare deployed bytecode fixture for local-only EVM
         run: |
           python scripts/extra_verified_runtime_fixture.py \
