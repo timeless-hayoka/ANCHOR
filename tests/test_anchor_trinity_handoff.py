@@ -136,6 +136,39 @@ def test_compiler_failure_remains_visible_but_not_promoted():
     assert result["lead"]["scope_status"] == "unknown"
 
 
+def test_independent_rpc_provenance_does_not_promote_finding():
+    digest = "a" * 64
+    rpc = {
+        "state": "RPC_MATCHES_PROVIDER_ONCHAIN", "chain_id": "10",
+        "address": ADDRESS,
+        "provider_onchain_sha256": digest, "rpc_onchain_sha256": digest,
+        "full_deployment_equivalence": "NOT_PROVEN", "transaction_broadcast": False,
+    }
+    result = bridge.prepare_handoff(READINESS, SOURCE, rpc_evidence=rpc)
+    assert result["provenance"]["rpc_state"] == "RPC_MATCHES_PROVIDER_ONCHAIN"
+    assert result["lead"]["state"] == "signal"
+    assert result["finding"] == "NONE"
+    assert result["deployment_bytecode_equivalence"] == "NOT_PROVEN"
+
+
+def test_fabricated_rpc_hash_and_mismatched_address_fail_closed():
+    good = {
+        "state": "RPC_MATCHES_PROVIDER_ONCHAIN", "chain_id": "10",
+        "address": ADDRESS,
+        "provider_onchain_sha256": "a" * 64,
+        "rpc_onchain_sha256": "a" * 64,
+        "full_deployment_equivalence": "NOT_PROVEN", "transaction_broadcast": False,
+    }
+    for changed in (
+        {"address": "0x" + "1" * 40},
+        {"rpc_onchain_sha256": "b" * 64},
+        {"transaction_broadcast": True},
+        {"full_deployment_equivalence": "PROVEN"},
+    ):
+        with pytest.raises(ValueError):
+            bridge.prepare_handoff(READINESS, SOURCE, rpc_evidence={**good, **changed})
+
+
 def test_existing_evidence_artifact_is_not_overwritten(tmp_path):
     output = tmp_path / "handoff.json"
     report = bridge.prepare_handoff(READINESS, SOURCE)
