@@ -40,7 +40,11 @@ def fixture(snapshot: Any, rpc_evidence: Any) -> dict[str, str]:
     ids = {item.get("id") for item in immutables}
     values = rt.get("transformationValues", {}).get("immutables")
     if len(ids) != 1 or not isinstance(values, dict):
-        raise ValueError("cannot map immutable to one deterministic registry value")
+        raise ValueError(
+            "cannot map immutable to one deterministic registry value: "
+            f"immutable_id_count={len(ids)}, ids={sorted(map(str, ids))[:12]}, "
+            f"value_keys={sorted(map(str, values))[:12] if isinstance(values, dict) else []}"
+        )
     identity = next(iter(ids))
     raw = hex_bytes(values.get(identity))
     if len(raw) != 32 or raw[:12] != bytes(12) or raw[12:] == bytes(20):
