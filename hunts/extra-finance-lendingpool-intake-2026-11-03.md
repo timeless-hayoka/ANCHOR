@@ -72,6 +72,17 @@ A subsequent isolated GitHub Actions read-only verification produced a non-exact
 
 **Consequence:** Do not use the pinned GitHub checkout as an unquestioned production-equivalent source mirror. Obtain the verified source tree, reconcile version and compiler settings, and reproduce on an isolated fork before drawing conclusions or submitting a report. The timestamp and credit-known-issue discrepancies might reflect source drift, but no causal chain or novelty has been established.
 
+## 2026-11-03 Solidity token-level source comparison
+
+[GitHub Actions source evidence run 41646844548](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41646844548) checked the pinned ExtraFi repository against the Sourcify non-exact-runtime verification. After excluding Solidity whitespace and comments (without discarding literal strings), the two source files are still **TOKEN_DIFFERENT**:
+- Pinned GitHub `LendingPool.sol`: **3,451** Solidity-like tokens.
+- Sourcify verified-source `LendingPool.sol`: **3,329** tokens.
+- **13 token-level changed regions**, separately from the 12 line-oriented changed regions.
+- The `security_conclusion` output is explicitly `NONE`.
+- The live-source check's top-level status remains `NOT_VERIFIED` for the pinned repository.
+
+The classifier is intentionally conservative: different tokens show code-level source drift, **not** necessarily different runtime behavior or an exploitable bug. The Sourcify verification is non-exact, so full bytecode equivalence remains unproven. Next: inspect exact differences and relevant published audit reports, pin the actually deployed build, then test approved invariants in isolation.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
