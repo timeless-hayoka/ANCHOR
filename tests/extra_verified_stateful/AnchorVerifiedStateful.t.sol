@@ -1,0 +1,181 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.18;
+
+// All protocol imports resolve exclusively to the Sourcify-verified 0.8.18
+// source tree. The two minimal mocks below are laboratory dependencies.
+import "../../contracts/lendingpool/LendingPool.sol";
+import "../../contracts/address-registry/AddressRegistry.sol";
+import "../../contracts/libraries/helpers/AddressId.sol";
+
+interface VmAnchor {
+    function prank(address who) external;
+    function startPrank(address who) external;
+    function stopPrank() external;
+    function expectRevert() external;
+    function warp(uint256 time) external;
+}
+
+contract AnchorMockERC20 {
+    string public name = "ANCHOR isolated reserve";
+    string public symbol = "AIR";
+    uint8 public constant decimals = 18;
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    function mint(address who, uint256 amount) external {
+        balanceOf[who] += amount;
+        totalSupply += amount;
+    }
+
+    function approve(address to, uint256 amount) external returns (bool) {
+        allowance[msg.sender][to] = amount;
+        return true;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        _transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        uint256 allowed = allowance[from][msg.sender];
+        require(allowed >= amount, "allowance");
+        allowance[from][msg.sender] = allowed - amount;
+        _transfer(from, to, amount);
+        return true;
+    }
+
+    function _transfer(address from, address to, uint256 amount) internal {
+        require(balanceOf[from] >= amount, "balance");
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+    }
+}
+
+contract AnchorMockVaultFactory {
+    mapping(uint256 => address) public vaults;
+    function setVault(uint256 id, address who) external {
+        vaults[id] = who;
+    }
+}
+
+/// @notice Checks actual Sourcify-verified Solidity source, compiled with
+/// solc 0.8.18. This fixture is not the earlier pinned GitHub revision.
+/// Real deployment immutables/storage are not reconstructed or claimed.
+contract AnchorVerifiedStatefulTest {
+    VmAnchor internal constant vm = VmAnchor(
+        address(uint160(uint256(keccak256("hevm cheat code"))))
+    );
+    AddressRegistry internal registry;
+    LendingPool internal pool;
+    AnchorMockERC20 internal token;
+    AnchorMockVaultFactory internal factory;
+    address internal constant ALICE = address(0xA11CE);
+    address internal constant BOB = address(0xB0B);
+    address internal constant VAULT = address(0xC0FFEE);
+    address internal constant WETH = address(0x4200000000000000000000000000000000000006);
+    uint256 internal reserveId;
+
+    function setUp() public {
+        token = new AnchorMockERC20();
+        registry = new AddressRegistry(WETH);
+        factory = new AnchorMockVaultFactory();
+        registry.setAddress(AddressId.ADDRESS_ID_TREASURY, address(0x7EA5));
+        registry.setAddress(AddressId.ADDRESS_ID_VAULT_FACTORY, address(factory));
+        factory.setVault(1, VAULT);
+        pool = new LendingPool(address(registry), WETH);
+        pool.initReserve(address(token));
+        reserveId = pool.nextReserveId() - 1;
+        token.mint(ALICE, 2_000_000);
+        token.mint(BOB, 2_000_000);
+    }
+
+    function _deposit(address who, uint256 amount) internal returns (uint256 shares) {
+        vm.startPrank(who);
+        token.approve(address(pool), amount);
+        shares = pool.deposit(reserveId, amount, who, 0);
+        vm.stopPrank();
+    }
+
+    function _balanceShares(address who) internal view returns (uint256) {
+        return IERC20(pool.getETokenAddress(reserveId)).balanceOf(who);
+    }
+
+    function test_VerifiedFirstTwoDepositorsConserveLiquidity() public {
+        uint256 aliceShares = _deposit(ALICE, 100_000);
+        uint256 bobShares = _deposit(BOB, 200_000);
+        // The verified deployed-source implementation differs from the pinned
+        // GitHub revision's initial 1,000-share lock. Do not copy that premise.
+        require(aliceShares > 0 && bobShares > 0, "no deposit shares");
+        require(_balanceShares(ALICE) == aliceShares, "alice share balance");
+        require(_balanceShares(BOB) == bobShares, "bob share balance");
+        require(token.balanceOf(pool.getETokenAddress(reserveId)) == 300_000, "reserve liquidity conservation");
+        require(token.balanceOf(ALICE) == 1_900_000, "alice reserves");
+        require(token.balanceOf(BOB) == 1_800_000, "bob reserves");
+    }
+
+    function test_VerifiedUnauthorizedBorrowAndReserveCreationFail() public {
+        _deposit(ALICE, 100_000);
+        vm.prank(BOB);
+        vm.expectRevert();
+        pool.initReserve(address(token));
+        vm.prank(BOB);
+        vm.expectRevert();
+        pool.borrow(BOB, 1, 100);
+        require(token.balanceOf(BOB) == 2_000_000, "unauthorized balance change");
+    }
+
+    function _prepareDebt() internal returns (uint256 debtId) {
+        _deposit(ALICE, 500_000);
+        pool.enableVaultToBorrow(1);
+        pool.setCreditsOfVault(1, reserveId, 200_000);
+        vm.prank(VAULT);
+        debtId = pool.newDebtPosition(reserveId);
+    }
+
+    function test_VerifiedBorrowAndRepayConserveAssetsAndCredit() public {
+        uint256 id = _prepareDebt();
+        uint256 priorLiquidity = token.balanceOf(pool.getETokenAddress(reserveId));
+        vm.prank(VAULT);
+        pool.borrow(VAULT, id, 100_000);
+        require(token.balanceOf(VAULT) == 100_000, "vault not paid");
+        require(token.balanceOf(pool.getETokenAddress(reserveId)) == priorLiquidity - 100_000, "borrow liquidity");
+        require(pool.credits(reserveId, VAULT) == 100_000, "borrow credit consumption");
+        (uint256 beforeDebt,) = pool.getCurrentDebt(id);
+        require(beforeDebt >= 100_000, "borrow debt missing");
+
+        vm.startPrank(VAULT);
+        token.approve(address(pool), type(uint256).max);
+        uint256 paid = pool.repay(VAULT, id, 100_000);
+        vm.stopPrank();
+        require(paid > 0 && paid <= 100_000, "invalid repayment");
+        require(token.balanceOf(pool.getETokenAddress(reserveId)) == priorLiquidity - 100_000 + paid, "repay liquidity");
+        require(pool.credits(reserveId, VAULT) == 100_000 + paid, "repay credit restoration");
+        (uint256 afterDebt,) = pool.getCurrentDebt(id);
+        require(afterDebt <= beforeDebt, "repay debt increased in same block");
+    }
+
+    function test_VerifiedCreditAndDebtOwnerBoundaries() public {
+        uint256 id = _prepareDebt();
+        vm.prank(BOB);
+        vm.expectRevert();
+        pool.borrow(BOB, id, 1);
+        vm.prank(VAULT);
+        vm.expectRevert();
+        pool.borrow(VAULT, id, 200_001);
+        require(token.balanceOf(VAULT) == 0, "failed borrow transferred tokens");
+        require(pool.credits(reserveId, VAULT) == 200_000, "failed borrow consumed credit");
+    }
+
+    function test_VerifiedDebtIndexNeverDecreasesOverOneDay() public {
+        uint256 id = _prepareDebt();
+        vm.prank(VAULT);
+        pool.borrow(VAULT, id, 100_000);
+        (uint256 startingDebt, uint256 startingIndex) = pool.getCurrentDebt(id);
+        vm.warp(block.timestamp + 1 days);
+        (uint256 laterDebt, uint256 laterIndex) = pool.getCurrentDebt(id);
+        require(laterIndex >= startingIndex, "borrow index went backwards");
+        require(laterDebt >= startingDebt, "debt went backwards without repayment");
+    }
+}
