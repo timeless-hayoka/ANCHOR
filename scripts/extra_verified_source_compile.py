@@ -79,6 +79,8 @@ def prepare_input(snapshot: Any) -> tuple[dict[str, Any], dict[str, Any]]:
 def compare_compilation(compiled: Any, context: dict[str, Any]) -> dict[str, Any]:
     report = {
         "state": "COMPILE_NOT_PROVEN",
+        "chain_id": CHAIN_ID,
+        "address": ADDRESS,
         "compiler_version": context["compiler_version"],
         "source_count": context["source_count"],
         "source_sha256": context["source_sha256"],
