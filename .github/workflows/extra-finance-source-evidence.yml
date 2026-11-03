@@ -8,6 +8,11 @@ on:
       - 'scripts/anchor_deployment_provenance.py'
       - 'scripts/extra_verified_source_compile.py'
       - 'scripts/extra_rpc_bytecode_attestation.py'
+      - 'scripts/extra_runtime_transform_reconciliation.py'
+      - 'tests/test_extra_runtime_transform_reconciliation.py'
+      - 'scripts/extra_verified_runtime_fixture.py'
+      - 'tests/test_extra_verified_runtime_fixture.py'
+      - 'tests/extra_runtime_lab/ExtraVerifiedRuntimeSmoke.t.sol'
       - 'tests/test_extra_rpc_bytecode_attestation.py'
       - 'tests/test_extra_verified_source_compile.py'
       - 'tests/test_anchor_deployment_provenance.py'
@@ -140,6 +145,51 @@ jobs:
           if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
             exit 1
           fi
+      - name: Test strict runtime transformations and planted opcode mutations
+        run: python -m pytest tests/test_extra_runtime_transform_reconciliation.py -q
+      - name: Reconcile onchain versus compiled bytecode transformations
+        shell: bash
+        run: |
+          set +e
+          python scripts/extra_runtime_transform_reconciliation.py \
+            --rpc-evidence evidence/extra-independent-bytecode.json \
+            --output evidence/extra-runtime-transformation-review.json
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::Runtime byte differences not reconciled."
+          fi
+          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
+            exit 1
+          fi
+      - name: Validate AST-to-immutable fixture mapping
+        run: python -m pytest tests/test_extra_verified_runtime_fixture.py -q
+      - name: Prepare deployed bytecode fixture for local-only EVM
+        run: |
+          python scripts/extra_verified_runtime_fixture.py \
+            --rpc-evidence evidence/extra-independent-bytecode.json \
+            --outdir evidence/extra-local-runtime
+      - name: Install Foundry for isolated runtime smoke
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.7
+      - name: Run deployed runtime immutable getter in disposable Foundry EVM
+        shell: bash
+        run: |
+          mkdir -p .extra-runtime-lab/test
+          cp tests/extra_runtime_lab/ExtraVerifiedRuntimeSmoke.t.sol \
+            .extra-runtime-lab/test/ExtraVerifiedRuntimeSmoke.t.sol
+          cat > .extra-runtime-lab/foundry.toml <<'TOML'
+          [profile.default]
+          src = "src"
+          test = "test"
+          solc_version = "0.8.18"
+          TOML
+          runtime=$(cat evidence/extra-local-runtime/runtime.hex)
+          registry=$(python -c 'import json; print(json.load(open("evidence/extra-local-runtime/fixture.json"))["registry_address"])')
+          EXTRA_RUNTIME="$runtime" EXTRA_REGISTRY="$registry" \
+            forge test --root .extra-runtime-lab \
+              --match-test test_DeployedRuntimeReturnsImmutableRegistry -vv
       - name: Validate Trinity handoff tests
         run: python -m pytest tests/test_anchor_trinity_handoff.py -q
       - name: Archive blocked research signal for Trinity

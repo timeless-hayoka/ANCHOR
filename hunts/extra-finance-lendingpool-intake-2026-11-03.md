@@ -214,6 +214,19 @@ Result: **`RPC_MATCHES_PROVIDER_ONCHAIN`**. The scripted RPC test suite passed 4
 
 **Important remaining delta:** Sourcify's **recompiled** runtime hash (`8b048845dc91e9a5e62c9d727b3aaec097854a791d8d2c90268208898cb4f108`) differs from its **onchain** runtime hash. The new solc 0.8.18 build matches the former; the independent public RPC matches the latter. This does not imply a vulnerability, but **full deployed-bytecode equivalence is not established** until all metadata/library/immutable transformations are accounted for and compiler settings/source provenance are independently reconciled. Trinity's lead remains at `signal` and the bounty scope review is not automatically authorized.
 
+## Transformation-aware OP runtime validation and local Foundry proof (2026-11-03)
+
+PR #39 adds `extra_runtime_transform_reconciliation.py`. Its first live passing read-only run [41662540427](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41662540427) compared Sourcify's recompiled runtime, Sourcify's onchain runtime, and a matching independent chain-RPC hash:
+
+- **20,318 bytes** in each runtime; **108 differing byte positions**.
+- All differences lie inside **12 declared, non-overlapping replacements**: **11 immutable-reference locations** and **one 53-byte CBOR metadata suffix**.
+- Each onchain replacement agrees with its declared Sourcify value; the immutable locations are cross-checked against the compiler `immutableReferences` map and the CBOR location against the compiler `cborAuxdata` map. **Zero unexplained byte differences**.
+- This is evidence of declared bytecode transformations, not a new vulnerability. Compiler immutables can affect runtime behavior, and deployed runtime correctness remains a separate security question.
+
+The isolated, non-broadcast Foundry job [41665195487](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41665195487) also loaded the **actual onchain runtime bytecode** into a disposable EVM address and successfully called its public `addressRegistry()` immutable getter. The expected registry address was derived by recompiling the verified Solidity 0.8.18 AST, resolving the correct immutable ID among two IDs (not by guessing the address). Foundry: **1 passed / 0 failed**. The registry address observed was `0x85603119c938750dfb5904f8a501b64f3f3a01d2`.
+
+These are *source-reconciliation and smoke-test milestones*, not exploit reproductions. No production transaction was sent; no Trinity finding was promoted; scope grant remains separate. Next: initialize protocol state on a verified-code local test harness and write accounting/authorization invariants distinct from the four already-disclosed known issue families.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
