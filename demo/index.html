@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ANCHOR · Evidence Before Belief</title>
-  <meta name="description" content="Explore ANCHOR’s proof-gated smart-contract security workflow, public benchmark evidence, and browser-only interactive demos.">
+  <meta name="description" content="ANCHOR helps smart-contract researchers turn tool signals into reviewable evidence. Explore the demo, inspect benchmark records, and run your first local corpus check.">
   <link rel="canonical" href="https://timeless-hayoka.github.io/ANCHOR/">
   <style>
     :root {
@@ -268,9 +268,9 @@
     <section class="hero">
       <div class="panel copy">
         <div class="eyebrow">ANCHOR · Evidence Before Belief</div>
-        <h1>See what ANCHOR looks like without running a hunt.</h1>
+        <h1>Turn security signals into reviewable evidence.</h1>
         <div class="lede">
-          This page is a safe static preview of the ANCHOR console. It does not launch tools, touch targets, or require credentials. It exists so researchers, reviewers, and collaborators can understand the proof gate, benchmark framing, and evidence workflow at a glance.
+          ANCHOR is a local-first workflow for smart-contract researchers who need to explain what was tested, what reproduced, and what remains unproven. Keep signals provisional, collect reproducible evidence, and leave a case another reviewer can inspect. Explore the browser-only demo here, then run the bundled corpus locally.
         </div>
         <div class="pills">
           <div class="pill"><span class="dot gold"></span> Proof gate first</div>
@@ -278,16 +278,17 @@
           <div class="pill"><span class="dot green"></span> No live actions</div>
         </div>
         <div class="actions">
-          <a class="btn primary" href="trinity_hunt.html" target="_blank" rel="noopener noreferrer">Open console preview</a>
+          <a class="btn primary" href="getting-started.html">Run your first local check</a>
+          <a class="btn" href="#preview">Explore the interactive demo</a>
           <a class="btn" href="anchor_dashboard.html" target="_blank" rel="noopener noreferrer">Open dashboard preview</a>
           <a class="btn" href="https://github.com/timeless-hayoka/ANCHOR/blob/main/docs/METHODOLOGY.md">Read the methodology</a>
         </div>
       </div>
       <div class="panel rail">
         <div class="metric">
-          <div class="k">What this demonstrates</div>
+          <div class="k">Research workflow</div>
           <div class="v">Method</div>
-          <div class="d">Visitors can see the product, the proof gate, and the benchmark posture without mistaking the demo for a live exploit environment.</div>
+          <div class="d">Scope → hypothesis → reproduction attempt → evidence review. The public website demonstrates the workflow; the research engine runs locally.</div>
         </div>
         <div class="metric">
           <div class="k">Current benchmark maturity</div>
@@ -303,19 +304,19 @@
     </section>
 
     <section class="panel section">
-      <h2>What people should understand in 30 seconds</h2>
+      <h2>Built for research you can review</h2>
       <div class="grid">
         <div class="card">
-          <h3>Proof gate</h3>
-          <p>AI suggestions and detector hits are not findings. A claim must survive reproduction before ANCHOR promotes it.</p>
+          <h3>For smart-contract researchers</h3>
+          <p>Use a structured workflow to move from a detector signal to a scoped hypothesis, a reproduction attempt, and a reviewable case.</p>
         </div>
         <div class="card">
-          <h3>Methodology</h3>
-          <p>Scope confirmation, hypothesis creation, evidence collection, reproduction, council review, report generation, archive.</p>
+          <h3>Evidence with context</h3>
+          <p>Record the target version, test command, assertions, failed attempts, and limitations so another reviewer can judge the conclusion.</p>
         </div>
         <div class="card">
-          <h3>Benchmarks</h3>
-          <p>Benchmarks are published as auditable artifacts, with measured outcomes, limitations, and next actions stated plainly.</p>
+          <h3>A practical first step</h3>
+          <p>Run four bundled signal-processing cases locally. No wallet, RPC, API key, Foundry installation, or external target is needed for this starting exercise.</p>
         </div>
       </div>
       <div class="ladder">
@@ -388,6 +389,7 @@
 
     <section class="panel section">
       <h2>Research links</h2>
+      <p>Three historical publication entries were withdrawn because their referenced evidence is missing. <a href="https://github.com/timeless-hayoka/ANCHOR/blob/main/docs/BENCHMARK_PUBLICATION_REVIEW.md">Read the publication review</a>. The records below remain dated research artifacts, not a live audit or a general accuracy guarantee.</p>
       <div class="actions" style="margin-top: 0;">
         <a class="btn primary" href="https://github.com/timeless-hayoka/ANCHOR/blob/main/README.md">Repository README</a>
         <a class="btn" href="https://github.com/timeless-hayoka/ANCHOR/blob/main/docs/METHODOLOGY.md">Methodology</a>
@@ -399,7 +401,7 @@
       </div>
     </section>
 
-    <section class="panel preview-wrap">
+    <section class="panel preview-wrap" id="preview">
       <div class="preview-head">
         <div>
           <h2 style="margin:0 0 8px;">Interactive preview</h2>

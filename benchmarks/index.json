@@ -568,9 +568,9 @@
       "id": "dvd-phase1-local-2026-06-27T08-55-16Z",
       "target": "damn-vulnerable-defi",
       "title": "Damn Vulnerable DeFi Phase 1 scaffold run with detector stage",
-      "status": "scaffold",
+      "status": "evidence_missing",
       "level": "Phase 1",
-      "publication_tier": "published",
+      "publication_tier": "development",
       "commit": "a11634dd",
       "branch": "main",
       "executed_at": "2026-06-27T08:55:16.019852+00:00",
@@ -605,8 +605,8 @@
         "reproduction": "partial",
         "comparative_data": "partial"
       },
-      "verified": true,
-      "confidence": "scaffold",
+      "verified": false,
+      "confidence": "unverified",
       "results_summary": {
         "passed": 15,
         "failed": 2,
@@ -622,15 +622,30 @@
         "medium_high_target_relevant_findings": 58
       },
       "published_at": "2026-06-27T14:57:30.711428+00:00",
-      "publication_note": "phase1 near-complete baseline"
+      "publication_note": "phase1 near-complete baseline",
+      "publication_review": {
+        "reviewed_at": "2026-11-03",
+        "disposition": "withdrawn_pending_evidence",
+        "reason": "Referenced evidence files are absent from this checkout and were not found in fetched Git history. Historical summary counts are retained, not revalidated.",
+        "previous_state": {
+          "publication_tier": "published",
+          "status": "scaffold",
+          "verified": true,
+          "confidence": "scaffold"
+        },
+        "missing_paths": [
+          "benchmarks/damn-vulnerable-defi/runs/2026-06-27T08-55-16Z/README.md",
+          "benchmarks/damn-vulnerable-defi/runs/2026-06-27T08-55-16Z/benchmark.json"
+        ]
+      }
     },
     {
       "id": "dvd-phase1-local-2026-06-27T16-06-54Z",
       "target": "damn-vulnerable-defi",
       "title": "Damn Vulnerable DeFi Phase 1 scaffold run with detector stage",
-      "status": "published",
+      "status": "evidence_missing",
       "level": "Phase 1",
-      "publication_tier": "published",
+      "publication_tier": "development",
       "commit": "a11634dd",
       "branch": "main",
       "executed_at": "2026-06-27T16:06:54.550650+00:00",
@@ -683,8 +698,8 @@
         "reproduction": "partial",
         "comparative_data": "partial"
       },
-      "verified": true,
-      "confidence": "scaffold",
+      "verified": false,
+      "confidence": "unverified",
       "results_summary": {
         "passed": 16,
         "failed": 2,
@@ -701,7 +716,23 @@
       },
       "published_at": "2026-06-27T16:10:32.674132+00:00",
       "publication_note": "wallet-mining now passes with the 300s cap; phase1 near-complete baseline",
-      "published_record": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/PUBLISHED.md"
+      "published_record": "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/PUBLISHED.md",
+      "publication_review": {
+        "reviewed_at": "2026-11-03",
+        "disposition": "withdrawn_pending_evidence",
+        "reason": "Referenced evidence files are absent from this checkout and were not found in fetched Git history. Historical summary counts are retained, not revalidated.",
+        "previous_state": {
+          "publication_tier": "published",
+          "status": "published",
+          "verified": true,
+          "confidence": "scaffold"
+        },
+        "missing_paths": [
+          "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/README.md",
+          "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/PUBLISHED.md",
+          "benchmarks/damn-vulnerable-defi/runs/2026-06-27T16-06-54Z/benchmark.json"
+        ]
+      }
     },
     {
       "id": "sarif-known-findings-2026-06-29T03-49-14Z",
@@ -968,11 +999,11 @@
       "id": "sarif-known-findings-2026-06-30T23-48-08Z",
       "target": "anchor_sarif",
       "title": "SARIF known findings benchmark run",
-      "status": "published",
+      "status": "evidence_missing",
       "level": "Phase 1",
       "executed_at": "2026-06-30T23:48:08.336980+00:00",
-      "confidence": "measured",
-      "publication_tier": "published",
+      "confidence": "unverified",
+      "publication_tier": "development",
       "record": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/REPORT.md",
       "artifact_json": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/benchmark.json",
       "metrics_json": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/metrics.json",
@@ -1004,10 +1035,28 @@
         "reproduction": "high",
         "comparative_data": "partial"
       },
-      "verified": true,
+      "verified": false,
       "published_at": "2026-07-01T02:51:21.983479+00:00",
       "published_record": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/PUBLISHED.md",
-      "regression_report": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/REGRESSION_REPORT.md"
+      "regression_report": "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/REGRESSION_REPORT.md",
+      "publication_review": {
+        "reviewed_at": "2026-11-03",
+        "disposition": "withdrawn_pending_evidence",
+        "reason": "Referenced evidence files are absent from this checkout and were not found in fetched Git history. Historical summary counts are retained, not revalidated.",
+        "previous_state": {
+          "publication_tier": "published",
+          "status": "published",
+          "verified": true,
+          "confidence": "measured"
+        },
+        "missing_paths": [
+          "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/REPORT.md",
+          "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/PUBLISHED.md",
+          "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/benchmark.json",
+          "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/metrics.json",
+          "benchmarks/sarif-known-findings/runs/2026-06-30T23-48-08Z/REGRESSION_REPORT.md"
+        ]
+      }
     },
     {
       "id": "defihacklabs-source-comparison-2026-07-01T03-08-57Z",

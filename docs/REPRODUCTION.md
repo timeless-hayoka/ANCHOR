@@ -4,6 +4,8 @@ This guide is the **credibility milestone** for ANCHOR Phase C. Anyone on a clea
 
 ANCHOR computes trends and strategy in one place (`anchor_trends.py`, `anchor_strategy.py`). The CLI, HTTP API, and dashboard **consume** those modules — they do not recompute trend math.
 
+For a first run without Foundry, RPC, or external targets, use [GETTING_STARTED.md](GETTING_STARTED.md) first.
+
 ## What you will verify
 
 After following this guide you can answer:

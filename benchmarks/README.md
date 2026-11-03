@@ -2,6 +2,8 @@
 
 Benchmarks let other researchers evaluate ANCHOR by outcome and method.
 
+[Publication review and evidence requirements](../docs/BENCHMARK_PUBLICATION_REVIEW.md): three historical entries are withdrawn from published views because their referenced evidence is missing. Their original summaries remain unverified history.
+
 ## Purpose
 
 Each benchmark answers:
