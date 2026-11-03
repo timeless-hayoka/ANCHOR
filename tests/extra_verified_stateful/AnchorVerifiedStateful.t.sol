@@ -225,9 +225,10 @@ contract AnchorVerifiedStatefulTest {
         vm.prank(VAULT);
         pool.borrow(VAULT, id, 100_000);
         (uint256 startingDebt, uint256 startingIndex) = pool.getCurrentDebt(id);
-        vm.warp(block.timestamp + 1 days);
+        require(pool.borrowingRateOfReserve(reserveId) > 0, "positive utilization must charge interest");
+        vm.warp(block.timestamp + 7 days);
         (uint256 laterDebt, uint256 laterIndex) = pool.getCurrentDebt(id);
-        require(laterIndex >= startingIndex, "borrow index went backwards");
-        require(laterDebt >= startingDebt, "debt went backwards without repayment");
+        require(laterIndex > startingIndex, "borrow index failed to accrue");
+        require(laterDebt > startingDebt, "debt failed to accrue at positive rate");
     }
 }
