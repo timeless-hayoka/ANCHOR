@@ -4,6 +4,8 @@ on:
     paths:
       - 'scripts/check_extra_lendingpool_source.py'
       - 'scripts/anchor_hunt_readiness.py'
+      - 'scripts/anchor_trinity_handoff.py'
+      - 'tests/test_anchor_trinity_handoff.py'
       - 'tests/test_anchor_hunt_readiness.py'
       - 'scripts/extra_verified_source_hunk_review.py'
       - 'tests/test_extra_verified_source_hunk_review.py'
@@ -87,6 +89,26 @@ jobs:
             exit 1
           fi
           echo "::notice::Extra Finance readiness remains blocked pending complete scope and source evidence."
+      - name: Validate Trinity handoff tests
+        run: python -m pytest tests/test_anchor_trinity_handoff.py -q
+      - name: Archive blocked research signal for Trinity
+        shell: bash
+        run: |
+          python scripts/anchor_trinity_handoff.py \
+            --readiness evidence/extra-hunt-readiness.json \
+            --source-evidence evidence/extra-lendingpool-source-verification.json \
+            --output evidence/extra-trinity-signal.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path("evidence/extra-trinity-signal.json").read_text())
+          assert payload["handoff_status"] == "BLOCKED_RESEARCH_SIGNAL", payload["handoff_status"]
+          assert payload["lead"]["state"] == "signal"
+          assert payload["lead"]["scope_status"] == "unknown"
+          assert payload["finding"] == "NONE"
+          assert payload["authorization_grant_issued"] is False
+          print("Expected blocked Trinity research signal recorded; no finding promoted")
+          PY
       - name: Upload source comparison evidence
         if: always()
         uses: actions/upload-artifact@v4
