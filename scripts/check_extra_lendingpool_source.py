@@ -75,6 +75,23 @@ def analyze_snapshot(snapshot: Any, source_text: str) -> dict[str, Any]:
     ]
     matched = [path for path, text in possible if text == source_text]
     if not matched:
+        local_lines = source_text.splitlines()
+        differences = []
+        for path, verified_text in sorted(possible):
+            remote_lines = verified_text.splitlines()
+            first_different_line = next(
+                (i + 1 for i in range(max(len(local_lines), len(remote_lines)))
+                 if (local_lines[i] if i < len(local_lines) else None)
+                 != (remote_lines[i] if i < len(remote_lines) else None)),
+                None,
+            )
+            differences.append({
+                "path": path,
+                "first_different_line": first_different_line,
+                "local_line_count": len(local_lines),
+                "verified_line_count": len(remote_lines),
+            })
+        result["source_differences"] = differences
         result["reason"] = "verified LendingPool.sol text differs from local source"
         return result
 
