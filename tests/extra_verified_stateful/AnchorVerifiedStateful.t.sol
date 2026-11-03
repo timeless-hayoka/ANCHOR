@@ -487,6 +487,71 @@ contract AnchorVerifiedStatefulTest {
         );
     }
 
+    /// @notice Two distinct vaults have independently authorized debt and
+    /// credit. Shared reserve liquidity must still account for both loans.
+    function test_VerifiedIndependentVaultCreditAndDebtOwnership() public {
+        _deposit(ALICE, 500_000);
+        address secondVault = address(0xC0FFEF);
+        factory.setVault(2, secondVault);
+        pool.enableVaultToBorrow(1);
+        pool.enableVaultToBorrow(2);
+        pool.setCreditsOfVault(1, reserveId, 100_000);
+        pool.setCreditsOfVault(2, reserveId, 120_000);
+
+        vm.prank(VAULT);
+        uint256 firstId = pool.newDebtPosition(reserveId);
+        vm.prank(secondVault);
+        uint256 secondId = pool.newDebtPosition(reserveId);
+        uint256 initialLiquidity = token.balanceOf(pool.getETokenAddress(reserveId));
+
+        vm.prank(VAULT);
+        pool.borrow(VAULT, firstId, 40_000);
+        vm.prank(secondVault);
+        pool.borrow(secondVault, secondId, 50_000);
+
+        require(pool.credits(reserveId, VAULT) == 60_000, "vault one credits");
+        require(pool.credits(reserveId, secondVault) == 70_000, "vault two credits");
+        (uint256 firstDebt,) = pool.getCurrentDebt(firstId);
+        (uint256 secondDebt,) = pool.getCurrentDebt(secondId);
+        require(firstDebt == 40_000 && secondDebt == 50_000, "separate debt amounts");
+        require(
+            token.balanceOf(pool.getETokenAddress(reserveId)) == initialLiquidity - 90_000,
+            "two-vault reserve liquidity"
+        );
+
+        vm.prank(secondVault);
+        vm.expectRevert();
+        pool.borrow(secondVault, firstId, 1);
+        vm.prank(VAULT);
+        vm.expectRevert();
+        pool.borrow(VAULT, secondId, 1);
+
+        (firstDebt,) = pool.getCurrentDebt(firstId);
+        (secondDebt,) = pool.getCurrentDebt(secondId);
+        require(firstDebt == 40_000 && secondDebt == 50_000, "cross-vault borrow changed debt");
+        require(pool.credits(reserveId, VAULT) == 60_000, "cross-vault credit one");
+        require(pool.credits(reserveId, secondVault) == 70_000, "cross-vault credit two");
+    }
+
+    /// @notice Increasing utilization should raise the curve's borrowing rate
+    /// under the verified implementation's default synthetic reserve config.
+    function test_VerifiedBorrowRateMovesWithUtilization() public {
+        uint256 id = _prepareDebt();
+        uint256 idleRate = pool.borrowingRateOfReserve(reserveId);
+        vm.prank(VAULT);
+        pool.borrow(VAULT, id, 50_000);
+        uint256 rateAfterFirst = pool.borrowingRateOfReserve(reserveId);
+        vm.prank(VAULT);
+        pool.borrow(VAULT, id, 100_000);
+        uint256 rateAfterSecond = pool.borrowingRateOfReserve(reserveId);
+
+        require(rateAfterFirst > idleRate, "first borrow did not increase rate");
+        require(rateAfterSecond > rateAfterFirst, "increased utilization did not raise rate");
+        require(pool.credits(reserveId, VAULT) == 50_000, "credit after rising utilization");
+        (uint256 debt,) = pool.getCurrentDebt(id);
+        require(debt == 150_000, "two borrows changed combined principal");
+    }
+
     function test_VerifiedBorrowingInterestAccruesOverSevenDays() public {
         uint256 id = _prepareDebt();
         vm.prank(VAULT);
