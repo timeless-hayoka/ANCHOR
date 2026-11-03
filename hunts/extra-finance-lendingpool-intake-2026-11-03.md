@@ -202,6 +202,18 @@ This establishes a reproducible compilation matching **Sourcify's compilation**,
 
 **Next validation gate:** independently capture deployed runtime bytecode, handle Solidity metadata/library/immutable transformations without ignoring behavioral differences, then write Foundry controls against the verified 0.8.18 implementation and pass approved scope through the operator review gate.
 
+## Independent read-only deployed-bytecode hash confirmation (2026-11-03)
+
+[GitHub Actions run 41660031507](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41660031507) used the independently listed OP Mainnet public RPC `https://mainnet.optimism.io` and only `eth_chainId`, `eth_blockNumber`, and `eth_getCode` to check the real scoped address. It confirmed chain ID 10 and fetched contract code at recorded block **`0x97b0f28`**.
+
+The independently fetched RPC runtime SHA-256 and Sourcify's **onchain** runtime SHA-256 both equal:
+
+`647e7c9bf34efd611358b8123f08473f30b2f3c0e8250d6ed033484293764260`
+
+Result: **`RPC_MATCHES_PROVIDER_ONCHAIN`**. The scripted RPC test suite passed 4/4, including planted differing-bytecode and wrong-chain controls. No contract transaction was signed, sent or simulated on public infrastructure.
+
+**Important remaining delta:** Sourcify's **recompiled** runtime hash (`8b048845dc91e9a5e62c9d727b3aaec097854a791d8d2c90268208898cb4f108`) differs from its **onchain** runtime hash. The new solc 0.8.18 build matches the former; the independent public RPC matches the latter. This does not imply a vulnerability, but **full deployed-bytecode equivalence is not established** until all metadata/library/immutable transformations are accounted for and compiler settings/source provenance are independently reconciled. Trinity's lead remains at `signal` and the bounty scope review is not automatically authorized.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
