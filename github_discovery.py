@@ -843,13 +843,20 @@ def compute_repo_score(
         candidate.reasons.append("repo name suggests tooling or practice rather than protocol source")
 
     candidate.score = score
-    candidate.priority_score = max(0, min(100, 50 + (score * 4)))
+    # Preserve visible separation among typical ranked candidates: the former
+    # 50 + 4*score mapping saturated at 100 for every score >= 13.
+    # This is a relative research-priority display, not a bounty-eligibility score.
+    candidate.priority_score = max(0, min(100, 40 + (score * 2)))
     if score >= 10 and candidate.docs_present and candidate.open_issues > 0 and not candidate.archived:
         candidate.recommendation = "join"
     elif score >= 7:
         candidate.recommendation = "watch"
     else:
         candidate.recommendation = "skip"
+    # A named audit tool or training lab can be useful research material, but
+    # should not become an immediate hunt solely through keyword scoring.
+    if non_target_name and candidate.recommendation == "join":
+        candidate.recommendation = "watch"
 
     return candidate
 
