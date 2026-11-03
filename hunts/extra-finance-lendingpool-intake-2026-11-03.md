@@ -146,6 +146,18 @@ The read-only source-review workflow [run 41649997589](https://github.com/timele
 
 The branch also adds `.github/workflows/extra-finance-lab-baseline.yml` to run the upstream repository's existing LendingPool, eToken and staking Foundry tests in isolation, without fork RPC credentials or broadcast. Existing upstream tests are useful for environment and baseline checks **only**, not a proof against the deployed Sourcify version.
 
+## Isolated Foundry upstream baseline — verified 2026-11-03
+
+[GitHub Actions run 41650590053](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41650590053) successfully compiled the *pinned GitHub revision* `a66e925d78ee5c990eb2bafa5009cebcbeafe42d` with its Forge-configured Solidity compiler `0.8.20`. In isolated CI with no fork RPC or broadcast, the compatible positive test suites returned:
+- `ExtraInterestBearingToken.t.sol`: **2 passed**.
+- `LendingPool.t.sol`: **3 passed**.
+- `StakingRewards.t.sol`: **4 passed**.
+- **Total 9 passed / 0 failed**.
+
+**Limitation:** Five historical tests named `testFail*` were *excluded*, not passed. Current Forge rejects that obsolete convention; the CI job records them separately in the `legacy-testfail-tests.txt` artifact. Those negative controls still require explicit modernization. Neither the nine positive tests nor compiler success establish that the source matches the Sourcify-verified Optimism runtime.
+
+**Immediate next tasks:** build modern negative controls using `vm.expectRevert` in an isolated forkless harness, confirm the relevant authorization and insufficient-share failures, and then repeat against correctly matched deployed-source input. No production interaction.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
