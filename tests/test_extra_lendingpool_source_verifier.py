@@ -31,11 +31,23 @@ class ExtraSourceVerificationTests(unittest.TestCase):
         self.assertIn("full compilation inputs", result["reason"])
         self.assertEqual(result["matched_source_paths"], ["contracts/lendingpool/LendingPool.sol"])
 
+    def test_nonexact_runtime_is_a_distinct_lower_evidence_tier(self):
+        snapshot = {**self.verified, "runtimeMatch": "match"}
+        result = verifier.analyze_snapshot(snapshot, self.source)
+        self.assertEqual(result["status"], "PINNED_SOURCE_MATCH_NONEXACT_RUNTIME")
+        self.assertEqual(result["reported_runtime_match"], "match")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "LendingPool.sol"
+            saved = root / "metadata.json"
+            source.write_text(self.source, encoding="utf-8")
+            saved.write_text(json.dumps(snapshot), encoding="utf-8")
+            self.assertEqual(verifier.main(["--source", str(source), "--snapshot", str(saved)]), 3)
+
     def test_mismatch_unknown_or_wrong_chain_fail_closed(self):
         cases = [
             {**self.verified, "chainId": "8453"},
             {**self.verified, "address": "0x" + "1" * 40},
-            {**self.verified, "runtimeMatch": "match"},
             {**self.verified, "runtimeMatch": None},
             {**self.verified, "sources": {}},
             {**self.verified, "sources": {"contracts/lendingpool/LendingPool.sol": {"content": "different"}}},
