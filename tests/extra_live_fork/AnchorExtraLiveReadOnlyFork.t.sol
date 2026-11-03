@@ -7,6 +7,7 @@ pragma solidity 0.8.18;
 interface VmAnchorFork {
     function prank(address who) external;
     function expectRevert() external;
+    function expectRevert(bytes calldata revertData) external;
 }
 
 interface IAnchorAddressRegistry {
@@ -265,10 +266,10 @@ contract AnchorExtraLiveReadOnlyForkTest {
         uint256 borrowsBefore = POOL.totalBorrowsOfReserve(selectedReserve);
 
         vm.prank(competingVault);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "7"));
         POOL.borrow(competingVault, selectedDebt, 1);
         vm.prank(competingVault);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "7"));
         POOL.repay(competingVault, selectedDebt, 1);
 
         (uint256 afterReserve, address afterOwner, uint256 afterDebt,) =
