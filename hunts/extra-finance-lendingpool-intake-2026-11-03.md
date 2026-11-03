@@ -46,6 +46,19 @@ The official Immunefi information page lists these as known (as of the 2026-09-1
 - A *Base* explorer page for the same address reports `LendingPool` compiled with solc 0.8.18 and 200 runs. This is **not verification of the Optimism build**; it is a warning to avoid assuming the repo's default toolchain reproduces deployed bytecode.
 - Pending: fetch OP verified source metadata/compiler settings, deployment bytecode, linked libraries and constructor args; rebuild at exact settings, compare runtime bytecode excluding metadata/immutables as appropriate, and document the comparison before any production-equivalent claim.
 
+## Library follow-up and apparent timestamp discrepancy
+
+Additional pinned sources inspected:
+- `contracts/libraries/logic/ReserveLogic.sol` (blob `720220963b431eb44af666dde9575bf9fcd9fe3b`): exchange-rate and borrow-index math; `_updateIndexes` computes debt interest conditionally, but assigns `reserve.lastUpdateTimestamp = uint128(block.timestamp)` **outside** the `totalBorrows > 0` condition.
+- `contracts/lendingpool/ExtraInterestBearingToken.sol` (blob `c4a24d65dd39f7939cd9c4ae67e5694226eb9d42`): only-LendingPool mint, burn, and underlying transfers.
+- `contracts/lendingpool/StakingRewards.sol` (blob `0ebdf9b9956f9ee7ff1fea019b95eb2e7e433765`): `withdrawByLendingPool` checks the LendingPool caller and debits the named user's stake.
+- `contracts/Payments.sol` (blob `c3cd0d3022a2068ca0450da033ead06e69274cf3`): native-WETH wrapping, WETH unwrapping, and refund paths.
+- `contracts/VaultFactory.sol` (blob `d92545d9c50c0839dcbe9756c81d52c1fa83b36d`): vault deployment entry points (full vault call graph still pending).
+
+**Consistency question:** The Immunefi published known issue says the zero-borrow timestamp fails to advance. The pinned repository's `ReserveLogic._updateIndexes` visibly writes the timestamp regardless of borrow count *when called*. This may mean the known issue describes an older revision, that a relevant path never calls `updateState`, or that the deployed Optimism bytecode differs. It is not itself proof of source divergence, remediation, or a novel defect. Verify the deployed implementation and execution paths before interpreting the known issue.
+
+A separate caution: the `Payments.unwrapWETH9` helper uses the contract's full WETH balance rather than only its minimum-amount parameter. Assess accounting and invocation assumptions in an isolated harness before drawing any security conclusion; no impact has been shown.
+
 ## Candidate invariants for isolated validation (not findings)
 
 - Redemption cannot release more underlying than the redeemer's properly accounted eToken shares, subject to the documented rounding model.
