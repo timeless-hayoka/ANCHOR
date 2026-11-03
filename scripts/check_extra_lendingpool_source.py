@@ -104,8 +104,8 @@ def analyze_snapshot(snapshot: Any, source_text: str) -> dict[str, Any]:
             None, local_lines, first_verified_lines, autojunk=False
         ).get_opcodes()
         function_header = re.compile(
-            r"^\\s*(?:function\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(|"
-            r"(constructor)\\s*\\(|modifier\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\()"
+            r"^\s*(?:function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(|"
+            r"(constructor)\s*\(|modifier\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\()"
         )
 
         def enclosing_entrypoint(lines: list[str], position: int) -> str:
