@@ -846,7 +846,7 @@ def compute_repo_score(
     # Preserve visible separation among typical ranked candidates: the former
     # 50 + 4*score mapping saturated at 100 for every score >= 13.
     # This is a relative research-priority display, not a bounty-eligibility score.
-    candidate.priority_score = max(0, min(100, 40 + (score * 2)))
+    candidate.priority_score = max(0, min(100, 42 + (score * 2)))
     if score >= 10 and candidate.docs_present and candidate.open_issues > 0 and not candidate.archived:
         candidate.recommendation = "join"
     elif score >= 7:
