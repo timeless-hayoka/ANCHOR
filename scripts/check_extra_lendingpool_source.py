@@ -44,8 +44,8 @@ def analyze_snapshot(snapshot: Any, source_text: str) -> dict[str, Any]:
         return result
     runtime_match = snapshot.get("runtimeMatch")
     result["reported_runtime_match"] = runtime_match if isinstance(runtime_match, str) else None
-    if runtime_match != "exact_match":
-        result["reason"] = "Sourcify exact runtime match not established"
+    if runtime_match not in {"exact_match", "match"}:
+        result["reason"] = "Sourcify runtime verification not established"
         return result
     sources = snapshot.get("sources")
     if not isinstance(sources, dict) or not sources:
@@ -70,12 +70,17 @@ def analyze_snapshot(snapshot: Any, source_text: str) -> dict[str, Any]:
 
     # Match of a single file plus the explorer's exact-runtime verification
     # is useful, but not proof of full repository/build equivalence.
-    result["status"] = "PINNED_SOURCE_MATCH"
+    result["status"] = (
+        "PINNED_SOURCE_MATCH"
+        if runtime_match == "exact_match"
+        else "PINNED_SOURCE_MATCH_NONEXACT_RUNTIME"
+    )
     result["matched_source_paths"] = sorted(matched)
     result["reason"] = (
-        "single file matches Sourcify-verified runtime source; "
-        "full compilation inputs, libraries, immutables and onchain bytecode "
-        "still require independent comparison"
+        "single source file agrees with Sourcify's runtime-verified source; "
+        "non-exact runtime verification means the complete bytecode is not "
+        "proven identical. Full compilation inputs, libraries, immutables "
+        "and onchain bytecode still require independent comparison"
     )
     return result
 
@@ -112,7 +117,9 @@ def main(argv: list[str] | None = None) -> int:
             "reason": f"verification unavailable: {type(exc).__name__}",
         }
     print(json.dumps(outcome, indent=2, sort_keys=True))
-    return 0 if outcome["status"] == "PINNED_SOURCE_MATCH" else 2
+    # Exit 3 conveys source-text agreement with non-exact runtime evidence,
+    # never the stronger exact-runtime status. Missing/mismatch stays exit 2.
+    return {"PINNED_SOURCE_MATCH": 0, "PINNED_SOURCE_MATCH_NONEXACT_RUNTIME": 3}.get(outcome["status"], 2)
 
 
 if __name__ == "__main__":
