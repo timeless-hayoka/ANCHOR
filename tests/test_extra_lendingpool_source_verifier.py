@@ -59,6 +59,20 @@ class ExtraSourceVerificationTests(unittest.TestCase):
             with self.subTest(snapshot=snapshot):
                 self.assertEqual(verifier.analyze_snapshot(snapshot, self.source)["status"], "NOT_VERIFIED")
 
+    def test_mismatch_reports_hash_and_position_without_source_dump(self):
+        snapshot = {
+            **self.verified,
+            "runtimeMatch": "match",
+            "sources": {"contracts/lendingpool/LendingPool.sol": {"content": self.source + "// modified\n"}},
+        }
+        result = verifier.analyze_snapshot(snapshot, self.source)
+        self.assertEqual(result["status"], "NOT_VERIFIED")
+        self.assertEqual(result["reported_runtime_match"], "match")
+        self.assertEqual(result["source_differences"][0]["first_different_line"], 3)
+        self.assertEqual(result["verified_source_candidates"][0]["line_count"], 3)
+        self.assertEqual(len(result["verified_source_candidates"][0]["sha256"]), 64)
+        self.assertNotIn("modified", json.dumps(result))
+
     def test_offline_cli_never_claims_verification_on_error(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
