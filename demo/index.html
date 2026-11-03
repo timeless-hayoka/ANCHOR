@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ANCHOR Demo · Proof Gate Preview</title>
+  <title>ANCHOR · Evidence Before Belief</title>
+  <meta name="description" content="Explore ANCHOR’s proof-gated smart-contract security workflow, public benchmark evidence, and browser-only interactive demos.">
+  <link rel="canonical" href="https://timeless-hayoka.github.io/ANCHOR/">
   <style>
     :root {
       --bg: #061017;
@@ -29,6 +31,7 @@
         radial-gradient(circle at 85% 10%, rgba(121,192,255,0.12), transparent 24%),
         linear-gradient(160deg, #04070c 0%, #09131d 100%);
     }
+    a:focus-visible, button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 4px; }
     a { color: inherit; text-decoration: none; }
     .wrap { max-width: 1280px; margin: 0 auto; padding: 28px 22px 64px; }
     .hero {
@@ -252,6 +255,7 @@
       .frame { height: 720px; }
     }
     @media (max-width: 720px) {
+      .hero > *, .grid > * { min-width: 0; overflow-wrap: anywhere; }
       .wrap { padding: 18px 14px 42px; }
       .copy, .rail, .section, .preview-wrap, .footer { padding: 18px; }
       .frame { height: 640px; }
@@ -260,10 +264,10 @@
   </style>
 </head>
 <body>
-  <div class="wrap">
+  <main class="wrap" id="main">
     <section class="hero">
       <div class="panel copy">
-        <div class="eyebrow">Public demo</div>
+        <div class="eyebrow">ANCHOR · Evidence Before Belief</div>
         <h1>See what ANCHOR looks like without running a hunt.</h1>
         <div class="lede">
           This page is a safe static preview of the ANCHOR console. It does not launch tools, touch targets, or require credentials. It exists so researchers, reviewers, and collaborators can understand the proof gate, benchmark framing, and evidence workflow at a glance.
@@ -276,7 +280,7 @@
         <div class="actions">
           <a class="btn primary" href="trinity_hunt.html" target="_blank" rel="noopener noreferrer">Open console preview</a>
           <a class="btn" href="anchor_dashboard.html" target="_blank" rel="noopener noreferrer">Open dashboard preview</a>
-          <a class="btn" href="../README.md">Read the methodology</a>
+          <a class="btn" href="https://github.com/timeless-hayoka/ANCHOR/blob/main/docs/METHODOLOGY.md">Read the methodology</a>
         </div>
       </div>
       <div class="panel rail">
@@ -324,7 +328,7 @@
     </section>
 
     <section class="panel section">
-      <h2>Benchmark metadata</h2>
+      <h2 id="benchmarks">Benchmark metadata</h2>
       <div style="overflow-x:auto;">
         <table style="width:100%; border-collapse: collapse; margin-top: 8px;">
           <thead>
@@ -343,13 +347,6 @@
             <tr><td style="padding: 12px; color: var(--muted);">Evidence status</td><td id="metaEvidenceStatus" style="padding: 12px;">Published artifact with machine-readable manifest</td></tr>
           </tbody>
         </table>
-      </div>
-      <div class="ladder" style="margin-top: 18px;">
-        <div class="step done"><div class="s">Methodology</div><div class="n">High</div></div>
-        <div class="step done"><div class="s">Environment</div><div class="n">High</div></div>
-        <div class="step partial"><div class="s">Detection</div><div class="n">Partial</div></div>
-        <div class="step partial"><div class="s">Reproduction</div><div class="n">Partial</div></div>
-        <div class="step todo"><div class="s">Comparative data</div><div class="n">Not yet</div></div>
       </div>
     </section>
 
@@ -392,13 +389,13 @@
     <section class="panel section">
       <h2>Research links</h2>
       <div class="actions" style="margin-top: 0;">
-        <a class="btn primary" href="../README.md">Repository README</a>
-        <a class="btn" href="../docs/METHODOLOGY.md">Methodology</a>
-        <a class="btn" href="../docs/PROOF_GATE.md">Proof Gate</a>
-        <a class="btn" href="../docs/EVIDENCE_LIFECYCLE.md">Evidence Lifecycle</a>
-        <a class="btn" href="../benchmarks/README.md">Benchmarks</a>
-        <a class="btn" href="../benchmarks/damn-vulnerable-defi/2026-06-26-phase0-baseline.md">DVD baseline artifact</a>
-        <a class="btn" href="../targets/enzyme-blue.md">Current Enzyme target note</a>
+        <a class="btn primary" href="https://github.com/timeless-hayoka/ANCHOR/blob/main/README.md">Repository README</a>
+        <a class="btn" href="https://github.com/timeless-hayoka/ANCHOR/blob/main/docs/METHODOLOGY.md">Methodology</a>
+        <a class="btn" href="https://github.com/timeless-hayoka/ANCHOR/blob/main/docs/PROOF_GATE.md">Proof Gate</a>
+        <a class="btn" href="https://github.com/timeless-hayoka/ANCHOR/blob/main/docs/EVIDENCE_LIFECYCLE.md">Evidence Lifecycle</a>
+        <a class="btn" href="https://github.com/timeless-hayoka/ANCHOR/blob/main/benchmarks/README.md">Benchmarks</a>
+        <a class="btn" href="https://github.com/timeless-hayoka/ANCHOR/blob/main/benchmarks/damn-vulnerable-defi/2026-06-26-phase0-baseline.md">DVD baseline artifact</a>
+        <a class="btn" href="https://github.com/timeless-hayoka/ANCHOR/blob/main/targets/enzyme-blue.md">Current Enzyme target note</a>
       </div>
     </section>
 
@@ -406,35 +403,36 @@
       <div class="preview-head">
         <div>
           <h2 style="margin:0 0 8px;">Interactive preview</h2>
-          <div class="note">This embeds the real static ANCHOR surfaces from the repo. Toggle between the operator console and the dashboard companion view. Nothing here initiates a real run.</div>
+          <div class="note">This embeds the real static ANCHOR surfaces from the repo. Toggle between the operator console and the dashboard companion view. All console metrics and cases are illustrative demo fixtures, not current benchmark results. Nothing here initiates a real run.</div>
         </div>
         <div class="tabs">
-          <button class="tab active" data-src="trinity_hunt.html">Console</button>
-          <button class="tab" data-src="anchor_dashboard.html">Dashboard</button>
+          <button aria-pressed="true" class="tab active" data-src="trinity_hunt.html">Console</button>
+          <button aria-pressed="false" class="tab" data-src="anchor_dashboard.html">Dashboard</button>
         </div>
       </div>
       <iframe id="previewFrame" class="frame" title="ANCHOR demo preview" src="trinity_hunt.html"></iframe>
     </section>
 
     <section class="panel footer">
-      <strong style="color: var(--text);">How to use this page publicly</strong><br>
-      Put this on GitHub Pages or any static host and link people here first. It gives them a clean, non-threatening way to understand the product before they dive into the repo or the hunt details. If they want the deeper story, send them to <code>README.md</code>, <code>docs/</code>, and <code>benchmarks/</code> next.<br><br>
-      <span style="color: var(--muted);">This repository is licensed under Apache 2.0. See <code>LICENSE</code> for the full terms.</span>
+      <strong>ANCHOR · Evidence Before Belief</strong><br>
+      Explore the public methodology and dated benchmark artifacts using the research links above. These browser-only previews do not connect to a security engine or collect your messages.<br><br>
+      Licensed under <a href="https://github.com/timeless-hayoka/ANCHOR/blob/main/LICENSE">Apache 2.0</a>.
     </section>
-  </div>
+  </main>
   <script>
     const frame = document.getElementById('previewFrame');
     const tabs = Array.from(document.querySelectorAll('.tab'));
     tabs.forEach((tab) => {
       tab.addEventListener('click', () => {
-        tabs.forEach((t) => t.classList.remove('active'));
+        tabs.forEach((t) => { t.classList.remove('active'); t.setAttribute('aria-pressed', 'false'); });
         tab.classList.add('active');
+        tab.setAttribute('aria-pressed', 'true');
         frame.src = tab.dataset.src;
       });
     });
 
     function titleCase(value) {
-      return String(value || '').replace(/_/g, ' ').replace(/\w/g, (m) => m.toUpperCase());
+      return String(value || '').replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
     }
 
     function setConfidence(name, value) {
@@ -451,17 +449,18 @@
       if (!rows.length) return null;
       const sortByExecutedAt = (a, b) => String(a.executed_at || '').localeCompare(String(b.executed_at || ''));
       const published = rows.filter((entry) => (entry.publication_tier || 'development') === 'published');
-      return (published.length ? published : rows).sort(sortByExecutedAt).at(-1);
+      return published.sort(sortByExecutedAt).at(-1) || null;
     }
 
     async function loadLatestBenchmark() {
       try {
-        const res = await fetch('/benchmarks/index.json');
+        const res = await fetch('./benchmarks/index.json');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const benchmarks = Array.isArray(data.benchmarks) ? data.benchmarks : [];
         if (!benchmarks.length) return;
         const latest = selectLatestPublishedBenchmark(benchmarks);
+        if (!latest) throw new Error('No published benchmark');
         const summary = latest.results_summary || {};
         const tier = latest.publication_tier || 'development';
         document.getElementById('benchmarkLevel').textContent = latest.level || 'Unknown';
@@ -474,10 +473,10 @@
         ].filter(Boolean).join(' · ');
         document.getElementById('metaBenchmarkId').textContent = latest.id || 'unknown';
         document.getElementById('metaBenchmarkLevel').textContent = [latest.level || 'Unknown', latest.status || 'unknown', tier].join(' · ');
-        document.getElementById('metaCommit').innerHTML = `<code>${latest.commit || 'unknown'}</code>`;
-        document.getElementById('metaBranch').innerHTML = `<code>${latest.branch || 'unknown'}</code>`;
-        document.getElementById('metaForge').innerHTML = `<code>${latest.environment?.forge_version || 'unknown'}</code>`;
-        document.getElementById('metaExecutionModel').textContent = latest.environment?.os || 'Local-first benchmark run';
+        document.getElementById('metaCommit').textContent = latest.commit || 'Not recorded';
+        document.getElementById('metaBranch').textContent = latest.branch || 'Not recorded';
+        document.getElementById('metaForge').textContent = latest.environment?.forge_version || 'Not recorded / not applicable';
+        document.getElementById('metaExecutionModel').textContent = latest.environment?.execution_model || 'See selected benchmark record';
         document.getElementById('metaEvidenceStatus').textContent = [
           tier === 'published' ? 'Published artifact' : 'Development artifact',
           summary.detector_signals != null ? `${summary.detector_signals} detector-signal challenges` : null,
@@ -489,9 +488,17 @@
         setConfidence('Detection', ladder.detection);
         setConfidence('Reproduction', ladder.reproduction);
         setConfidence('Comparative', ladder.comparative_data);
-        document.getElementById('artifactSpotlight').innerHTML = `<strong style="color: var(--text);">${latest.title || latest.id || 'Latest benchmark'}</strong><br>Latest selected run: ${latest.executed_at || 'unknown time'} (${tier}). Summary: ${summary.passed ?? 0} passed, ${summary.failed ?? 0} failed, ${summary.timed_out ?? 0} timed out.`;
+        const spotlight = document.getElementById('artifactSpotlight');
+        spotlight.textContent = `${latest.title || latest.id} · Executed ${latest.executed_at || 'date unavailable'}. `;
+        const record = latest.published_record || latest.record;
+        if (record && /^benchmarks\/[A-Za-z0-9_./-]+$/.test(record) && !record.includes('..')) {
+          const link = document.createElement('a');
+          link.href = 'https://github.com/timeless-hayoka/ANCHOR/blob/main/' + record;
+          link.textContent = 'Read this benchmark’s evidence and limitations';
+          spotlight.appendChild(link);
+        }
       } catch (_) {
-        // Static fallback is already rendered in markup.
+        document.getElementById('benchmarkMaturityNote').textContent = 'Benchmark metadata unavailable. Showing the dated Phase 0 baseline below; follow the repository links for evidence.';
       }
     }
 
