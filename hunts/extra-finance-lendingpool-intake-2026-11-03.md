@@ -187,6 +187,21 @@ The associated ANCHOR handoff generated a deterministic Trinity `signal` with `B
 
 **Next research gate:** capture Sourcify's standard compiler input and transformation details, run an exact 0.8.18 isolated source build, then compare produced and independently obtained runtime bytecode with appropriate transformation handling before testing protocol invariants.
 
+## Verified-source compilation and Trinity evidence handoff (2026-11-03)
+
+[GitHub Actions run 41659197251](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41659197251) completed all of the following in an isolated, non-broadcast CI environment:
+
+- Fetched Sourcify's public verified-source compilation input for the OP Mainnet LendingPool.
+- Recompiled the **33 source files** with compiler **solc `0.8.18+commit.87f61d96`**, optimizer enabled with 200 runs.
+- Compared the resulting `LendingPool` runtime to Sourcify's **recompiled** runtime bytecode: **byte-identical** (provider-recompiled SHA-256 `8b048845dc91e9a5e62c9d727b3aaec097854a791d8d2c90268208898cb4f108`).
+- Checked the build's `LendingPool.sol` SHA-256 `9e1a6cf5930e2477aab0022536be39ab4bb7e1fbb6953b31cf90429f6205bf6f` against the verified-source evidence, and recorded `PROVIDER_RECOMPILE_MATCH_SOURCE_LINKED`.
+- Produced a valid Trinity `signal` handoff with **`BLOCKED_RESEARCH_SIGNAL`**, unknown scope status, no reproduction, and no vulnerability claim.
+- CI completed **8 compiler-preparation tests** and **19 Trinity handoff tests**, then asserted the live handoff did not self-authorize or promote a finding.
+
+This establishes a reproducible compilation matching **Sourcify's compilation**, not independent proof of bytecode equality with the actual live OP Mainnet runtime. Sourcify still reports `runtimeMatch: match` rather than `exact_match`, and its provider-reported onchain and recompiled bytecode are not byte-identical. The additional bytecode differences need transformation-aware comparison and separate read-only chain-RPC attestation before claiming deployed equivalence. The pinned GitHub repository remains a distinct revision and its 14/14 upstream tests must not be transferred to this verified build.
+
+**Next validation gate:** independently capture deployed runtime bytecode, handle Solidity metadata/library/immutable transformations without ignoring behavioral differences, then write Foundry controls against the verified 0.8.18 implementation and pass approved scope through the operator review gate.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
