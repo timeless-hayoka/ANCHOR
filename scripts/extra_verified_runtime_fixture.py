@@ -9,9 +9,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
+import tempfile
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+from extra_verified_source_compile import prepare_input
 
 from extra_runtime_transform_reconciliation import (
     ADDRESS, CHAIN_ID, URL, examine, hex_bytes, sha,
@@ -22,7 +26,40 @@ EXPECTED_DECLARATION = re.compile(
 )
 
 
-def fixture(snapshot: Any, rpc_evidence: Any) -> dict[str, str]:
+def compile_verified_ast(snapshot: Any) -> dict[str, Any]:
+    """Compile only the AST from the same 0.8.18 Standard JSON source input."""
+    standard, _ = prepare_input(snapshot)
+    standard["settings"]["outputSelection"] = {
+        "contracts/lendingpool/LendingPool.sol": {"": ["ast"]},
+    }
+    with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as infile:
+        json.dump(standard, infile)
+        infile.flush()
+        infile.seek(0)
+        proc = subprocess.run(
+            ["npx", "--yes", "solc@0.8.18", "--standard-json"],
+            stdin=infile, text=True, capture_output=True,
+            timeout=180, check=False,
+        )
+    output = proc.stdout
+    pos = output.find("{")
+    if proc.returncode != 0 or pos < 0 or len(output) > 20_000_000:
+        raise ValueError("AST compiler exited without bounded JSON")
+    parsed = json.loads(output[pos:])
+    if any(
+        isinstance(item, dict) and item.get("severity") == "error"
+        for item in parsed.get("errors", [])
+    ):
+        raise ValueError("AST compiler reported Solidity errors")
+    src = parsed.get("sources")
+    info = src.get("contracts/lendingpool/LendingPool.sol") if isinstance(src, dict) else None
+    ast = info.get("ast") if isinstance(info, dict) else None
+    if not isinstance(ast, dict):
+        raise ValueError("compiler did not produce LendingPool AST")
+    return ast
+
+
+def fixture(snapshot: Any, rpc_evidence: Any, compiled_ast: Any = None) -> dict[str, str]:
     result = examine(snapshot, rpc_evidence)
     if result["state"] != "DECLARED_TRANSFORMS_RECONCILED":
         raise ValueError("runtime transformation evidence not reconciled")
@@ -46,7 +83,9 @@ def fixture(snapshot: Any, rpc_evidence: Any) -> dict[str, str]:
     compiler_output = snapshot.get("stdJsonOutput")
     sources = compiler_output.get("sources") if isinstance(compiler_output, dict) else None
     source_info = sources.get("contracts/lendingpool/LendingPool.sol") if isinstance(sources, dict) else None
-    ast = source_info.get("ast") if isinstance(source_info, dict) else None
+    ast = compiled_ast if compiled_ast is not None else (
+        source_info.get("ast") if isinstance(source_info, dict) else None
+    )
     matches = []
     def traverse(node):
         if isinstance(node, list):
@@ -105,7 +144,8 @@ def main() -> int:
             raise ValueError("Sourcify response exceeds limit")
         snap = json.loads(raw.decode("utf-8"))
         rpc = json.loads(args.rpc_evidence.read_text(encoding="utf-8"))
-        data = fixture(snap, rpc)
+        ast = compile_verified_ast(snap)
+        data = fixture(snap, rpc, compiled_ast=ast)
         args.outdir.mkdir(parents=True, exist_ok=True)
         # The runtime is public code. Separate from concise evidence so CI
         # doesn't log the full bytecode string by accident.
