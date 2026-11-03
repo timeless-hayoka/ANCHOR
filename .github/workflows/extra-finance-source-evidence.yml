@@ -41,9 +41,11 @@ jobs:
           printf '%s\n' "$code" > evidence/source-verifier-exit-code.txt
           cat evidence/extra-lendingpool-source-verification.json
           if [ "$code" -eq 0 ]; then
-            echo "Sourcify source file matched; full build/bytecode equivalence remains unverified."
+            echo "Exact runtime verified source file matched; full build/bytecode equivalence remains unverified."
+          elif [ "$code" -eq 3 ]; then
+            echo "::warning::Source file matched a nonexact Sourcify runtime verification; full bytecode equivalence remains unverified."
           else
-            echo "::warning::Sourcify verification unavailable/mismatch (exit $code); do not promote source equivalence."
+            echo "::warning::Sourcify source comparison unavailable/mismatched (exit $code); do not promote source equivalence."
           fi
       - name: Upload source comparison evidence
         if: always()
