@@ -109,6 +109,12 @@ class ExtraSourceVerificationTests(unittest.TestCase):
         result = compare_solidity_source(a, b)
         self.assertEqual(result["classification"], "TOKEN_DIFFERENT")
         self.assertEqual(compare_solidity_source('contract A{/*unclosed', 'contract A{}')["classification"], "INDETERMINATE")
+        identifiers = compare_solidity_source(
+            "contract V { uint oldBalance; }",
+            "contract V { uint newBalance; }",
+        )["token_hunks_first_12"][0]
+        self.assertEqual(identifiers["local_changed_identifiers"], ["oldBalance"])
+        self.assertEqual(identifiers["verified_changed_identifiers"], ["newBalance"])
 
     def test_offline_cli_never_claims_verification_on_error(self):
         with tempfile.TemporaryDirectory() as directory:
