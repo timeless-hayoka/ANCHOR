@@ -41,7 +41,7 @@ SNAPSHOT = {
             "id": "1", "type": "replace", "reason": "cborAuxdata", "offset": len(BASE)
         }],
         "transformationValues": {"cborAuxdata": {"1": "0x" + VALID_META.hex()}},
-        "cborAuxdata": {"1": {"offset": len(BASE), "value": "0x" + VALID_META.hex()}},
+        "cborAuxdata": {"1": {"offset": len(BASE), "value": "0x" + bytes.fromhex("a100020003").hex()}},
     },
 }
 
