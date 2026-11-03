@@ -72,6 +72,62 @@ A subsequent isolated GitHub Actions read-only verification produced a non-exact
 
 **Consequence:** Do not use the pinned GitHub checkout as an unquestioned production-equivalent source mirror. Obtain the verified source tree, reconcile version and compiler settings, and reproduce on an isolated fork before drawing conclusions or submitting a report. The timestamp and credit-known-issue discrepancies might reflect source drift, but no causal chain or novelty has been established.
 
+## 2026-11-03 Solidity token-level source comparison
+
+[GitHub Actions source evidence run 41646844548](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41646844548) checked the pinned ExtraFi repository against the Sourcify non-exact-runtime verification. After excluding Solidity whitespace and comments (without discarding literal strings), the two source files are still **TOKEN_DIFFERENT**:
+- Pinned GitHub `LendingPool.sol`: **3,451** Solidity-like tokens.
+- Sourcify verified-source `LendingPool.sol`: **3,329** tokens.
+- **13 token-level changed regions**, separately from the 12 line-oriented changed regions.
+- The `security_conclusion` output is explicitly `NONE`.
+- The live-source check's top-level status remains `NOT_VERIFIED` for the pinned repository.
+
+The classifier is intentionally conservative: different tokens show code-level source drift, **not** necessarily different runtime behavior or an exploitable bug. The Sourcify verification is non-exact, so full bytecode equivalence remains unproven. Next: inspect exact differences and relevant published audit reports, pin the actually deployed build, then test approved invariants in isolation.
+
+## Source diff hotspot triage (2026-11-03, live Sourcify evidence)
+
+The source-difference classifier ran against the *verified* Optimism source with `runtimeMatch: match` and produced **13 Solidity token change hunks** (3,451 vs 3,329 tokens). The line-oriented classifier attributes its 12 changed regions to their nearest named functions. These are candidate code-review locations **not** identified vulnerabilities:
+
+| Pinned source lines | Nearest function | Triage rationale |
+| --- | --- | --- |
+| 1, 20, 27–29 | Contract header/imports | Check interface, compiler, inheritance and constants. |
+| 185 | `redeem` | Compare eToken receipt handling and beneficiary accounting. |
+| 224 | `unStakeAndWithdraw` | Compare withdrawal orchestration with staking accounting. |
+| 277–287 | `_deposit` | Compare actual incoming funds and eToken mint arithmetic. |
+| 452–462 and 468 | `repay` | Compare debt adjustment, clamping and credit paths; known repayment issues overlap and must be excluded. |
+| 535–538 and 558–559 | `setBorrowingRateConfig` | Compare privileged configuration validation. |
+| 789–792 | `setReserveFeeRate` | Compare fee-setting safeguards. |
+
+Evidence: [GitHub Actions source-evidence run 41647190600](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41647190600). Nearest-function association is a *textual heuristic* rather than an AST or a proof of changed behavior.
+
+**Next gate:** recover and review each changed source body from the independently verified compiler input, compare with released audit reports and known-issue exclusions, and only then build non-broadcast Foundry invariants. Do not promote any of these differences to a bounty submission without a distinct, reproduced in-scope impact.
+
+## Historical audit duplicate register (PeckShield 2023-098)
+
+Primary report: [PeckShield ExtraFi v1.0 (May 5, 2023)](https://github.com/peckshield/publications/blob/master/audit_reports/PeckShield-Audit-Report-ExtraFi-v1.0.pdf). The report identifies **a different repository and revision**: `ExtraFi/contracts` reviewed commit `c70f83d` and post-fix commit `ebed8b1`. This must not be conflated with the current pinned `ExtraFi/extra-contracts` commit `a66e925d...` or with deployed Optimism bytecode.
+
+Published findings in the 2023 audit, to exclude from novelty claims:
+- **PVE-001 (High; resolved):** Possible Position Value Manipulation, affecting position leverage valuation and reserve-derived amounts.
+- **PVE-002 (Low; resolved):** Accommodation of Non-ERC20-Compliant Tokens.
+- **PVE-003 (Low; resolved):** Incorrect `VeToken.balanceOfAt()` Calculation.
+- **PVE-004 (Low; resolved):** `StakingRewards.setReward()` logic improvement.
+- **PVE-005 (Medium; mitigated):** Trust Issue of Admin Keys.
+- **PVE-006 (Informational; resolved):** Redundant State/Code Removal.
+
+The older report states all issues except admin-key trust were marked resolved, with admin risk mitigated. Extra Finance's current bounty rules exclude unfixed issues mentioned in its listed audits. **Historical status is not proof that any current deployment is fixed**; verify the actual runtime and separate the dated audit scope from the verified source delta. The BlockSec and Sherlock findings are not yet fully triaged against these source hunks.
+
+## Token identifier delta review — prevalidation signals, NOT findings
+
+GitHub Actions [run 41647727141](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41647727141) recorded **13 token-difference regions** without dumping verified source code. Changed-identifier summaries point to these areas:
+
+| Source drift indicator | Research classification |
+| --- | --- |
+| `MINIMUM_ETOKEN_AMOUNT`, `DEAD_ADDRESS`, initial eToken `mint` and `totalSupply` appear in the pinned GitHub version but not the same locations in verified source | **KNOWN-ISSUE OVERLAP**: initial share-inflation / locked minimum shares is already disclosed by the program; assess versioning only, not a novel claim. |
+| `repay` branch identifiers include `debtPosition.borrowed`, `reserve.totalBorrows`, `amount` and subtraction logic on both sides in different positions | **KNOWN-ISSUE OVERLAP**: repayment rounding and credit handling disclosed in program; compare control flow, but no bounty claim without distinct mechanism. |
+| `payable` and `avoidUsingNativeEther` vary around redeem/unstake functions | **SPECIFICATION REVIEW**: determine intended WETH/native-ETH semantics and whether a source version change alters a supported path. No impact shown. |
+| `setBorrowingRateConfig` and fee configuration call-path terms differ | **ADMIN/CONFIG REVIEW**: owner authorization and parameter checks must be assessed with the deployed verified source; no unauthorized state change demonstrated. |
+
+The classifier removes whitespace and comments, but preserves Solidity-like tokens and literals; it is not an AST verifier, compiler equivalence proof, or exploit test. The live source's Sourcify runtime verification remains **non-exact**. None of these differences should be promoted beyond a research hypothesis until confirmed against an appropriate deployed-code mirror and audit history.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.

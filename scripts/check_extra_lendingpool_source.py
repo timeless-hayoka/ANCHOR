@@ -11,11 +11,14 @@ import argparse
 import difflib
 import hashlib
 import json
+import re
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+from extra_source_semantic_delta import compare_solidity_source
 
 CHAIN_ID = "10"
 ADDRESS = "0xbb505c54d71e9e599cb8435b4f0ceec05fc71cbd"
@@ -93,17 +96,34 @@ def analyze_snapshot(snapshot: Any, source_text: str) -> dict[str, Any]:
                 "verified_line_count": len(remote_lines),
             })
         result["source_differences"] = differences
+        result["token_comparison"] = compare_solidity_source(source_text, sorted(possible)[0][1])
         # Report only bounded line ranges, never raw source or suspected attack
         # paths. A changed line count alone does not establish logic drift.
         first_verified_lines = sorted(possible)[0][1].splitlines()
         opcodes = difflib.SequenceMatcher(
             None, local_lines, first_verified_lines, autojunk=False
         ).get_opcodes()
+        function_header = re.compile(
+            r"^\s*(?:function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(|"
+            r"(constructor)\s*\(|modifier\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\()"
+        )
+
+        def enclosing_entrypoint(lines: list[str], position: int) -> str:
+            # Best-effort display context only, not verified AST call tracing.
+            context = "contract-level"
+            for line in lines[:max(0, position)]:
+                match = function_header.match(line)
+                if match:
+                    context = next(part for part in match.groups() if part)
+            return context
+
         changes = [
             {
                 "kind": tag,
                 "local_line_range": [i1 + 1, i2],
                 "verified_line_range": [j1 + 1, j2],
+                "local_nearest_function": enclosing_entrypoint(local_lines, max(i1 + 1, i2)),
+                "verified_nearest_function": enclosing_entrypoint(first_verified_lines, max(j1 + 1, j2)),
             }
             for tag, i1, i2, j1, j2 in opcodes
             if tag != "equal"
