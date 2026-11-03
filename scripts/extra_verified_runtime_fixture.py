@@ -32,16 +32,21 @@ def compile_verified_ast(snapshot: Any) -> dict[str, Any]:
     standard["settings"]["outputSelection"] = {
         "contracts/lendingpool/LendingPool.sol": {"": ["ast"]},
     }
-    with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as infile:
+    # solcjs can truncate a large JSON write to a pipe (~64 KiB) on hosted
+    # runners. Use regular files for BOTH stdin and stdout.
+    with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as infile, \
+         tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as outfile:
         json.dump(standard, infile)
         infile.flush()
         infile.seek(0)
         proc = subprocess.run(
             ["npx", "--yes", "solc@0.8.18", "--standard-json"],
-            stdin=infile, text=True, capture_output=True,
-            timeout=180, check=False,
+            stdin=infile, stdout=outfile, stderr=subprocess.PIPE,
+            text=True, timeout=180, check=False,
         )
-    output = proc.stdout
+        outfile.flush()
+        outfile.seek(0)
+        output = outfile.read(20_000_001)
     pos = output.find("{")
     if proc.returncode != 0 or pos < 0 or len(output) > 20_000_000:
         raise ValueError("AST compiler exited without bounded JSON")
