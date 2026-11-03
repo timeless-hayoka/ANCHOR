@@ -220,6 +220,93 @@ contract AnchorVerifiedStatefulTest {
         require(_deposit(ALICE, 10_000) > 0, "resumed deposit unavailable");
     }
 
+    function test_VerifiedPartialRepaymentPreservesRemainingDebtAndCredit() public {
+        uint256 id = _prepareDebt();
+        uint256 startingLiquidity = token.balanceOf(pool.getETokenAddress(reserveId));
+
+        vm.prank(VAULT);
+        pool.borrow(VAULT, id, 100_000);
+        require(pool.credits(reserveId, VAULT) == 100_000, "initial borrow credit");
+
+        vm.startPrank(VAULT);
+        token.approve(address(pool), 40_000);
+        uint256 firstPaid = pool.repay(VAULT, id, 40_000);
+        vm.stopPrank();
+
+        require(firstPaid == 40_000, "partial repayment amount");
+        require(pool.credits(reserveId, VAULT) == 140_000, "partial credit restoration");
+        require(
+            token.balanceOf(pool.getETokenAddress(reserveId)) ==
+                startingLiquidity - 60_000,
+            "partial repayment reserve balance"
+        );
+        (uint256 residualDebt,) = pool.getCurrentDebt(id);
+        require(residualDebt == 60_000, "partial repayment residual debt");
+
+        vm.startPrank(VAULT);
+        token.approve(address(pool), 60_000);
+        uint256 finalPaid = pool.repay(VAULT, id, 60_000);
+        vm.stopPrank();
+
+        require(finalPaid == 60_000, "final repayment amount");
+        (uint256 closedDebt,) = pool.getCurrentDebt(id);
+        require(closedDebt == 0, "debt not extinguished");
+        require(pool.credits(reserveId, VAULT) == 200_000, "final credit restoration");
+        require(
+            token.balanceOf(pool.getETokenAddress(reserveId)) == startingLiquidity,
+            "recovered liquidity differs"
+        );
+    }
+
+    function test_VerifiedMissingRepaymentAllowanceRollsBackDebtAndLiquidity() public {
+        uint256 id = _prepareDebt();
+        vm.prank(VAULT);
+        pool.borrow(VAULT, id, 90_000);
+
+        uint256 previousLiquidity = token.balanceOf(pool.getETokenAddress(reserveId));
+        uint256 previousCredit = pool.credits(reserveId, VAULT);
+        (uint256 previousDebt,) = pool.getCurrentDebt(id);
+
+        vm.prank(VAULT);
+        vm.expectRevert();
+        pool.repay(VAULT, id, 30_000);
+
+        require(
+            token.balanceOf(pool.getETokenAddress(reserveId)) == previousLiquidity,
+            "reverted repay altered underlying liquidity"
+        );
+        require(
+            pool.credits(reserveId, VAULT) == previousCredit,
+            "reverted repay changed credit"
+        );
+        (uint256 subsequentDebt,) = pool.getCurrentDebt(id);
+        require(subsequentDebt == previousDebt, "reverted repay changed debt");
+    }
+
+    function test_VerifiedInterestAccrualThenPartialRepaymentDoesNotRaiseDebt() public {
+        uint256 id = _prepareDebt();
+        vm.prank(VAULT);
+        pool.borrow(VAULT, id, 100_000);
+
+        vm.warp(block.timestamp + 7 days);
+        (uint256 accruedDebt, uint256 accruedIndex) = pool.getCurrentDebt(id);
+        require(accruedDebt > 100_000, "no seven-day interest accrued");
+        require(accruedIndex > 1e18, "borrow index did not grow");
+
+        // One-half of the borrowed principal is intentionally partial, so
+        // the test doesn't depend on total-debt settlement rounding behavior.
+        vm.startPrank(VAULT);
+        token.approve(address(pool), 50_000);
+        uint256 paid = pool.repay(VAULT, id, 50_000);
+        vm.stopPrank();
+        require(paid == 50_000, "interest-sensitive partial repayment failed");
+
+        (uint256 remainingDebt, uint256 afterIndex) = pool.getCurrentDebt(id);
+        require(afterIndex >= accruedIndex, "repayment decreased borrow index");
+        require(remainingDebt < accruedDebt, "partial repayment did not reduce debt");
+        require(remainingDebt > 0, "partial repayment incorrectly closed debt");
+    }
+
     function test_VerifiedBorrowingInterestAccruesOverSevenDays() public {
         uint256 id = _prepareDebt();
         vm.prank(VAULT);
