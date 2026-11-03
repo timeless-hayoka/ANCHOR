@@ -151,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, TypeError, OSError, UnicodeError, subprocess.TimeoutExpired) as exc:
         report = {
             "state": "COMPILE_NOT_PROVEN",
-            "reason": f"build evidence unavailable: {type(exc).__name__}",
+            "reason": f"build evidence unavailable: {type(exc).__name__}: {str(exc)[:220]}",
             "independent_rpc_check": "NOT_PERFORMED",
             "full_deployment_equivalence": "NOT_PROVEN",
         }
