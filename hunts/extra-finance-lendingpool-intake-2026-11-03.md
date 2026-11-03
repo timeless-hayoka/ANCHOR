@@ -115,6 +115,19 @@ Published findings in the 2023 audit, to exclude from novelty claims:
 
 The older report states all issues except admin-key trust were marked resolved, with admin risk mitigated. Extra Finance's current bounty rules exclude unfixed issues mentioned in its listed audits. **Historical status is not proof that any current deployment is fixed**; verify the actual runtime and separate the dated audit scope from the verified source delta. The BlockSec and Sherlock findings are not yet fully triaged against these source hunks.
 
+## Token identifier delta review — prevalidation signals, NOT findings
+
+GitHub Actions [run 41647727141](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41647727141) recorded **13 token-difference regions** without dumping verified source code. Changed-identifier summaries point to these areas:
+
+| Source drift indicator | Research classification |
+| --- | --- |
+| `MINIMUM_ETOKEN_AMOUNT`, `DEAD_ADDRESS`, initial eToken `mint` and `totalSupply` appear in the pinned GitHub version but not the same locations in verified source | **KNOWN-ISSUE OVERLAP**: initial share-inflation / locked minimum shares is already disclosed by the program; assess versioning only, not a novel claim. |
+| `repay` branch identifiers include `debtPosition.borrowed`, `reserve.totalBorrows`, `amount` and subtraction logic on both sides in different positions | **KNOWN-ISSUE OVERLAP**: repayment rounding and credit handling disclosed in program; compare control flow, but no bounty claim without distinct mechanism. |
+| `payable` and `avoidUsingNativeEther` vary around redeem/unstake functions | **SPECIFICATION REVIEW**: determine intended WETH/native-ETH semantics and whether a source version change alters a supported path. No impact shown. |
+| `setBorrowingRateConfig` and fee configuration call-path terms differ | **ADMIN/CONFIG REVIEW**: owner authorization and parameter checks must be assessed with the deployed verified source; no unauthorized state change demonstrated. |
+
+The classifier removes whitespace and comments, but preserves Solidity-like tokens and literals; it is not an AST verifier, compiler equivalence proof, or exploit test. The live source's Sourcify runtime verification remains **non-exact**. None of these differences should be promoted beyond a research hypothesis until confirmed against an appropriate deployed-code mirror and audit history.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
