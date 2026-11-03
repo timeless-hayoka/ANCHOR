@@ -36,24 +36,22 @@ ANCHOR is not another scanner. It is a **proof-gated smart-contract security res
 
 ## Quick start
 
-Fifteen-minute path on a clean machine (full detail: [docs/REPRODUCTION.md](docs/REPRODUCTION.md)):
+[Live website and browser demo](https://timeless-hayoka.github.io/ANCHOR/) · [First local run](docs/GETTING_STARTED.md)
+
+Start with the bundled SARIF corpus in a Linux, macOS, or Windows WSL terminal (Python 3.11+):
 
 ```bash
 git clone https://github.com/timeless-hayoka/ANCHOR.git
 cd ANCHOR
-export ANCHOR_ROOT="$(pwd)"
-
-./anchor env init
-.venv/bin/pip install -r requirements.txt
-
-./anchor knowledge list
-./anchor knowledge show sarif
-
-./anchor benchmark dvd phase1   # requires Foundry + DVD checkout; see REPRODUCTION.md
-./anchor benchmark latest
-./anchor benchmark trends
-./anchor strategy
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python anchor_cli.py benchmark sarif known-findings
+.venv/bin/python scripts/verify_sarif_benchmark.py
 ```
+
+Expected: four labeled corpus cases pass (3 TP, 1 TN, no FP/FN). This checks signal processing, not exploit reproduction. No RPC, wallet, API key, Foundry, or external target is needed. The runner writes local artifacts and a development manifest entry. Follow [the guide](docs/GETTING_STARTED.md) to inspect the evidence and troubleshoot.
+
+For actual smart-contract reproduction in the authorized local DVD lab, follow [REPRODUCTION.md](docs/REPRODUCTION.md) after installing its additional prerequisites.
 
 Sibling companion + MCP (optional):
 
@@ -65,7 +63,7 @@ git clone -b anchor https://github.com/timeless-hayoka/infj-bot.git ../infj_bot
 
 If you are new to ANCHOR, use this order:
 
-1. [demo/index.html](demo/index.html) - see the product and proof gate quickly
+1. [Live ANCHOR demo](https://timeless-hayoka.github.io/ANCHOR/) and [first local run](docs/GETTING_STARTED.md) - explore the workflow, then inspect your own corpus results
 2. [docs/REPRODUCTION.md](docs/REPRODUCTION.md) - reproduce benchmarks on a clean machine (Phase C credibility gate)
 3. [docs/METHODOLOGY.md](docs/METHODOLOGY.md) - understand the hunt workflow
 4. [docs/PROOF_GATE.md](docs/PROOF_GATE.md) - understand what counts as a finding
@@ -119,6 +117,8 @@ Read the method documents here:
 - [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)
 
 ## Benchmarks
+
+[Publication review](docs/BENCHMARK_PUBLICATION_REVIEW.md): three historical entries are withdrawn pending missing evidence recovery; their summaries are retained as unverified history.
 
 Benchmarks exist so other researchers can evaluate ANCHOR by method, not by pitch.
 

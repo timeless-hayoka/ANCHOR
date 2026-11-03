@@ -58,6 +58,14 @@ def check():
             elif resolved.netloc == 'github.com' and '/blob/main/' in resolved.path:
                 target = resolved.path.split('/blob/main/', 1)[1]
                 assert (ROOT / target).is_file(), (name, link)
+    source_rows = json.loads((ROOT / 'benchmarks/index.json').read_text())['benchmarks']
+    for row in source_rows:
+        if row.get('publication_tier') == 'published':
+            assert row.get('record'), (row['id'], 'missing record reference')
+            for field in ('record', 'published_record', 'artifact_json', 'metrics_json', 'regression_report'):
+                if row.get(field):
+                    artifact = (ROOT / row[field]).resolve()
+                    assert artifact.is_relative_to(ROOT / 'benchmarks') and artifact.is_file(), (row['id'], field, 'published evidence missing')
     benchmarks = json.loads((SITE / 'benchmarks/index.json').read_text())['benchmarks']
     for row in benchmarks:
         for field in ('record', 'published_record', 'artifact_json'):
