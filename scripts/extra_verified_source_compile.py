@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 import subprocess
+import tempfile
 import urllib.request
 from copy import deepcopy
 from pathlib import Path
@@ -138,15 +139,21 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("provider response too large")
         std, context = prepare_input(json.loads(raw.decode("utf-8")))
         command = ["npx", "--yes", "solc@0.8.18", "--standard-json"]
-        completed = subprocess.run(
-            command, input=json.dumps(std), text=True, capture_output=True,
-            timeout=180, check=False,
-        )
+        # solcjs reads stdin synchronously; a large pipe can raise EAGAIN on
+        # hosted runners. Use a regular temporary file as its input stream.
+        with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as stdin_file:
+            json.dump(std, stdin_file)
+            stdin_file.flush()
+            stdin_file.seek(0)
+            completed = subprocess.run(
+                command, stdin=stdin_file, text=True, capture_output=True,
+                timeout=180, check=False,
+            )
         # solcjs may print an SMT advisory before its JSON output.
         output = completed.stdout
         start = output.find("{")
         if completed.returncode != 0 or start < 0 or len(output) > 20_000_000:
-            detail = completed.stderr[-450:].replace("\\n", " ")
+            detail = completed.stderr[:450].replace("\\n", " ")
             raise ValueError(
                 f"compiler failed (returncode={completed.returncode}, "
                 f"stdout_bytes={len(output)}, stderr_tail={detail})"
