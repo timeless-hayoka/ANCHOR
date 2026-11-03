@@ -10,6 +10,7 @@ Use the JSON result from `scripts/anchor_hunt_readiness.py` and a source evidenc
 python scripts/anchor_trinity_handoff.py \
   --readiness evidence/extra-hunt-readiness.json \
   --source-evidence evidence/extra-lendingpool-source-verification.json \
+  --build-evidence evidence/extra-verified-build.json \
   --output evidence/extra-trinity-signal.json
 ```
 
@@ -30,6 +31,12 @@ The artifact contains:
 The `Extra Finance source evidence` GitHub Actions job fetches public Sourcify metadata and the pinned source, generates a **BLOCKED** readiness report, and feeds both to this bridge. It requires the resulting Trinity signal to remain blocked and unauthorised. That is the **expected** healthy outcome while scope evidence, source version matching and full deployed-bytecode comparison remain unresolved.
 
 The separately passing 14/14 Foundry tests refer to the pinned GitHub source. They do **not** validate the different Sourcify verified source.
+
+## Reproducible deployed-source build
+
+The CI workflow now runs `scripts/extra_verified_source_compile.py` against Sourcify's verified Standard JSON input with a **pinned solc 0.8.18** compiler. It checks the locally compiled LendingPool runtime against Sourcify's **recompiled** runtime; it does *not* silently strip Solidity metadata or declare an independent deployed-code match.
+
+Run [41659197251](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41659197251) returned `PROVIDER_BUILD_COMPILED` with matching provider-recompiled runtime bytecode. The Trinity bridge cross-checks the build's verified source hash and deployment identity, storing `PROVIDER_RECOMPILE_MATCH_SOURCE_LINKED` in evidence provenance. Trinity still receives only a blocked `signal`, never a finding. The compiler comparison does **not** establish equivalence to on-chain runtime, scope approval, or exploitation.
 
 ## Remaining launch gates
 
