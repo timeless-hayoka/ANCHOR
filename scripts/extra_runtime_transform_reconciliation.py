@@ -142,7 +142,48 @@ def examine(snapshot: Any, rpc_evidence: Any = None) -> dict[str, Any]:
         if (reason in {"library", "callProtection"} and len(replacement) != 20):
             report["reason"] = f"transformation {index} invalid 20-byte address"
             return report
+        # Independently cross-check replacement offsets against the compiler
+        # reference map instead of trusting arbitrary provider transformation
+        # offsets. A forged "immutable" mask must never hide changed opcodes.
+        if reason == "immutable":
+            refs = runtime.get("immutableReferences")
+            spans = refs.get(identity) if isinstance(refs, dict) else None
+            if not isinstance(spans, list) or not any(
+                isinstance(span, dict)
+                and type(span.get("start")) is int
+                and type(span.get("length")) is int
+                and span["start"] == offset
+                and span["length"] == len(replacement)
+                for span in spans
+            ):
+                report["reason"] = f"immutable transformation {index} not in compiler reference map"
+                return report
+        if reason == "library":
+            references = runtime.get("linkReferences")
+            matches = []
+            if isinstance(references, dict):
+                for src, by_name in references.items():
+                    if isinstance(src, str) and isinstance(by_name, dict):
+                        for name, spans in by_name.items():
+                            if f"{src}:{name}" != identity or not isinstance(spans, list):
+                                continue
+                            matches.extend(span for span in spans if isinstance(span, dict))
+            if not any(
+                span.get("start") == offset and span.get("length") == len(replacement)
+                for span in matches
+            ):
+                report["reason"] = f"library transformation {index} not in compiler reference map"
+                return report
         if reason == "cborAuxdata":
+            metadata_map = runtime.get("cborAuxdata")
+            entry = metadata_map.get(identity) if isinstance(metadata_map, dict) else None
+            if (
+                not isinstance(entry, dict)
+                or entry.get("offset") != offset
+                or str(entry.get("value", "")).lower() != ("0x" + replacement.hex())
+            ):
+                report["reason"] = f"metadata transformation {index} not in compiler CBOR map"
+                return report
             if len(replacement) < 2:
                 report["reason"] = f"transformation {index} invalid metadata"
                 return report
