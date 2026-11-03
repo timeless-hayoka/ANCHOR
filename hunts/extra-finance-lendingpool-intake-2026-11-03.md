@@ -55,6 +55,12 @@ python /path/to/ANCHOR/scripts/check_extra_lendingpool_source.py \
 
 `PINNED_SOURCE_MATCH` means one source file agrees with a chain-specific Sourcify exact-runtime-verified source entry; it **does not** establish that the complete GitHub repository or its Foundry build reproduces the deployed bytecode. Missing metadata, non-exact runtime verification, failed requests, wrong network/address, or different source content yield `NOT_VERIFIED` (exit 2). The independent source comparison has **not yet produced a verified result for this target**; the current environment could not retrieve the exact onchain proof. The unit tests use fabricated snapshots only.
 
+## 2026-11-03 automated public-source check — NOT VERIFIED
+
+GitHub Actions run [41642082384](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41642082384) checked out the pinned ExtraFi source commit, passed the offline verifier tests, and requested Sourcify chain-10 deployment metadata. The public-source comparison emitted `status: NOT_VERIFIED` with reason `Sourcify exact runtime match not established`, and uploaded the evidence artifact `extra-lendingpool-source-evidence`. The collection job itself succeeded because it records evidence independently of result status; its green status is **not** contract verification. Further automated runs now also preserve `reported_runtime_match` to distinguish a nonexact source verification from absent verification.
+
+No bytecode equivalence, production-level issue, or novel bug is claimed. Next: compare Etherscan's Optimism verified build metadata and all included source units, or determine whether Sourcify reports a non-exact runtime match. Use an isolated fork only after establishing the appropriate deployed-code mirror.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
