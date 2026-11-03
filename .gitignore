@@ -12,3 +12,5 @@ scope/active_grant.json
 scope/analysis/
 # BugBot pipeline discovery output (temporary artifacts)
 discoveries/
+
+/dist-pages/
