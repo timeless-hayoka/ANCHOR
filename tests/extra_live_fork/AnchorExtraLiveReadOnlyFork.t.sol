@@ -19,7 +19,7 @@ interface IAnchorLiveLendingPool {
 
 contract AnchorExtraLiveReadOnlyForkTest {
     address internal constant TARGET =
-        0xbb505c54d71e9e599cb8435b4f0ceec05fc71cbd;
+        0xBB505c54D71E9e599cB8435b4F0cEEc05fC71cbD;
     uint256 internal constant OP_CHAIN_ID = 10;
     uint256 internal constant MAX_RESERVES_TO_READ = 8;
 
