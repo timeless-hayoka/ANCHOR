@@ -176,7 +176,8 @@ jobs:
           mkdir -p .extra-runtime-lab/test
           cp tests/extra_runtime_lab/ExtraVerifiedRuntimeSmoke.t.sol \
             .extra-runtime-lab/test/ExtraVerifiedRuntimeSmoke.t.sol
-          printf '[profile.default]\\nsrc = "src"\\ntest = "test"\\nsolc_version = "0.8.18"\\n' \
+          printf '%s\\n' '[profile.default]' 'src = "src"' \
+            'test = "test"' 'solc_version = "0.8.18"' \
             > .extra-runtime-lab/foundry.toml
           # The ~40 KiB runtime stays in a local env var; never echo it in logs.
           runtime=$(cat evidence/extra-local-runtime/runtime.hex)
