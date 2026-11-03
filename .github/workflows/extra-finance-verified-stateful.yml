@@ -59,9 +59,9 @@ jobs:
           solc_version = "0.8.18"
           optimizer = true
           optimizer_runs = 200
-          fuzz_runs = 128
+          # Fuzz count is set through FOUNDRY_FUZZ_RUNS below.
           TOML
-          forge test --root .extra-verified-stateful \
+          FOUNDRY_FUZZ_RUNS=256 forge test --root .extra-verified-stateful \
             --match-contract AnchorVerifiedStatefulTest -vv \
             2>&1 | tee evidence/extra-verified-stateful-test.log
       - name: Preserve stateful lab evidence
