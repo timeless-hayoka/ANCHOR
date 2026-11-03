@@ -131,6 +131,7 @@ jobs:
           python scripts/anchor_trinity_handoff.py \
             --readiness evidence/extra-hunt-readiness.json \
             --source-evidence evidence/extra-lendingpool-source-verification.json \
+            --build-evidence evidence/extra-verified-build.json \
             --output evidence/extra-trinity-signal.json
           python - <<'PY'
           import json
