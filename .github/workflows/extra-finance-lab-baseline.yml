@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/extra-finance-lab-baseline.yml'
+      - 'scripts/extra_legacy_test_adapter.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,11 +37,11 @@ jobs:
           forge --version > evidence/forge-version.txt
           git -C .source-extrafi rev-parse HEAD > evidence/upstream-commit.txt
           # No fork URL, deployment keys or broadcast flags. Only tests.
-          # Upstream uses legacy testFail* negative tests, which current Forge
-          # rejects. Run the compatible positive tests and record this gap.
-          grep -R -E 'function[[:space:]]+testFail' .source-extrafi/tests/lending-pool \
-            > evidence/legacy-testfail-tests.txt || true
-          echo "::warning::Legacy testFail* negative tests are excluded, not passed. See evidence/legacy-testfail-tests.txt."
+          # Copy-only compatibility conversion of five legacy negative tests.
+          # Transformations are guarded by exact pinned test signatures and
+          # executed only in the ephemeral CI checkout.
+          python scripts/extra_legacy_test_adapter.py --checkout .source-extrafi
+          echo "Legacy negative tests adapted to explicit revert expectations" > evidence/negative-controls.txt
           forge test --root .source-extrafi --match-path 'tests/lending-pool/*.t.sol' \
             --match-test '^test_' -vv 2>&1 | tee evidence/extra-lendingpool-tests.log
       - name: Preserve lab evidence
