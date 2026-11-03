@@ -177,6 +177,49 @@ contract AnchorVerifiedStatefulTest {
         require(pool.credits(reserveId, VAULT) == 200_000, "failed borrow consumed credit");
     }
 
+    function testFuzz_VerifiedFirstDepositConservation(uint96 raw) public {
+        uint256 amount = 1_001 + (uint256(raw) % 900_000);
+        uint256 shares = _deposit(ALICE, amount);
+        require(shares > 0, "no minted shares");
+        require(_balanceShares(ALICE) == shares, "share recipient mismatch");
+        require(token.balanceOf(pool.getETokenAddress(reserveId)) == amount, "underlying conserved");
+        require(token.balanceOf(ALICE) == 2_000_000 - amount, "payer debited");
+    }
+
+    function testFuzz_VerifiedBorrowRepayCreditConservation(uint96 raw) public {
+        uint256 debtId = _prepareDebt();
+        uint256 amount = 1_000 + (uint256(raw) % 180_000);
+        uint256 initialLiquidity = token.balanceOf(pool.getETokenAddress(reserveId));
+        vm.prank(VAULT);
+        pool.borrow(VAULT, debtId, amount);
+        require(token.balanceOf(VAULT) == amount, "vault borrowed funds");
+        require(token.balanceOf(pool.getETokenAddress(reserveId)) == initialLiquidity - amount, "borrow debit");
+        require(pool.credits(reserveId, VAULT) == 200_000 - amount, "credit debit");
+        vm.startPrank(VAULT);
+        token.approve(address(pool), amount);
+        uint256 repaid = pool.repay(VAULT, debtId, amount);
+        vm.stopPrank();
+        require(repaid == amount, "same-block repayment mismatch");
+        require(token.balanceOf(pool.getETokenAddress(reserveId)) == initialLiquidity, "repay asset recovery");
+        require(pool.credits(reserveId, VAULT) == 200_000, "credit restoration");
+        (uint256 outstanding,) = pool.getCurrentDebt(debtId);
+        require(outstanding == 0, "same-block debt not extinguished");
+    }
+
+    function test_VerifiedPauseRejectsNewDebtAndDepositsUntilResumed() public {
+        pool.emergencyPauseAll();
+        vm.startPrank(ALICE);
+        token.approve(address(pool), 10_000);
+        vm.expectRevert();
+        pool.deposit(reserveId, 10_000, ALICE, 0);
+        vm.expectRevert();
+        pool.newDebtPosition(reserveId);
+        vm.stopPrank();
+        require(token.balanceOf(pool.getETokenAddress(reserveId)) == 0, "paused deposit mutated state");
+        pool.unPauseAll();
+        require(_deposit(ALICE, 10_000) > 0, "resumed deposit unavailable");
+    }
+
     function test_VerifiedDebtIndexNeverDecreasesOverOneDay() public {
         uint256 id = _prepareDebt();
         vm.prank(VAULT);
