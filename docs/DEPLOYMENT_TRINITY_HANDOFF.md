@@ -11,6 +11,7 @@ python scripts/anchor_trinity_handoff.py \
   --readiness evidence/extra-hunt-readiness.json \
   --source-evidence evidence/extra-lendingpool-source-verification.json \
   --build-evidence evidence/extra-verified-build.json \
+  --rpc-evidence evidence/extra-independent-bytecode.json \
   --output evidence/extra-trinity-signal.json
 ```
 
@@ -37,6 +38,12 @@ The separately passing 14/14 Foundry tests refer to the pinned GitHub source. Th
 The CI workflow now runs `scripts/extra_verified_source_compile.py` against Sourcify's verified Standard JSON input with a **pinned solc 0.8.18** compiler. It checks the locally compiled LendingPool runtime against Sourcify's **recompiled** runtime; it does *not* silently strip Solidity metadata or declare an independent deployed-code match.
 
 Run [41659197251](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41659197251) returned `PROVIDER_BUILD_COMPILED` with matching provider-recompiled runtime bytecode. The Trinity bridge cross-checks the build's verified source hash and deployment identity, storing `PROVIDER_RECOMPILE_MATCH_SOURCE_LINKED` in evidence provenance. Trinity still receives only a blocked `signal`, never a finding. The compiler comparison does **not** establish equivalence to on-chain runtime, scope approval, or exploitation.
+
+## Independent RPC bytecode evidence
+
+The same public evidence workflow runs `scripts/extra_rpc_bytecode_attestation.py`: it uses only read-only `eth_chainId`, `eth_blockNumber` and `eth_getCode` against OP Mainnet, records the queried block number and hashes, and verifies that an independent RPC runtime-bytecode response agrees with Sourcify's **onchain** runtime. [Run 41660031507](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41660031507) returned `RPC_MATCHES_PROVIDER_ONCHAIN`.
+
+The bridge accepts the optional `--rpc-evidence` report, validates address/chain and hash consistency, and preserves its digest and status. **The RPC-vs-onchain confirmation does not close the difference between Sourcify's onchain and recompiled runtime**. Trinity remains `signal`, not `reproduced_real`, and operator-approved scope is still mandatory.
 
 ## Remaining launch gates
 
