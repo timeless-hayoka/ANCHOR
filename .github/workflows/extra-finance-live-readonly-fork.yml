@@ -1,0 +1,65 @@
+name: Extra Finance live Optimism read-only fork validation
+
+on:
+  pull_request:
+    paths:
+      - 'tests/extra_live_fork/**'
+      - '.github/workflows/extra-finance-live-readonly-fork.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-live-fork-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OP_READONLY_RPC: https://mainnet.optimism.io
+      FOUNDRY_DISABLE_NIGHTLY_WARNING: 'true'
+    steps:
+      - name: Checkout ANCHOR
+        uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.7
+      - name: Pin Optimism block and assert chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          chain=$(cast chain-id --rpc-url "$OP_READONLY_RPC")
+          test "$chain" = "10"
+          block=$(cast block-number --rpc-url "$OP_READONLY_RPC")
+          test "$block" -gt 100000
+          echo "ANCHOR_FORK_BLOCK=$block" >> "$GITHUB_ENV"
+          printf '{"chain_id":10,"fork_block":%s,"rpc":"https://mainnet.optimism.io","network_methods":"read_only","broadcast":false,"target":"0xbb505c54d71e9e599cb8435b4f0ceec05fc71cbd"}\n' "$block" > evidence/extra-live-fork-provenance.json
+          cat evidence/extra-live-fork-provenance.json
+      - name: Execute live-storage read-only Foundry checks on pinned fork
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .extra-live-fork/test
+          cp tests/extra_live_fork/AnchorExtraLiveReadOnlyFork.t.sol .extra-live-fork/test/
+          cat > .extra-live-fork/foundry.toml <<'TOML'
+          [profile.default]
+          src = "src"
+          test = "test"
+          solc_version = "0.8.18"
+          optimizer = true
+          optimizer_runs = 200
+          TOML
+          forge test --root .extra-live-fork \
+            --fork-url "$OP_READONLY_RPC" \
+            --fork-block-number "$ANCHOR_FORK_BLOCK" \
+            --match-contract AnchorExtraLiveReadOnlyForkTest -vv \
+            2>&1 | tee evidence/extra-live-fork-test.log
+      - name: Preserve independent live-read evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extra-live-readonly-fork-evidence
+          path: evidence/
+          retention-days: 14
+          if-no-files-found: warn
