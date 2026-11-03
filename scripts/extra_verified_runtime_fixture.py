@@ -39,21 +39,47 @@ def fixture(snapshot: Any, rpc_evidence: Any) -> dict[str, str]:
         raise ValueError("missing immutable reference transformations")
     ids = {item.get("id") for item in immutables}
     values = rt.get("transformationValues", {}).get("immutables")
-    if len(ids) != 1 or not isinstance(values, dict):
+
+    # Solidity immutableReferences keys are AST VariableDeclaration IDs. Find
+    # the exact registry variable, rather than assuming a single immutable
+    # across this contract and inherited modules.
+    compiler_output = snapshot.get("stdJsonOutput")
+    sources = compiler_output.get("sources") if isinstance(compiler_output, dict) else None
+    source_info = sources.get("contracts/lendingpool/LendingPool.sol") if isinstance(sources, dict) else None
+    ast = source_info.get("ast") if isinstance(source_info, dict) else None
+    matches = []
+    def traverse(node):
+        if isinstance(node, list):
+            for child in node:
+                traverse(child)
+        elif isinstance(node, dict):
+            if (
+                node.get("nodeType") == "VariableDeclaration"
+                and node.get("name") == "addressRegistry"
+                and node.get("mutability") == "immutable"
+                and node.get("stateVariable") is True
+            ):
+                matches.append(str(node.get("id")))
+            for child in node.values():
+                if isinstance(child, (dict, list)):
+                    traverse(child)
+    if isinstance(ast, dict):
+        traverse(ast)
+    if len(matches) != 1 or matches[0] not in ids or not isinstance(values, dict):
         raise ValueError(
-            "cannot map immutable to one deterministic registry value: "
-            f"immutable_id_count={len(ids)}, ids={sorted(map(str, ids))[:12]}, "
-            f"value_keys={sorted(map(str, values))[:12] if isinstance(values, dict) else []}"
+            "cannot map registry immutable to unique compiler AST id: "
+            f"found_ast_ids={matches[:8]}, runtime_ids={sorted(map(str, ids))[:12]}"
         )
-    identity = next(iter(ids))
+    identity = matches[0]
     raw = hex_bytes(values.get(identity))
     if len(raw) != 32 or raw[:12] != bytes(12) or raw[12:] == bytes(20):
         raise ValueError("immutable is not a canonical nonzero Solidity address")
     # All instances of this immutable are already reference-map checked by
     # examine(). Validate the number of referenced spans as a final guard.
     refs = rt.get("immutableReferences", {}).get(identity)
-    if not isinstance(refs, list) or len(refs) != len(immutables):
-        raise ValueError("immutable reference count is inconsistent")
+    selected = [item for item in immutables if item.get("id") == identity]
+    if not isinstance(refs, list) or len(refs) != len(selected):
+        raise ValueError("registry immutable reference count is inconsistent")
     return {
         "runtime_hex": rt["onchainBytecode"].lower(),
         "registry_address": "0x" + raw[12:].hex(),
