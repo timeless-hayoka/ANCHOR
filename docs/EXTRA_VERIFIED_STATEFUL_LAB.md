@@ -31,10 +31,18 @@ The independent bytecode work in PRs #38–#39 established that the separately c
 | Fuzz deposit | 256 random first-deposit amounts conserve underlying and eToken ownership |
 | Fuzz borrow/repay | 256 random borrowed amounts conserve vault credits, reserve liquidity and same-block debt after full repayment |
 
-Evidence: [Actions source-matched stateful run 41678965139](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41678965139) reported **8 tests passed, 0 failed**, with 256 executions per fuzz property (512 fuzzed cases total). Python provenance regression tests: **3 passed**. Later commit renamed the interest test for accuracy; validate that final commit's CI independently.
+Evidence: [Actions source-matched stateful run 41689723972](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41689723972) reported **12 tests passed, 0 failed**, with 256 executions per fuzz property (512 randomized cases total). Python source-provenance regression tests: **3 passed**.
+
+Additional CI-tested controls (2026-11-03):
+- **Two-stage partial repayment:** Borrow 100,000, repay 40,000 and then 60,000 in the same block. Assert exact remaining debt, restored credits, and liquidity conservation at each step.
+- **Failed-repayment rollback:** Borrow 90,000, attempt to repay 30,000 without token approval, assert that debt, credit, and reserve balances remain unchanged on revert.
+- **Accrued-interest partial settlement:** Borrow 100,000, advance the isolated clock seven days, confirm debt/index growth, then repay 50,000; debt must decrease but remain positive.
+- **Full accrued-interest settlement:** Fund the isolated vault for its additional accrued interest, repay the full seven-day debt, assert outstanding debt is zero, and verify transfer of accrued interest to the reserve.
+
+The full settlement test is **not** evidence that interest always settles correctly under other time windows, extreme utilization, multiple positions, fee-on-transfer tokens or rounding edge cases. It validates the stated scenario only.
 
 ## Limits and next gates
 
-These tests establish source-matched **lab behavior** only, not reportable findings. The borrow/repay control checks same-block repayment and does **not** assert safety under the already disclosed repayment/rounding issue families. The depositor test does **not** claim the first-share-lock mitigation present in the older GitHub revision exists in deployed source. The lab does not yet reconstruct mainnet reserve configuration, vault implementation callbacks, oracle state, liquidations, multi-reserve debt, or all security invariants.
+These tests establish source-matched **lab behavior** only, not reportable findings.  The isolated contract was freshly deployed with synthetic registry, mock ERC-20 and vault factory, not loaded with the onchain contract's historical storage configuration. The seven-day interest settlement succeeds in the tested scenario and does not rule out already disclosed repayment rounding or credit problems. The borrow/repay control checks same-block repayment and does **not** assert safety under the already disclosed repayment/rounding issue families. The depositor test does **not** claim the first-share-lock mitigation present in the older GitHub revision exists in deployed source. The lab does not yet reconstruct mainnet reserve configuration, vault implementation callbacks, oracle state, liquidations, multi-reserve debt, or all security invariants.
 
 Next: negative-control mutations of accounting/authorization assertions; additional partial repayment and interest-sensitive settlement tests; reconstruct distinct scope-approved vault/market configurations; review known findings and active bounty eligibility before any PoC or disclosure. Trinity remains `signal` with no finding.
