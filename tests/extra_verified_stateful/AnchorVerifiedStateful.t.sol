@@ -220,7 +220,7 @@ contract AnchorVerifiedStatefulTest {
         require(_deposit(ALICE, 10_000) > 0, "resumed deposit unavailable");
     }
 
-    function test_VerifiedDebtIndexNeverDecreasesOverOneDay() public {
+    function test_VerifiedBorrowingInterestAccruesOverSevenDays() public {
         uint256 id = _prepareDebt();
         vm.prank(VAULT);
         pool.borrow(VAULT, id, 100_000);
