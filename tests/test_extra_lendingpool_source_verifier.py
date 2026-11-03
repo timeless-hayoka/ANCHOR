@@ -81,10 +81,10 @@ class ExtraSourceVerificationTests(unittest.TestCase):
         snapshot = {
             **self.verified,
             "sources": {"contracts/lendingpool/LendingPool.sol": {
-                "content": "// comment changed\\ncontract LendingPool { uint x = 1; }\\n"
+                "content": "// comment changed\ncontract LendingPool { uint x = 1; }\n"
             }},
         }
-        local = "// another comment\\ncontract LendingPool {uint x=2;}\\n"
+        local = "// another comment\ncontract LendingPool {uint x=2;}\n"
         result = verifier.analyze_snapshot(snapshot, local)
         self.assertEqual(result["status"], "NOT_VERIFIED")
         self.assertEqual(result["token_comparison"]["classification"], "TOKEN_DIFFERENT")
@@ -95,7 +95,7 @@ class ExtraSourceVerificationTests(unittest.TestCase):
         snapshot = {
             **self.verified,
             "sources": {"contracts/lendingpool/LendingPool.sol": {
-                "content": "// new comment\\ncontract LendingPool { uint x=1; }"
+                "content": "// new comment\ncontract LendingPool { uint x=1; }"
             }},
         }
         local = "contract LendingPool {/*old*/uint x = 1;}"
