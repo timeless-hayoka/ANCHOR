@@ -149,6 +149,7 @@ jobs:
             --readiness evidence/extra-hunt-readiness.json \
             --source-evidence evidence/extra-lendingpool-source-verification.json \
             --build-evidence evidence/extra-verified-build.json \
+            --rpc-evidence evidence/extra-independent-bytecode.json \
             --output evidence/extra-trinity-signal.json
           python - <<'PY'
           import json
