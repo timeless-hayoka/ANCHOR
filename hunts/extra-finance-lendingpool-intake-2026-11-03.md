@@ -237,6 +237,14 @@ The new checks cover two-user deposit-to-eToken share accounting, underlying res
 
 **Next gate:** port the tested invariant structure to Solidity **0.8.18** and Sourcify's actual verified 33-file source tree, initialize isolated dependencies with explicit versions and immutable values, add borrower/debt/interest invariants, and only then discuss novel findings after known-issue and scope review. The Trinity record remains a `signal`, not a reproduced issue.
 
+## Verified Solidity 0.8.18 source-matched stateful lab (2026-11-03)
+
+PR #42 now runs a **forkless stateful Foundry test suite** using the 33 source files returned in Sourcify's verified deployment compiler input, rather than the divergent pinned ExtraFi GitHub contract. The exact verified LendingPool source SHA-256 and Optimism chain/address are enforced before compilation. Lab-only registry, vault factory and ERC-20 mocks are isolated from the verified protocol code.
+
+[CI run 41678965139](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41678965139): **8/8 stateful controls passed**, including **256 fuzz runs for deposit conservation and 256 for borrow/repay credit conservation**. Controls include two-party deposits, owner/whitelist/credit denies, borrow and full same-block repay, pause/resume, and strictly positive seven-day borrowing-index/debt accrual at a positive rate. Three Python source-provenance tests also passed.
+
+**Interpretation:** Verified-source stateful behavior reproduced with synthetic initialization, *not* the historical deployed reserves/positions, mainnet owner state, or economics of real vault implementations. No distinct vulnerability or bounty impact has been reproduced. See `docs/EXTRA_VERIFIED_STATEFUL_LAB.md` for current evidence and limitations. Trinity must remain a signal pending scope-confirmed, independent proof and duplicate review.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
