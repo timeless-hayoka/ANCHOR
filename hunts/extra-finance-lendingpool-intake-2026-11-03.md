@@ -158,6 +158,18 @@ The branch also adds `.github/workflows/extra-finance-lab-baseline.yml` to run t
 
 **Immediate next tasks:** build modern negative controls using `vm.expectRevert` in an isolated forkless harness, confirm the relevant authorization and insufficient-share failures, and then repeat against correctly matched deployed-source input. No production interaction.
 
+## Full pinned Foundry baseline with modernized negative controls
+
+Run [41651290826](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41651290826) compiled pinned commit `a66e925d78ee5c990eb2bafa5009cebcbeafe42d` and executed all existing LendingPool, eToken and staking tests inside a non-broadcast CI environment:
+
+- **14 passed, 0 failed, 0 skipped**, across three test suites.
+- Exactly five `testFail*` functions were converted to modern `test_RevertWhen*` form in an **ephemeral checkout only**, using `scripts/extra_legacy_test_adapter.py`. The adapter does not change the protocol repository on GitHub.
+- The first attempted modernization honestly produced 11 passed / 3 failed due to two stale `Ownable` revert-message expectations and one flawed pre-assertion burn test setup. All were corrected in the scoped ephemeral adapter before the passing run.
+- CI preserves pinned-source provenance, Forge version and test output.
+- The current branch also includes adapter self-tests. Revalidate the final commit's CI independently before merging.
+
+**Important:** This is a passing test baseline for the *pinned repository*, not the verified Optimism implementation. Because Sourcify's verified `LendingPool.sol` differs in executable tokens, this result does **not** establish that the deployed version passes identical checks. Existing test cases also do not cover the full economic invariant space. Novel vulnerability evidence remains **NONE**.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
