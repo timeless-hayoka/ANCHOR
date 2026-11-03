@@ -18,6 +18,10 @@ interface IAnchorLiveLendingPool {
 }
 
 contract AnchorExtraLiveReadOnlyForkTest {
+    // Foundry displays standard DSTest-style events for passing tests with
+    // -vv, providing inspectable onchain values from a single pinned block.
+    event log_named_uint(string label, uint256 value);
+    event log_named_address(string label, address value);
     address internal constant TARGET =
         0xBB505c54D71E9e599cB8435b4F0cEEc05fC71cbD;
     uint256 internal constant OP_CHAIN_ID = 10;
@@ -26,16 +30,20 @@ contract AnchorExtraLiveReadOnlyForkTest {
     IAnchorLiveLendingPool internal constant POOL =
         IAnchorLiveLendingPool(TARGET);
 
-    function test_LiveForkIdentityAndActualDeploymentStorage() public view {
+    function test_LiveForkIdentityAndActualDeploymentStorage() public {
         require(block.chainid == OP_CHAIN_ID, "must fork Optimism");
         require(TARGET.code.length > 10_000, "target bytecode missing");
         address registry = POOL.addressRegistry();
         require(registry != address(0) && registry.code.length > 0, "real registry missing");
         require(POOL.nextReserveId() > 1, "no deployed reserves");
         require(POOL.nextDebtPositionId() >= 1, "invalid debt position count");
+        emit log_named_uint("fork_block", block.number);
+        emit log_named_address("registry", registry);
+        emit log_named_uint("nextReserveId", POOL.nextReserveId());
+        emit log_named_uint("nextDebtPositionId", POOL.nextDebtPositionId());
     }
 
-    function test_LiveForkReserveAddressesAndDebtViews() public view {
+    function test_LiveForkReserveAddressesAndDebtViews() public {
         require(block.chainid == OP_CHAIN_ID, "wrong chain");
         uint256 next = POOL.nextReserveId();
         require(next > 1, "no live reserves");
@@ -55,6 +63,13 @@ contract AnchorExtraLiveReadOnlyForkTest {
             require(liquidity >= borrows, "live reserve owes more than reported total liquidity");
             require(utilization <= 1e18, "live utilization greater than 100 percent");
             require(borrowingRate <= 100e18, "unreasonable live annualized borrow rate");
+            emit log_named_uint("reserve_id", id);
+            emit log_named_address("underlying", underlying);
+            emit log_named_address("eToken", eToken);
+            emit log_named_uint("total_liquidity", liquidity);
+            emit log_named_uint("total_borrows", borrows);
+            emit log_named_uint("utilization_1e18", utilization);
+            emit log_named_uint("borrowing_rate_1e18", borrowingRate);
         }
     }
 
