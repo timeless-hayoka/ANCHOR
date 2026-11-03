@@ -63,8 +63,21 @@ def compare_solidity_source(local: str, verified: str) -> dict[str, Any]:
             if item[0] != "equal"
         ]
         output["token_hunk_count"] = len(hunks)
+        def changed_identifiers(tokens: list[str]) -> list[str]:
+            # Bounded identifier summary, not a source-code excerpt.
+            return sorted({
+                token for token in tokens
+                if re.fullmatch(r"[A-Za-z_$][A-Za-z0-9_$]*", token)
+            })[:12]
+
         output["token_hunks_first_12"] = [
-            {"kind": kind, "local_token_range": [a + 1, b], "verified_token_range": [c + 1, d]}
+            {
+                "kind": kind,
+                "local_token_range": [a + 1, b],
+                "verified_token_range": [c + 1, d],
+                "local_changed_identifiers": changed_identifiers(left[a:b]),
+                "verified_changed_identifiers": changed_identifiers(right[c:d]),
+            }
             for kind, a, b, c, d in hunks[:12]
         ]
     return output
