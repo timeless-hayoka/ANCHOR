@@ -356,14 +356,14 @@ contract AnchorVerifiedStatefulTest {
         require(debtBefore >= borrowAmount, "time reduced outstanding principal");
         uint256 liquidityBefore = token.balanceOf(pool.getETokenAddress(reserveId));
         uint256 creditBefore = pool.credits(reserveId, VAULT);
-        uint256 partial = borrowAmount / 2;
+        uint256 partialAmount = borrowAmount / 2;
 
         vm.startPrank(VAULT);
-        token.approve(address(pool), partial);
-        uint256 paid = pool.repay(VAULT, id, partial);
+        token.approve(address(pool), partialAmount);
+        uint256 paid = pool.repay(VAULT, id, partialAmount);
         vm.stopPrank();
 
-        require(paid == partial, "partial repayment differs from requested amount");
+        require(paid == partialAmount, "partial repayment differs from requested amount");
         require(
             token.balanceOf(pool.getETokenAddress(reserveId)) == liquidityBefore + paid,
             "reserve partial repayment liquidity mismatch"
