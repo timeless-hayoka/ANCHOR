@@ -65,11 +65,11 @@ These two additional tests resolve the deployed vault via the actual public `Add
 
 ## Real cross-vault debt ownership boundary (2026-11-03)
 
-[GitHub Actions run 41718872413](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41718872413) passed **8/8 fork tests, zero failures** at OP Mainnet block **159070638**.
+[GitHub Actions run 41719162207](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41719162207) passed **8/8 fork tests, zero failures** at OP Mainnet block **159070694**.
 
 The additional local-only test `test_LocalForkWhitelistedVaultCannotOperateAnotherVaultDebt` scans a bounded number of actual deployed debt IDs and factory vault IDs. It locates a debt position whose owner is a whitelisted onchain vault, and a **different**, also whitelisted onchain vault. It then simulates `borrow(otherVault, debtId, 1)` and `repay(otherVault, debtId, 1)` as that second vault inside the disposable fork.
 
-**Both cross-vault calls reverted.** The recorded original position owner, debt principal, reserve ID, competing vault credit, total reserve liquidity, and aggregate borrowing remained unchanged. No live-chain transaction was broadcast. The test asserts that the pool is not paused to avoid counting the pause guard as an owner-check success.
+**Both cross-vault calls reverted with the exact Solidity `Error(string)` reason `"7"` (`VL_INVALID_DEBT_OWNER`).** A generic unrelated revert would fail this test. The recorded original position owner, debt principal, reserve ID, competing vault credit, total reserve liquidity, and aggregate borrowing remained unchanged. No live-chain transaction was broadcast. The test asserts that the pool is not paused to avoid counting the pause guard as an owner-check success.
 
 **Research status: NEGATIVE / NO CROSS-VAULT DEBT OWNERSHIP BYPASS REPRODUCED.** This establishes one verified deployment snapshot and bounded pair of real whitelisted vaults, not all vaults, historical blocks, debt configurations, or a new in-scope financial loss. This evidence must not be promoted to a bounty report.
 
