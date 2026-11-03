@@ -41,6 +41,7 @@ SNAPSHOT = {
             "id": "1", "type": "replace", "reason": "cborAuxdata", "offset": len(BASE)
         }],
         "transformationValues": {"cborAuxdata": {"1": "0x" + VALID_META.hex()}},
+        "cborAuxdata": {"1": {"offset": len(BASE), "value": "0x" + VALID_META.hex()}},
     },
 }
 
@@ -79,6 +80,32 @@ def test_missing_or_forged_transformation_values_fail_closed():
     ):
         snap = {**SNAPSHOT, "runtimeBytecode": {**SNAPSHOT["runtimeBytecode"], **runtime_change}}
         assert mod.examine(snap)["state"] == "NOT_RECONCILED", runtime_change
+
+
+def test_fake_immutable_mask_cannot_hide_opcode_tampering():
+    # A forged transformation payload must agree with Solidity's immutableReferences.
+    original = bytes.fromhex("60016000")
+    compiled = original + bytes(32) + bytes.fromhex("55")
+    altered = original + bytes([7] * 32) + bytes.fromhex("55")
+    malicious = {
+        "chainId": "10", "address": ADDRESS, "runtimeMatch": "match",
+        "runtimeBytecode": {
+            "onchainBytecode": "0x" + altered.hex(),
+            "recompiledBytecode": "0x" + compiled.hex(),
+            "transformations": [{"id": "123", "type": "replace", "reason": "immutable", "offset": 4}],
+            "transformationValues": {"immutables": {"123": "0x" + bytes([7] * 32).hex()}},
+            "immutableReferences": {},
+        },
+    }
+    result = mod.examine(malicious)
+    assert result["state"] == "NOT_RECONCILED"
+    assert "compiler reference map" in result["reason"]
+    malicious["runtimeBytecode"]["immutableReferences"] = {
+        "123": [{"start": 4, "length": 32}],
+    }
+    result = mod.examine(malicious)
+    assert result["state"] == "DECLARED_TRANSFORMS_RECONCILED"
+    assert result["full_deployment_equivalence"] == "NOT_PROVEN"
 
 
 def test_wrong_chain_or_rpc_digest_blocks():
