@@ -55,6 +55,19 @@ def test_compile_output_does_not_claim_onchain_equivalence():
     assert report["independent_rpc_check"] == "NOT_PERFORMED"
 
 
+def test_detector_rejects_planted_runtime_bytecode_mutation():
+    _, meta = m.prepare_input(SNAPSHOT)
+    mutated = {"contracts": {
+        "contracts/lendingpool/LendingPool.sol": {
+            "LendingPool": {"evm": {"deployedBytecode": {"object": "6001"}}}
+        }
+    }}
+    result = m.compare_compilation(mutated, meta)
+    assert result["state"] == "PROVIDER_BUILD_COMPILED"
+    assert result["compiler_equals_provider_recompiled"] is False
+    assert result["full_deployment_equivalence"] == "NOT_PROVEN"
+
+
 def test_compiler_errors_fail_closed():
     _, meta = m.prepare_input(SNAPSHOT)
     result = m.compare_compilation(
