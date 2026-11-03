@@ -42,7 +42,9 @@ def analyze_snapshot(snapshot: Any, source_text: str) -> dict[str, Any]:
     if str(snapshot.get("address", "")).lower() != ADDRESS:
         result["reason"] = "snapshot address mismatch"
         return result
-    if snapshot.get("runtimeMatch") != "exact_match":
+    runtime_match = snapshot.get("runtimeMatch")
+    result["reported_runtime_match"] = runtime_match if isinstance(runtime_match, str) else None
+    if runtime_match != "exact_match":
         result["reason"] = "Sourcify exact runtime match not established"
         return result
     sources = snapshot.get("sources")
