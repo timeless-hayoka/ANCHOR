@@ -190,7 +190,7 @@ contract AnchorExtraLiveReadOnlyForkTest {
     function test_LocalForkNonOwnerCannotToggleVaultBorrowingAuthorization() public {
         require(block.chainid == OP_CHAIN_ID, "wrong chain");
         uint256 vaultId = 1;
-        address vault = POOL.getVault(vaultId);
+        address vault = _realVault(vaultId);
         require(vault != address(0) && vault.code.length > 0, "real vault missing");
         address outsider = address(uint160(0xD00D));
         bool initiallyWhitelisted = POOL.borrowingWhiteList(vault);
