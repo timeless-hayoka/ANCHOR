@@ -31,13 +31,14 @@ The independent bytecode work in PRs #38–#39 established that the separately c
 | Fuzz deposit | 256 random first-deposit amounts conserve underlying and eToken ownership |
 | Fuzz borrow/repay | 256 random borrowed amounts conserve vault credits, reserve liquidity and same-block debt after full repayment |
 
-Evidence: [Actions source-matched stateful run 41689723972](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41689723972) reported **12 tests passed, 0 failed**, with 256 executions per fuzz property (512 randomized cases total). Python source-provenance regression tests: **3 passed**.
+Evidence: [Actions source-matched stateful run 41690115525](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41690115525) reported **13 tests passed, 0 failed**, with 256 executions for each of three fuzz properties (**768 randomized runs total**). Python source-provenance regression tests: **3 passed**.
 
 Additional CI-tested controls (2026-11-03):
 - **Two-stage partial repayment:** Borrow 100,000, repay 40,000 and then 60,000 in the same block. Assert exact remaining debt, restored credits, and liquidity conservation at each step.
 - **Failed-repayment rollback:** Borrow 90,000, attempt to repay 30,000 without token approval, assert that debt, credit, and reserve balances remain unchanged on revert.
 - **Accrued-interest partial settlement:** Borrow 100,000, advance the isolated clock seven days, confirm debt/index growth, then repay 50,000; debt must decrease but remain positive.
 - **Full accrued-interest settlement:** Fund the isolated vault for its additional accrued interest, repay the full seven-day debt, assert outstanding debt is zero, and verify transfer of accrued interest to the reserve.
+- **Variable-interest fuzz settlement:** For 256 generated combinations of loan sizes and 1–30 simulated days, repay half the principal; assert reserve liquidity and vault credit increase by the amount paid while debt decreases but remains positive and the borrowing index never declines.
 
 The full settlement test is **not** evidence that interest always settles correctly under other time windows, extreme utilization, multiple positions, fee-on-transfer tokens or rounding edge cases. It validates the stated scenario only.
 
