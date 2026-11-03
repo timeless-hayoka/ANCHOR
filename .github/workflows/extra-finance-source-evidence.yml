@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'scripts/check_extra_lendingpool_source.py'
+      - 'scripts/anchor_hunt_readiness.py'
+      - 'tests/test_anchor_hunt_readiness.py'
       - 'scripts/extra_verified_source_hunk_review.py'
       - 'tests/test_extra_verified_source_hunk_review.py'
       - 'tests/test_extra_lendingpool_source_verifier.py'
@@ -64,6 +66,27 @@ jobs:
           if [ "$code" -ne 0 ]; then
             echo "::warning::Verified-source hunk review unavailable; evidence incomplete."
           fi
+      - name: Record fail-closed ANCHOR hunt readiness
+        shell: bash
+        run: |
+          # No reviewer-approved scope confirmation or verified Finder selection
+          # is provided here. The correct outcome for this real target is BLOCKED.
+          set +e
+          python scripts/anchor_hunt_readiness.py \
+            --target-id ExtraFi/extra-contracts \
+            --target-ref a66e925d78ee5c990eb2bafa5009cebcbeafe42d \
+            --chain-id 10 \
+            --contract-address 0xbb505c54d71e9e599cb8435b4f0ceec05fc71cbd \
+            --source-evidence evidence/extra-lendingpool-source-verification.json \
+            --output evidence/extra-hunt-readiness.json
+          code=$?
+          set -e
+          cat evidence/extra-hunt-readiness.json
+          if [ "$code" -ne 2 ]; then
+            echo "::error::Extra Finance readiness unexpectedly unblocked or errored (exit $code)."
+            exit 1
+          fi
+          echo "::notice::Extra Finance readiness remains blocked pending complete scope and source evidence."
       - name: Upload source comparison evidence
         if: always()
         uses: actions/upload-artifact@v4
