@@ -61,8 +61,12 @@ def examine(snapshot: Any, rpc_evidence: Any = None) -> dict[str, Any]:
     except ValueError as exc:
         report["reason"] = str(exc)
         return report
-    report["onchain_sha256"] = sha(deployed)
-    report["recompiled_sha256"] = sha(compiled)
+    # Existing independent RPC/provenance reports hash the normalized 0x hex
+    # representation, not decoded bytes. Preserve that wire-format convention.
+    onchain_wire_sha = hashlib.sha256(("0x" + deployed.hex()).encode("utf-8")).hexdigest()
+    recompiled_wire_sha = hashlib.sha256(("0x" + compiled.hex()).encode("utf-8")).hexdigest()
+    report["onchain_sha256"] = onchain_wire_sha
+    report["recompiled_sha256"] = recompiled_wire_sha
     report["onchain_byte_count"] = len(deployed)
     report["recompiled_byte_count"] = len(compiled)
 
@@ -74,8 +78,8 @@ def examine(snapshot: Any, rpc_evidence: Any = None) -> dict[str, Any]:
             rpc_evidence.get("state") != "RPC_MATCHES_PROVIDER_ONCHAIN"
             or str(rpc_evidence.get("chain_id")) != CHAIN_ID
             or str(rpc_evidence.get("address", "")).lower() != ADDRESS
-            or str(rpc_evidence.get("rpc_onchain_sha256", "")).lower() != sha(deployed)
-            or str(rpc_evidence.get("provider_onchain_sha256", "")).lower() != sha(deployed)
+            or str(rpc_evidence.get("rpc_onchain_sha256", "")).lower() != onchain_wire_sha
+            or str(rpc_evidence.get("provider_onchain_sha256", "")).lower() != onchain_wire_sha
             or rpc_evidence.get("transaction_broadcast") is not False
         ):
             report["reason"] = "independent onchain bytecode attestation incomplete or contradictory"
