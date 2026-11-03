@@ -95,6 +95,47 @@ def test_cannot_reuse_fake_source_pass():
         bridge.prepare_handoff(ready, SOURCE)
 
 
+def test_build_evidence_is_recorded_without_promoting_lead():
+    source = {
+        **SOURCE,
+        "verified_source_candidates": [{
+            "path": "contracts/lendingpool/LendingPool.sol",
+            "sha256": "a" * 64,
+        }],
+    }
+    build = {
+        "state": "PROVIDER_BUILD_COMPILED",
+        "chain_id": "10", "address": ADDRESS,
+        "source_sha256": "a" * 64,
+        "compiler_equals_provider_recompiled": True,
+    }
+    result = bridge.prepare_handoff(READINESS, source, build)
+    assert result["provenance"]["build_state"] == "PROVIDER_RECOMPILE_MATCH_SOURCE_LINKED"
+    assert result["lead"]["state"] == "signal"
+    assert result["finding"] == "NONE"
+    assert result["deployment_bytecode_equivalence"] == "NOT_PROVEN"
+
+
+def test_other_chain_or_wrong_source_build_cannot_be_handed_off():
+    source = {
+        **SOURCE,
+        "verified_source_candidates": [{"sha256": "a" * 64}],
+    }
+    good = {
+        "state": "PROVIDER_BUILD_COMPILED", "chain_id": "10", "address": ADDRESS,
+        "source_sha256": "a" * 64, "compiler_equals_provider_recompiled": True,
+    }
+    for changed in ({"chain_id": "8453"}, {"address": "0x" + "2" * 40}, {"source_sha256": "b" * 64}):
+        with pytest.raises(ValueError):
+            bridge.prepare_handoff(READINESS, source, {**good, **changed})
+
+
+def test_compiler_failure_remains_visible_but_not_promoted():
+    result = bridge.prepare_handoff(READINESS, SOURCE, {"state": "COMPILE_NOT_PROVEN"})
+    assert result["provenance"]["build_state"] == "COMPILE_NOT_PROVEN"
+    assert result["lead"]["scope_status"] == "unknown"
+
+
 def test_existing_evidence_artifact_is_not_overwritten(tmp_path):
     output = tmp_path / "handoff.json"
     report = bridge.prepare_handoff(READINESS, SOURCE)
