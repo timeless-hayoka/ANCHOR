@@ -828,6 +828,20 @@ def compute_repo_score(
         score -= 2
         candidate.signals.append(RepoSignal("surface-gap", "no docs, workflows, or manifests", -2))
 
+    # Repository names describing audit products or training exercises should not
+    # outrank protocol source solely on security vocabulary. This is a priority
+    # hint, not an eligibility or authorization decision.
+    repo_slug = full_name.rsplit("/", 1)[-1].lower()
+    non_target_name = re.search(
+        r"(?:^|[-_])(?:auditor|audit-tool|audit-framework|security-lab|"
+        r"training-lab|vulnerability-scanner|static-analyzer)(?:$|[-_])",
+        repo_slug,
+    )
+    if non_target_name:
+        score -= 8
+        candidate.signals.append(RepoSignal("repository-kind", "auditing tool or training lab name", -8))
+        candidate.reasons.append("repo name suggests tooling or practice rather than protocol source")
+
     candidate.score = score
     candidate.priority_score = max(0, min(100, 50 + (score * 4)))
     if score >= 10 and candidate.docs_present and candidate.open_issues > 0 and not candidate.archived:
