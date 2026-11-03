@@ -9,6 +9,14 @@ interface VmAnchorFork {
     function expectRevert() external;
 }
 
+interface IAnchorAddressRegistry {
+    function getAddress(uint256 id) external view returns (address);
+}
+
+interface IAnchorVaultFactory {
+    function vaults(uint256 id) external view returns (address);
+}
+
 interface IAnchorLiveLendingPool {
     function addressRegistry() external view returns (address);
     function nextReserveId() external view returns (uint256);
@@ -18,7 +26,6 @@ interface IAnchorLiveLendingPool {
     function borrow(address onBehalfOf, uint256 debtId, uint256 amount) external;
     function repay(address onBehalfOf, uint256 debtId, uint256 amount) external returns (uint256);
     function borrowingWhiteList(address vault) external view returns (bool);
-    function getVault(uint256 vaultId) external view returns (address);
     function credits(uint256 reserveId, address vault) external view returns (uint256);
     function setCreditsOfVault(uint256 vaultId, uint256 reserveId, uint256 credit) external;
     function enableVaultToBorrow(uint256 vaultId) external;
@@ -143,11 +150,23 @@ contract AnchorExtraLiveReadOnlyForkTest {
     /// @notice Reject an ordinary account's attempt to increase the
     /// existing onchain vault's borrowing budget. All attempted state
     /// changes occur only in this disposable local Foundry fork.
+    /// @dev LendingPool.getVault() is INTERNAL in verified Solidity; resolve
+    /// registry key 10 (ADDRESS_ID_VAULT_FACTORY) through the actual external
+    /// registry and then its public vaults(id) mapping. No fabricated ABI.
+    function _realVault(uint256 vaultId) internal view returns (address vault) {
+        address registry = POOL.addressRegistry();
+        require(registry.code.length > 0, "registry missing");
+        address factory = IAnchorAddressRegistry(registry).getAddress(10);
+        require(factory != address(0) && factory.code.length > 0, "vault factory missing");
+        vault = IAnchorVaultFactory(factory).vaults(vaultId);
+        require(vault != address(0) && vault.code.length > 0, "vault ID not deployed");
+    }
+
     function test_LocalForkNonOwnerCannotIncreaseExistingVaultCredits() public {
         require(block.chainid == OP_CHAIN_ID, "wrong chain");
         uint256 reserveId = 1;
         uint256 vaultId = 1;
-        address currentVault = POOL.getVault(vaultId);
+        address currentVault = _realVault(vaultId);
         require(currentVault != address(0) && currentVault.code.length > 0, "real vault missing");
 
         address outsider = address(uint160(0xD00D));
