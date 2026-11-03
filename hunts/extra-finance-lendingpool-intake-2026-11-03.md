@@ -170,6 +170,23 @@ Run [41651290826](https://github.com/timeless-hayoka/ANCHOR/actions/runs/4165129
 
 **Important:** This is a passing test baseline for the *pinned repository*, not the verified Optimism implementation. Because Sourcify's verified `LendingPool.sol` differs in executable tokens, this result does **not** establish that the deployed version passes identical checks. Existing test cases also do not cover the full economic invariant space. Novel vulnerability evidence remains **NONE**.
 
+## Actual Sourcify deployment metadata (2026-11-03)
+
+The new read-only `scripts/anchor_deployment_provenance.py` collected the real Sourcify v2 `fields=all` verification metadata in [Extra Finance evidence run 41657612177](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41657612177):
+
+- Deployment: chain `10`, target `0xbb505c54d71e9e599cb8435b4f0ceec05fc71cbd`.
+- `compilation.fullyQualifiedName`: `contracts/lendingpool/LendingPool.sol:LendingPool`.
+- **Compiler: `0.8.18+commit.87f61d96`**; optimization enabled, **200 runs**.
+- Sourcify lists **33 verified source files**; `LendingPool.sol` SHA-256 is `9e1a6cf5930e2477aab0022536be39ab4bb7e1fbb6953b31cf90429f6205bf6f`.
+- `runtimeMatch: match` (not `exact_match`); the onchain and recompiled runtime bytecode in this provider's response were **not byte-identical**. This may be explained by permitted transformations/metadata and must **not** be called either an exploitable mismatch or independent bytecode parity.
+- Provider proxy-resolution reported `isProxy: false` for this address. This is a read-only provider classification, not a guarantee that all upstream integrations are non-upgradeable.
+- Independent chain-RPC bytecode attestation: **NOT PERFORMED**. Full source/build equivalence: **NOT PROVEN**.
+- The upstream repository's `foundry.toml` uses **0.8.20** and its Hardhat config uses **0.8.18**; only a compiler/build matched to the verified deployment can underpin production-equivalent tests.
+
+The associated ANCHOR handoff generated a deterministic Trinity `signal` with `BLOCKED_RESEARCH_SIGNAL`. No scope authorization, PoC, new vulnerability, or bounty claim has been produced.
+
+**Next research gate:** capture Sourcify's standard compiler input and transformation details, run an exact 0.8.18 isolated source build, then compare produced and independently obtained runtime bytecode with appropriate transformation handling before testing protocol invariants.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
