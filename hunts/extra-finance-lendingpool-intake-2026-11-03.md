@@ -83,6 +83,24 @@ A subsequent isolated GitHub Actions read-only verification produced a non-exact
 
 The classifier is intentionally conservative: different tokens show code-level source drift, **not** necessarily different runtime behavior or an exploitable bug. The Sourcify verification is non-exact, so full bytecode equivalence remains unproven. Next: inspect exact differences and relevant published audit reports, pin the actually deployed build, then test approved invariants in isolation.
 
+## Source diff hotspot triage (2026-11-03, live Sourcify evidence)
+
+The source-difference classifier ran against the *verified* Optimism source with `runtimeMatch: match` and produced **13 Solidity token change hunks** (3,451 vs 3,329 tokens). The line-oriented classifier attributes its 12 changed regions to their nearest named functions. These are candidate code-review locations **not** identified vulnerabilities:
+
+| Pinned source lines | Nearest function | Triage rationale |
+| --- | --- | --- |
+| 1, 20, 27–29 | Contract header/imports | Check interface, compiler, inheritance and constants. |
+| 185 | `redeem` | Compare eToken receipt handling and beneficiary accounting. |
+| 224 | `unStakeAndWithdraw` | Compare withdrawal orchestration with staking accounting. |
+| 277–287 | `_deposit` | Compare actual incoming funds and eToken mint arithmetic. |
+| 452–462 and 468 | `repay` | Compare debt adjustment, clamping and credit paths; known repayment issues overlap and must be excluded. |
+| 535–538 and 558–559 | `setBorrowingRateConfig` | Compare privileged configuration validation. |
+| 789–792 | `setReserveFeeRate` | Compare fee-setting safeguards. |
+
+Evidence: [GitHub Actions source-evidence run 41647190600](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41647190600). Nearest-function association is a *textual heuristic* rather than an AST or a proof of changed behavior.
+
+**Next gate:** recover and review each changed source body from the independently verified compiler input, compare with released audit reports and known-issue exclusions, and only then build non-broadcast Foundry invariants. Do not promote any of these differences to a bounty submission without a distinct, reproduced in-scope impact.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
