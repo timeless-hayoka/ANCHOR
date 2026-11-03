@@ -107,6 +107,8 @@ jobs:
           if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
             exit 1
           fi
+      - name: Install evidence test dependency
+        run: python -m pip install 'pytest>=8,<10'
       - name: Validate verified-build input tests
         run: python -m pytest tests/test_extra_verified_source_compile.py -q
       - name: Compile Sourcify source with pinned solc 0.8.18 (offline chain)
@@ -122,9 +124,7 @@ jobs:
           fi
           echo "Sourcify build verification status exit code: $code"
       - name: Validate Trinity handoff tests
-        run: |
-          python -m pip install 'pytest>=8,<10'
-          python -m pytest tests/test_anchor_trinity_handoff.py -q
+        run: python -m pytest tests/test_anchor_trinity_handoff.py -q
       - name: Archive blocked research signal for Trinity
         shell: bash
         run: |
