@@ -101,6 +101,20 @@ Evidence: [GitHub Actions source-evidence run 41647190600](https://github.com/ti
 
 **Next gate:** recover and review each changed source body from the independently verified compiler input, compare with released audit reports and known-issue exclusions, and only then build non-broadcast Foundry invariants. Do not promote any of these differences to a bounty submission without a distinct, reproduced in-scope impact.
 
+## Historical audit duplicate register (PeckShield 2023-098)
+
+Primary report: [PeckShield ExtraFi v1.0 (May 5, 2023)](https://github.com/peckshield/publications/blob/master/audit_reports/PeckShield-Audit-Report-ExtraFi-v1.0.pdf). The report identifies **a different repository and revision**: `ExtraFi/contracts` reviewed commit `c70f83d` and post-fix commit `ebed8b1`. This must not be conflated with the current pinned `ExtraFi/extra-contracts` commit `a66e925d...` or with deployed Optimism bytecode.
+
+Published findings in the 2023 audit, to exclude from novelty claims:
+- **PVE-001 (High; resolved):** Possible Position Value Manipulation, affecting position leverage valuation and reserve-derived amounts.
+- **PVE-002 (Low; resolved):** Accommodation of Non-ERC20-Compliant Tokens.
+- **PVE-003 (Low; resolved):** Incorrect `VeToken.balanceOfAt()` Calculation.
+- **PVE-004 (Low; resolved):** `StakingRewards.setReward()` logic improvement.
+- **PVE-005 (Medium; mitigated):** Trust Issue of Admin Keys.
+- **PVE-006 (Informational; resolved):** Redundant State/Code Removal.
+
+The older report states all issues except admin-key trust were marked resolved, with admin risk mitigated. Extra Finance's current bounty rules exclude unfixed issues mentioned in its listed audits. **Historical status is not proof that any current deployment is fixed**; verify the actual runtime and separate the dated audit scope from the verified source delta. The BlockSec and Sherlock findings are not yet fully triaged against these source hunks.
+
 ## Source/deployment equivalence gap
 
 - An OP explorer URL for the target and the project's contracts documentation both refer to the same address; a fully machine-readable verified-source/bytecode comparison was **not obtained**.
