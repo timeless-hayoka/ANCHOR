@@ -4,7 +4,7 @@
 
 ## Actual onchain execution
 
-The workflow connects to public OP Mainnet read-only RPC `https://mainnet.optimism.io`, checks `eth_chainId=10`, captures an explicit block, then executes a **pinned-block local Foundry fork**. The contract under test is the actual public LendingPool at its real deployed address and storage state. It does not deploy replacement LendingPool bytecode, mock reserve state, impersonate accounts, invoke state-changing LendingPool methods, or broadcast transactions.
+The workflow connects to public OP Mainnet read-only RPC `https://mainnet.optimism.io`, checks `eth_chainId=10`, captures an explicit block, then executes a **pinned-block local Foundry fork**. The contract under test is the actual public LendingPool at its real deployed address and storage state. It does not deploy replacement LendingPool bytecode or mock reserve state. It can **locally simulate** an unprivileged state-changing call inside the disposable fork; no such call is sent to the public RPC or broadcast to the chain.
 
 First passing run: [41699813858](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41699813858), **block 159066955**, **3/3 passed**.
 
@@ -31,10 +31,18 @@ All liquidity/debt values are **raw underlying token base units**; tokens have d
 
 The full pass log also records reserve IDs 3, 7, 8, registry address and eToken addresses. Only samples are reproduced above for readability. Exact state is **block-scoped**; these are not promises about present balances or configuration.
 
+## Live-storage security negative control (block 159067111)
+
+[GitHub Actions run 41700661923](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41700661923) passed **4/4 Foundry tests, 0 failures** on a new pinned OP block **159067111**.
+
+The fourth test, `test_LocalForkNonOwnerCannotInitializeReserve`, simulates an **unprivileged `initReserve` call only inside the disposable fork** using Foundry's `vm.prank`. The call reverts as expected, and `nextReserveId()` remains unchanged. The external public Optimism RPC only serves chain, code and storage reads; the simulated transaction is never broadcast or sent to the live chain.
+
+This tests one access-control boundary against real deployed code and real starting storage. It does **not** demonstrate a bypass or exploit, and does not prove authorization safety for every administrative method, proxy or reserve state.
+
 ## Conclusions and boundaries
 
 The deployed contract, actual registry and sampled live reserves are reachable; getters function consistently in a pinned-block fork. This provides real-state, source-independent confirmation beyond the synthetic reserve tests in PRs #42–#43.
 
-**This is not a validated vulnerability**, not a full asset audit, and not a demonstration of state-mutating borrow/repay safety on production storage. The fork tests use only view methods. Public RPC reliability and archive retention may affect repeatability. The next validation should compare active reserve configuration and vault permissions against source-matched protocol invariants, using local-only fork simulations, no live broadcasts, and independent scope review before any bounty finding claim.
+**This is not a validated vulnerability**, not a full asset audit, and not a demonstration of state-mutating borrow/repay safety on production storage. The first three fork tests use only view methods; the fourth uses an **isolated local simulation** of an unauthorized admin call and asserts rollback. Public RPC reliability and archive retention may affect repeatability. The next validation should compare active reserve configuration and vault permissions against source-matched protocol invariants, using local-only fork simulations, no live broadcasts, and independent scope review before any bounty finding claim.
 
 No Trinity lead is promoted; no report submitted.
