@@ -177,12 +177,22 @@ def examine(snapshot: Any, rpc_evidence: Any = None) -> dict[str, Any]:
         if reason == "cborAuxdata":
             metadata_map = runtime.get("cborAuxdata")
             entry = metadata_map.get(identity) if isinstance(metadata_map, dict) else None
-            if (
-                not isinstance(entry, dict)
-                or entry.get("offset") != offset
-                or str(entry.get("value", "")).lower() != ("0x" + replacement.hex())
-            ):
+            # The compiler CBOR map describes RECOMPILED metadata; the
+            # transformation value describes DEPLOYED metadata. Their bytes
+            # commonly differ, but offsets and lengths must align exactly.
+            if not isinstance(entry, dict) or entry.get("offset") != offset:
                 report["reason"] = f"metadata transformation {index} not in compiler CBOR map"
+                return report
+            try:
+                compiler_cbor = hex_bytes(entry.get("value"))
+            except ValueError:
+                report["reason"] = f"metadata transformation {index} has invalid compiler CBOR"
+                return report
+            if (
+                len(compiler_cbor) != len(replacement)
+                or compiled[offset:offset + len(compiler_cbor)] != compiler_cbor
+            ):
+                report["reason"] = f"metadata transformation {index} compiler CBOR range differs"
                 return report
             if len(replacement) < 2:
                 report["reason"] = f"transformation {index} invalid metadata"
