@@ -1,0 +1,74 @@
+name: Extra Finance verified-source stateful lab
+on:
+  pull_request:
+    paths:
+      - 'scripts/extra_verified_stateful_sources.py'
+      - 'tests/test_extra_verified_stateful_sources.py'
+      - 'tests/extra_verified_stateful/**'
+      - '.github/workflows/extra-finance-verified-stateful.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stateful-verified-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FOUNDRY_ETH_RPC_URL: ''
+      ETH_RPC_URL: ''
+    steps:
+      - name: Checkout ANCHOR
+        uses: actions/checkout@v4
+      - name: Install Python test dependency
+        run: python -m pip install 'pytest>=8,<10'
+      - name: Run source-provenance fail-closed checks
+        run: python -m pytest tests/test_extra_verified_stateful_sources.py -q
+      - name: Materialize real Sourcify Solidity 0.8.18 source tree
+        shell: bash
+        run: |
+          mkdir -p evidence
+          python scripts/extra_verified_stateful_sources.py \
+            --outdir .extra-verified-stateful \
+            | tee evidence/extra-verified-stateful-materialization.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          record=json.loads(Path('evidence/extra-verified-stateful-materialization.json').read_text())
+          assert record['state']=='VERIFIED_SOURCE_TREE_MATERIALIZED'
+          assert record['lendingpool_sha256']=='9e1a6cf5930e2477aab0022536be39ab4bb7e1fbb6953b31cf90429f6205bf6f'
+          assert record['compiler']=='0.8.18'
+          print('Verified source tree, not pinned GitHub contract revision')
+          PY
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.7
+      - name: Run isolated verified-source stateful controls
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p .extra-verified-stateful/tests/extra_verified_stateful
+          cp tests/extra_verified_stateful/AnchorVerifiedStateful.t.sol \
+            .extra-verified-stateful/tests/extra_verified_stateful/AnchorVerifiedStateful.t.sol
+          cat > .extra-verified-stateful/foundry.toml <<'TOML'
+          [profile.default]
+          src = "contracts"
+          test = "tests"
+          solc_version = "0.8.18"
+          optimizer = true
+          optimizer_runs = 200
+          # Fuzz count is set through FOUNDRY_FUZZ_RUNS below.
+          TOML
+          FOUNDRY_FUZZ_RUNS=256 forge test --root .extra-verified-stateful \
+            --match-contract AnchorVerifiedStatefulTest -vv \
+            2>&1 | tee evidence/extra-verified-stateful-test.log
+      - name: Preserve stateful lab evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extra-verified-source-stateful-evidence
+          path: evidence/
+          retention-days: 14
+          if-no-files-found: warn
