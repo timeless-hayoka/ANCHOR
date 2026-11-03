@@ -17,6 +17,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from extra_source_semantic_delta import compare_solidity_source
+
 CHAIN_ID = "10"
 ADDRESS = "0xbb505c54d71e9e599cb8435b4f0ceec05fc71cbd"
 SOURCE_NAME = "LendingPool.sol"
@@ -93,6 +95,7 @@ def analyze_snapshot(snapshot: Any, source_text: str) -> dict[str, Any]:
                 "verified_line_count": len(remote_lines),
             })
         result["source_differences"] = differences
+        result["token_comparison"] = compare_solidity_source(source_text, sorted(possible)[0][1])
         # Report only bounded line ranges, never raw source or suspected attack
         # paths. A changed line count alone does not establish logic drift.
         first_verified_lines = sorted(possible)[0][1].splitlines()
