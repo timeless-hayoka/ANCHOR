@@ -68,6 +68,20 @@ class FinderPipelineTests(unittest.TestCase):
         self.assertEqual(bundle['candidates'][0]['full_name'], 'new/name')
         self.assertEqual(bundle['candidates'][0]['scan_status'], 'complete')
 
+    def test_named_audit_tools_and_training_labs_rank_below_protocol_source(self):
+        base = {'language': 'Solidity', 'open_issues_count': 2,
+                'topics': ['solidity', 'foundry'], 'stargazers_count': 100}
+        readme = 'Solidity Foundry smart contracts security policy invariant testing'
+        protocol = finder.compute_repo_score({**base, 'full_name': 'org/vault-protocol'}, readme, ['solidity'])
+        auditor = finder.compute_repo_score({**base, 'full_name': 'org/smart-contract-auditor'}, readme, ['solidity'])
+        lab = finder.compute_repo_score({**base, 'full_name': 'org/security-lab'}, readme, ['solidity'])
+        self.assertGreater(protocol.score, auditor.score)
+        self.assertGreater(protocol.score, lab.score)
+        self.assertEqual(protocol.review_state, 'Needs scope confirmation')
+        for candidate in (auditor, lab):
+            self.assertTrue(any(signal.name == 'repository-kind' for signal in candidate.signals))
+            self.assertEqual(candidate.review_state, 'Needs scope confirmation')
+
     def test_score_cannot_upgrade_scope(self):
         candidate = finder.compute_repo_score(
             {'full_name': 'a/b', 'language': 'Solidity', 'topics': ['security', 'foundry'], 'open_issues_count': 10},
