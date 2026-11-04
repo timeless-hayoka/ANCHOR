@@ -23,6 +23,46 @@ interface IAnchorERC20Read {
     function totalSupply() external view returns (uint256);
 }
 
+interface IAnchorVaultTokens {
+    function token0() external view returns (address);
+    function token1() external view returns (address);
+}
+
+interface IAnchorVaultPositionManagerTransitions {
+    struct CloseParams {
+        uint256 vaultId;
+        uint256 vaultPositionId;
+        uint16 percent;
+        address receiver;
+        bool receiveNativeETH;
+        uint8 receiveType;
+        uint256 minAmount0WhenRemoveLiquidity;
+        uint256 minAmount1WhenRemoveLiquidity;
+        uint256 deadline;
+        uint256 swapExecutorId;
+        bytes swapPath;
+    }
+
+    struct LiquidateParams {
+        uint256 vaultId;
+        uint256 vaultPositionId;
+        uint16 percent;
+        address receiver;
+        bool receiveNativeETH;
+        uint8 receiveType;
+        uint256 minAmount0WhenRemoveLiquidity;
+        uint256 minAmount1WhenRemoveLiquidity;
+        uint256 deadline;
+        uint256 maxRepay0;
+        uint256 maxRepay1;
+        uint256 swapExecutorId;
+        bytes swapPath;
+    }
+
+    function closeVaultPositionPartially(CloseParams calldata params) external;
+    function liquidateVaultPositionPartially(LiquidateParams calldata params) external payable;
+}
+
 interface IAnchorLiveLendingPool {
     function addressRegistry() external view returns (address);
     function nextReserveId() external view returns (uint256);
@@ -34,6 +74,8 @@ interface IAnchorLiveLendingPool {
     function borrowingWhiteList(address vault) external view returns (bool);
     function credits(uint256 reserveId, address vault) external view returns (uint256);
     function debtPositions(uint256 debtId) external view returns (uint256 reserveId, address owner, uint256 borrowed, uint256 borrowedIndex);
+    function newDebtPosition(uint256 reserveId) external returns (uint256);
+
 
     function setCreditsOfVault(uint256 vaultId, uint256 reserveId, uint256 credit) external;
     function enableVaultToBorrow(uint256 vaultId) external;
@@ -56,6 +98,7 @@ contract AnchorExtraLiveReadOnlyForkTest {
     // -vv, providing inspectable onchain values from a single pinned block.
     event log_named_uint(string label, uint256 value);
     event log_named_address(string label, address value);
+    event log_named_string(string label, string value);
     address internal constant TARGET =
         0xBB505c54D71E9e599cB8435b4F0cEEc05fC71cbD;
     uint256 internal constant OP_CHAIN_ID = 10;
@@ -338,6 +381,284 @@ contract AnchorExtraLiveReadOnlyForkTest {
             emit log_named_uint("total_eToken_supply", shares);
             emit log_named_uint("expected_exchange_rate_1e18", expectedExchangeRate);
         }
+    }
+
+    /// @notice Exploratory only; manually audited in runs 41760768642 and 41760969085.\n    /// Not a routine CI test: public RPC throttled when combined with heavier transitions.\n    /// Phase-one *real* vault position discovery. We deliberately
+    /// query the deployed position manager and real factory, not synthetic
+    /// vaults or fabricated collateral. A later test must separately prove
+    /// a selected position is active and healthy before simulating closure
+    /// or liquidation. These are purely STATICCALLs to OP state.
+    function audit_LiveForkDiscoverRealVaultPositionManagersAndPositions() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        address registry = POOL.addressRegistry();
+        address factory = IAnchorAddressRegistry(registry).getAddress(10);
+        address positionManager = IAnchorAddressRegistry(registry).getAddress(7);
+        require(factory.code.length > 0, "deployed factory missing");
+        require(positionManager.code.length > 0, "deployed position manager missing");
+
+        emit log_named_address("position_manager", positionManager);
+        emit log_named_address("vault_factory", factory);
+
+        uint256 foundVaults;
+        uint256 foundPositions;
+        uint256 foundActive;
+        // Sparse read-only discovery of 2 vaults x 7 later position IDs; bounded to avoid public RPC 429 throttling.
+        for (uint256 vaultId = 1; vaultId <= 2; vaultId++) {
+            address vault = IAnchorVaultFactory(factory).vaults(vaultId);
+            if (vault == address(0) || vault.code.length == 0) continue;
+            foundVaults++;
+            emit log_named_uint("discovered_vault_id", vaultId);
+            emit log_named_address("discovered_vault", vault);
+            uint256[7] memory samples = [uint256(8), 16, 32, 64, 128, 256, 512];
+            for (uint256 sample = 0; sample < samples.length; sample++) {
+                uint256 posId = samples[sample];
+                // IVeloVaultPositionManager.getVaultPosition returns
+                // VaultTypes.VeloPositionValue; manager and isActive are its
+                // first two static ABI words.
+                (bool ok, bytes memory ret) = positionManager.staticcall(
+                    abi.encodeWithSignature(
+                        "getVaultPosition(uint256,uint256)", vaultId, posId
+                    )
+                );
+                if (!ok || ret.length < 64) continue;
+                address manager;
+                uint256 activeWord;
+                assembly {
+                    manager := mload(add(ret, 32))
+                    activeWord := mload(add(ret, 64))
+                }
+                if (manager == address(0) || activeWord > 1) continue;
+                foundPositions++;
+                if (activeWord == 1) {
+                    foundActive++;
+                    emit log_named_uint("active_vault_id", vaultId);
+                    emit log_named_uint("active_position_id", posId);
+                    emit log_named_address("active_position_manager", manager);
+                }
+            }
+        }
+        emit log_named_uint("scanned_deployed_vaults", foundVaults);
+        emit log_named_uint("sampled_positions_with_manager", foundPositions);
+        emit log_named_uint("sampled_active_positions", foundActive);
+        require(foundVaults > 0, "no live vaults were resolved");
+        // Existence is reported, not assumed; this stage does not claim a
+        // liquidation state-transition test or exploitation result.
+    }
+
+    /// @notice Local-only closed-position transition guard. This DOES NOT
+    /// establish healthy-position liquidation behavior or a bounty issue.
+    /// The vault, position manager and first position are real fork storage.
+    /// @notice A genuinely state-changing protocol action is exercised
+    /// only inside this disposable local OP fork. New debt records are
+    /// permissionless, but MUST start with no borrowable funds or credit.
+    /// This is not a vulnerability or permission bypass.
+    /// @notice Reserve #1 is frozen in the observed deployment snapshots.
+    /// A real fork state-transition attempt must reject debt creation and
+    /// leave existing reserve balances and ID counters unchanged.
+    /// @notice POSITIVE CONTROL: verify the actual deployed implementation
+    /// permits creation of a zero-borrow debt record in a non-frozen reserve.
+    /// The mutation occurs ONLY inside this disposable Foundry fork;
+    /// no privileged actor, funding, storage override or broadcast is used.
+    /// This is not a vault collateral position and cannot demonstrate a bug.
+    function test_LocalForkClassifiesDebtCreationAvailabilityAndPreservesAccounting() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        require(!POOL.paused(), "pool is paused");
+
+        address account = address(uint160(0xF0A7C));
+        uint256 nextBefore = POOL.nextDebtPositionId();
+        uint256 candidateReserve;
+        uint256 cashBefore;
+        uint256 borrowsBefore;
+        uint256 creditsBefore;
+        uint256 guardedReserves;
+
+        // Reserve #1 is frozen in the current deployment. Probe a BOUNDED
+        // set of real reserves rather than forging storage or admin rights.
+        for (uint256 id = 2; id <= 8; id++) {
+            address token = POOL.getUnderlyingTokenAddress(id);
+            address eToken = POOL.getETokenAddress(id);
+            if (token == address(0) || eToken == address(0)) continue;
+
+            uint256 totalBefore = POOL.totalLiquidityOfReserve(id);
+            uint256 borrowedBefore = POOL.totalBorrowsOfReserve(id);
+            uint256 allowedBefore = POOL.credits(id, account);
+            vm.prank(account);
+            try POOL.newDebtPosition(id) returns (uint256 newId) {
+                require(newId == nextBefore, "unexpected debt ID allocation");
+                candidateReserve = id;
+                cashBefore = totalBefore;
+                borrowsBefore = borrowedBefore;
+                creditsBefore = allowedBefore;
+                break;
+            } catch Error(string memory reason) {
+                emit log_named_uint("rejected_candidate_reserve", id);
+                emit log_named_string("reserve_revert_reason", reason);
+                require(
+                    keccak256(bytes(reason)) == keccak256(bytes("1")) ||
+                    keccak256(bytes(reason)) == keccak256(bytes("2")),
+                    "unexpected debt-creation guard"
+                );
+                guardedReserves++;
+                require(
+                    POOL.nextDebtPositionId() == nextBefore,
+                    "failed candidate changed debt ID counter"
+                );
+                require(
+                    POOL.totalLiquidityOfReserve(id) == totalBefore,
+                    "failed candidate changed reserve liquidity"
+                );
+                require(
+                    POOL.totalBorrowsOfReserve(id) == borrowedBefore,
+                    "failed candidate changed aggregate debt"
+                );
+            }
+        }
+
+        if (candidateReserve == 0) {
+            // This is NOT a positive debt-creation test: it records a real
+            // deployment availability BLOCKER and verifies all attempts
+            // were rejected by the correct inactive/frozen guards.
+            require(guardedReserves == 7, "unclassified sample responses");
+            require(POOL.nextDebtPositionId() == nextBefore, "blocked candidates allocated debt");
+            emit log_named_uint("positive_transition_blocked_candidates", guardedReserves);
+            return;
+        }
+        require(POOL.nextDebtPositionId() == nextBefore + 1, "debt counter not incremented once");
+        (uint256 debtReserve, address debtOwner, uint256 principal, uint256 borrowedIndex) =
+            POOL.debtPositions(nextBefore);
+        require(debtReserve == candidateReserve, "recorded reserve mismatch");
+        require(debtOwner == account, "new debt owner mismatch");
+        require(principal == 0, "empty position has a borrowed principal");
+        require(borrowedIndex > 0, "borrowing index was not initialized");
+        require(POOL.credits(candidateReserve, account) == creditsBefore, "permissionless record granted credit");
+        require(POOL.totalLiquidityOfReserve(candidateReserve) == cashBefore, "empty debt changed reserve total");
+        require(POOL.totalBorrowsOfReserve(candidateReserve) == borrowsBefore, "empty debt changed borrowed total");
+
+        emit log_named_uint("positive_control_reserve_id", candidateReserve);
+        emit log_named_uint("new_local_debt_position_id", nextBefore);
+    }
+
+    function test_LocalForkFrozenReserveRejectsNewDebtPositionWithoutMutation() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        require(!POOL.paused(), "pool paused");
+        uint256 reserveId = 1;
+        address newcomer = address(uint160(0xFA11BACC));
+        uint256 beforeNextId = POOL.nextDebtPositionId();
+        uint256 beforeLiquidity = POOL.totalLiquidityOfReserve(reserveId);
+        uint256 beforeBorrows = POOL.totalBorrowsOfReserve(reserveId);
+        uint256 beforeCredits = POOL.credits(reserveId, newcomer);
+
+        vm.prank(newcomer);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "2"));
+        POOL.newDebtPosition(reserveId);
+
+        require(POOL.nextDebtPositionId() == beforeNextId, "rejected debt position changed ID");
+        require(POOL.credits(reserveId, newcomer) == beforeCredits, "rejected position created credit");
+        require(POOL.totalLiquidityOfReserve(reserveId) == beforeLiquidity, "rejected position changed liquidity");
+        require(POOL.totalBorrowsOfReserve(reserveId) == beforeBorrows, "rejected position changed borrow totals");
+    }
+
+    function test_LocalForkClosedPositionCannotCloseOrLiquidateAgain() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        require(!POOL.paused(), "cannot attribute a revert when pool is paused");
+
+        uint256 vaultId = 1;
+        uint256 positionId = 1;
+        address vault = _realVault(vaultId);
+        address registry = POOL.addressRegistry();
+        address manager = IAnchorAddressRegistry(registry).getAddress(7);
+        require(manager.code.length > 0, "deployed position manager missing");
+
+        (bool readable, bytes memory positionBefore) = manager.staticcall(
+            abi.encodeWithSignature(
+                "getVaultPosition(uint256,uint256)", vaultId, positionId
+            )
+        );
+        require(readable && positionBefore.length >= 64, "position read unavailable");
+        address recordedManager;
+        uint256 activeWord;
+        assembly {
+            recordedManager := mload(add(positionBefore, 32))
+            activeWord := mload(add(positionBefore, 64))
+        }
+        require(recordedManager != address(0), "not an existing position");
+        require(activeWord == 0, "position must be recorded as inactive");
+
+        (bool vaultReadable, bytes memory vaultStateBefore) =
+            vault.staticcall(abi.encodeWithSignature("getVaultState()"));
+        require(vaultReadable && vaultStateBefore.length > 0, "vault state unavailable");
+
+        uint256 liquidityBefore = POOL.totalLiquidityOfReserve(1);
+        uint256 borrowsBefore = POOL.totalBorrowsOfReserve(1);
+        address token0 = IAnchorVaultTokens(vault).token0();
+        address token1 = IAnchorVaultTokens(vault).token1();
+        require(token0.code.length > 0 && token1.code.length > 0, "real vault tokens missing");
+        uint256 token0Before = IAnchorERC20Read(token0).balanceOf(vault);
+        uint256 token1Before = IAnchorERC20Read(token1).balanceOf(vault);
+
+        address caller = address(uint160(0xBEEF));
+        IAnchorVaultPositionManagerTransitions.CloseParams memory closeParams =
+            IAnchorVaultPositionManagerTransitions.CloseParams({
+                vaultId: vaultId,
+                vaultPositionId: positionId,
+                percent: 5000,
+                receiver: caller,
+                receiveNativeETH: false,
+                receiveType: 2,
+                minAmount0WhenRemoveLiquidity: 0,
+                minAmount1WhenRemoveLiquidity: 0,
+                deadline: block.timestamp + 1 days,
+                swapExecutorId: 0,
+                swapPath: new bytes(0)
+            });
+        vm.prank(caller);
+        vm.expectRevert();
+        IAnchorVaultPositionManagerTransitions(manager)
+            .closeVaultPositionPartially(closeParams);
+
+        IAnchorVaultPositionManagerTransitions.LiquidateParams memory liquidateParams =
+            IAnchorVaultPositionManagerTransitions.LiquidateParams({
+                vaultId: vaultId,
+                vaultPositionId: positionId,
+                percent: 5000,
+                receiver: caller,
+                receiveNativeETH: false,
+                receiveType: 2,
+                minAmount0WhenRemoveLiquidity: 0,
+                minAmount1WhenRemoveLiquidity: 0,
+                deadline: block.timestamp + 1 days,
+                maxRepay0: 0,
+                maxRepay1: 0,
+                swapExecutorId: 0,
+                swapPath: new bytes(0)
+            });
+        vm.prank(caller);
+        vm.expectRevert();
+        IAnchorVaultPositionManagerTransitions(manager)
+            .liquidateVaultPositionPartially(liquidateParams);
+
+        (bool positionAfterOk, bytes memory positionAfter) = manager.staticcall(
+            abi.encodeWithSignature(
+                "getVaultPosition(uint256,uint256)", vaultId, positionId
+            )
+        );
+        (bool vaultAfterOk, bytes memory vaultStateAfter) =
+            vault.staticcall(abi.encodeWithSignature("getVaultState()"));
+        require(positionAfterOk && vaultAfterOk, "post-operation read unavailable");
+        require(
+            keccak256(positionBefore) == keccak256(positionAfter),
+            "rejected transition changed position record"
+        );
+        require(
+            keccak256(vaultStateBefore) == keccak256(vaultStateAfter),
+            "rejected transition changed vault state"
+        );
+        require(POOL.totalLiquidityOfReserve(1) == liquidityBefore, "reserve cash/debt total changed");
+        require(POOL.totalBorrowsOfReserve(1) == borrowsBefore, "reserve outstanding borrowing changed");
+        require(IAnchorERC20Read(token0).balanceOf(vault) == token0Before, "vault token0 balance changed");
+        require(IAnchorERC20Read(token1).balanceOf(vault) == token1Before, "vault token1 balance changed");
+        emit log_named_address("closed_position_vault", vault);
+        emit log_named_uint("closed_position_id", positionId);
     }
 
     function test_LiveForkReadOnlyCallsAreDeterministic() public view {

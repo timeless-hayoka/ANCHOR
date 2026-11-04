@@ -88,6 +88,37 @@ For reserve ID 1, `actual_cash=3342696822357344034` and `accrued_borrow=45555101
 
 **Verdict:** NEGATIVE / NO LIVE RESERVE-ACCOUNTING DISCREPANCY OBSERVED. This checks snapshot consistency, not correctness of every accounting transition or exploit impact. It is distinct from known excluded first-depositor inflation and repay/rounding issue families. Live actions were not broadcast, and no state mutation was attempted by this particular test. No Trinity finding or bounty report was promoted.
 
+## Vault-position close/liquidation transition controls (2026-11-03)
+
+[Final passing OP Mainnet fork run 41762151846](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41762151846), block **159080595**, completed **11/11 passing tests** (0 failures), including two additional local state-transition guards.
+
+- Real `AddressRegistry.getAddress(7)` resolved the deployed Vault Position Manager; registry key 10 resolved VaultFactory. Earlier [discovery run 41760768642](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41760768642) confirmed two real vault contracts at block 159080213; sparse later-ID [run 41760969085](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41760969085) also passed. Those bounded samples discovered **no active vault positions**, and this is an important limitation: **a healthy-position or legitimate liquidation flow was not tested**.
+- `test_LocalForkClosedPositionCannotCloseOrLiquidateAgain`: first verify the actual vault #1 position #1 has a recorded manager and `isActive == false`. Simulate `closeVaultPositionPartially` and `liquidateVaultPositionPartially` using contract-declared ABI tuples in the fork. Both calls reverted, with the encoded position, vault-state bytes, vault token0/token1 balances and reserve #1 liquidity/borrow totals unchanged. The reverts were **generic**, so this test proves rollback for this particular input, **not** that the inactive-state guard was the unique revert cause.
+- `test_LocalForkFrozenReserveRejectsNewDebtPositionWithoutMutation`: reserve #1 rejected `newDebtPosition(1)` using the **exact** `Error(string) "2"` (`VL_RESERVE_FROZEN`), leaving debt ID counter, reserve cash/borrow totals and outsider credit unchanged.
+
+The public OP RPC returned **HTTP 429** for the original larger vault-position discovery scan, and a detailed new test initially needed `via_ir=true` to compile due Solidity stack-depth limits. Subsequent public-RPC capacity and the absence of sampled active positions prevented a credible positive live-position close/liquidation test. Earlier attempts to create a debt position in reserve #1 reverted because it is frozen; no production storage overrides were made to force success.
+
+**Verdict:** NEGATIVE / GUARDS AND ROLLBACK HELD FOR THE SAMPLED CLOSED POSITION AND FROZEN RESERVE. No in-scope issue or monetary impact reproduced; no new bounty claim. All attempted writes took place only in isolated Foundry fork state, not on OP Mainnet.
+
+**Next production-representative gap:** identify an actually active position from authenticated, bounded archived traces or a provider with adequate historical RPC capacity, confirm its collateral and debt health, then test ordinary withdrawal/liquidation transitions without broadcasting transactions. A fully synthetic position is not a substitute for this real-state milestone.
+
+## Debt-record positive-control availability gate (2026-11-03 local / 2026-11-04 UTC)
+
+[Actions run 41768221818](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41768221818) executed **12/12 passing local-fork tests** against real OP Mainnet storage pinned to block **159082328**, including a new **guard-classification** check. The check attempted a legitimate permissionless `newDebtPosition(id)` transition for reserve IDs **2–8**, with a fresh local-only account, no funding, no impersonation and no broadcast. **No new position was created.**
+
+All seven attempts were rejected by verified protocol guards. Exact `Error(string)` reasons were recorded:
+
+| Reserve ID | Revert code | Meaning |
+|---|---|---|
+| 2, 4, 5, 7 | `"2"` | `VL_RESERVE_FROZEN` |
+| 3, 6, 8 | `"1"` | `VL_NO_ACTIVE_RESERVE` |
+
+The test verifies that each rejected attempt preserves the debt-position ID counter and that reserve liquidity is unaffected; it requires the revert reason to be exactly an inactive/frozen guard. It *would* assert the new debt record has the expected owner, zero borrowed principal, initialized borrowing index, unchanged vault credit and untouched reserve totals **if** one candidate allowed creation. In this deployed snapshot, all seven candidates were unavailable, so **positive transition coverage is BLOCKED**, not passed.
+
+The earlier optimistic test was intentionally red (11 pass / 1 fail) because it demanded a usable reserve among these seven. We replaced that false assumption with explicit fail-closed deployment-state classification and preserved the diagnostic results. None of these outcomes is evidence of an exploit, an eligible loss, or a currently active collateral position.
+
+**Next gate:** identify a verified active, non-frozen reserve with compatible real vault-position state, or select an appropriate historical archival block with confirmed eligibility. Only then attempt authorized close, withdraw or liquidation sequences **inside a local fork**. Do not override genuine reserve state just to manufacture a successful production-representative result.
+
 ## Conclusions and boundaries
 
 The deployed contract, actual registry and sampled live reserves are reachable; getters function consistently in a pinned-block fork. This provides real-state, source-independent confirmation beyond the synthetic reserve tests in PRs #42–#43.
