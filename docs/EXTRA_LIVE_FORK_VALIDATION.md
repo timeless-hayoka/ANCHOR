@@ -102,6 +102,23 @@ The public OP RPC returned **HTTP 429** for the original larger vault-position d
 
 **Next production-representative gap:** identify an actually active position from authenticated, bounded archived traces or a provider with adequate historical RPC capacity, confirm its collateral and debt health, then test ordinary withdrawal/liquidation transitions without broadcasting transactions. A fully synthetic position is not a substitute for this real-state milestone.
 
+## Debt-record positive-control availability gate (2026-11-03 local / 2026-11-04 UTC)
+
+[Actions run 41768221818](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41768221818) executed **12/12 passing local-fork tests** against real OP Mainnet storage pinned to block **159082328**, including a new **guard-classification** check. The check attempted a legitimate permissionless `newDebtPosition(id)` transition for reserve IDs **2–8**, with a fresh local-only account, no funding, no impersonation and no broadcast. **No new position was created.**
+
+All seven attempts were rejected by verified protocol guards. Exact `Error(string)` reasons were recorded:
+
+| Reserve ID | Revert code | Meaning |
+|---|---|---|
+| 2, 4, 5, 7 | `"2"` | `VL_RESERVE_FROZEN` |
+| 3, 6, 8 | `"1"` | `VL_NO_ACTIVE_RESERVE` |
+
+The test verifies that each rejected attempt preserves the debt-position ID counter and that reserve liquidity is unaffected; it requires the revert reason to be exactly an inactive/frozen guard. It *would* assert the new debt record has the expected owner, zero borrowed principal, initialized borrowing index, unchanged vault credit and untouched reserve totals **if** one candidate allowed creation. In this deployed snapshot, all seven candidates were unavailable, so **positive transition coverage is BLOCKED**, not passed.
+
+The earlier optimistic test was intentionally red (11 pass / 1 fail) because it demanded a usable reserve among these seven. We replaced that false assumption with explicit fail-closed deployment-state classification and preserved the diagnostic results. None of these outcomes is evidence of an exploit, an eligible loss, or a currently active collateral position.
+
+**Next gate:** identify a verified active, non-frozen reserve with compatible real vault-position state, or select an appropriate historical archival block with confirmed eligibility. Only then attempt authorized close, withdraw or liquidation sequences **inside a local fork**. Do not override genuine reserve state just to manufacture a successful production-representative result.
+
 ## Conclusions and boundaries
 
 The deployed contract, actual registry and sampled live reserves are reachable; getters function consistently in a pinned-block fork. This provides real-state, source-independent confirmation beyond the synthetic reserve tests in PRs #42–#43.
