@@ -32,6 +32,7 @@ def test_workflow_separates_compile_from_opt_in_archive_requests():
     assert "workflow_dispatch:" in workflow
     assert "forge build --root .extra-oracle-probe" in workflow
     assert "if: github.event_name == 'workflow_dispatch'" in workflow
+    assert "github.head_ref == 'research/extra-historical-provenance-run-20261104'" in workflow
     assert "max-parallel" not in workflow  # no parallel historical matrix
     assert "cancel-in-progress: false" in workflow
     assert "--fork-block-number 120000000" in workflow
