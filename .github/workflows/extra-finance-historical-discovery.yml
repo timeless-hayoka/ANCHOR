@@ -11,10 +11,14 @@ permissions:
 
 jobs:
   archived-vault-discovery:
+    # Broad archived scans are opt-in. Public OP RPC rate-limited the
+    # previously parallel 145m scan, independently of the successful close.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         block: [120000000, 145000000]
     env:
@@ -64,6 +68,9 @@ jobs:
           if-no-files-found: warn
 
   historical-active-position-close:
+    # One known active historical position is the PR acceptance control.
+    # Do not compete with optional large archive scans for public RPC quota.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
