@@ -73,6 +73,21 @@ The additional local-only test `test_LocalForkWhitelistedVaultCannotOperateAnoth
 
 **Research status: NEGATIVE / NO CROSS-VAULT DEBT OWNERSHIP BYPASS REPRODUCED.** This establishes one verified deployment snapshot and bounded pair of real whitelisted vaults, not all vaults, historical blocks, debt configurations, or a new in-scope financial loss. This evidence must not be promoted to a bounty report.
 
+
+## Independent live reserve-accounting cross-check (2026-11-03)
+
+[GitHub Actions run 41753899539](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41753899539) executed **9/9 passing pinned-block Foundry tests** on the actual OP Mainnet LendingPool at block **159078365**. The added `test_LiveForkReserveAccountingMatchesActualERC20Balances` independently checks actual ERC-20 cash balances at each eToken address, eToken totalSupply, and LendingPool's getters for the first eight deployed reserve IDs.
+
+For every sampled reserve, all three independently reconstructed identities held exactly at 1e18 precision with Solidity floor rounding:
+
+1. `totalLiquidityOfReserve(id) == IERC20(underlying).balanceOf(eToken) + totalBorrowsOfReserve(id)`.
+2. `utilizationRateOfReserve(id) == totalBorrows * 1e18 / totalLiquidity` (zero-liquidity fallback to zero).
+3. `exchangeRateOfReserve(id) == totalLiquidity * 1e18 / IERC20(eToken).totalSupply()` (empty-supply/liquidity fallback to `1e18`).
+
+For reserve ID 1, `actual_cash=3342696822357344034` and `accrued_borrow=455551017728264323`, with `total_eToken_supply=3382022484954650034` and derived exchange rate `1123069955029154556` (all 1e18 unit conventions where applicable). Full evidence captures all eight cash/debt/supply/rate operands and is bound to the pinned block.
+
+**Verdict:** NEGATIVE / NO LIVE RESERVE-ACCOUNTING DISCREPANCY OBSERVED. This checks snapshot consistency, not correctness of every accounting transition or exploit impact. It is distinct from known excluded first-depositor inflation and repay/rounding issue families. Live actions were not broadcast, and no state mutation was attempted by this particular test. No Trinity finding or bounty report was promoted.
+
 ## Conclusions and boundaries
 
 The deployed contract, actual registry and sampled live reserves are reachable; getters function consistently in a pinned-block fork. This provides real-state, source-independent confirmation beyond the synthetic reserve tests in PRs #42–#43.
