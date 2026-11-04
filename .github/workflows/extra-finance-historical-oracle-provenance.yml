@@ -1,0 +1,84 @@
+name: Extra Finance historical vault oracle provenance (read-only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/extra_historical_fork/AnchorExtraHistoricalOracleProvenance.t.sol'
+      - 'tests/test_extra_historical_oracle_provenance.py'
+      - '.github/workflows/extra-finance-historical-oracle-provenance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-historic-provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.7
+      - name: Compile read-only probe without RPC
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .extra-oracle-probe/test
+          cp tests/extra_historical_fork/AnchorExtraHistoricalOracleProvenance.t.sol .extra-oracle-probe/test/
+          cat > .extra-oracle-probe/foundry.toml <<'TOML'
+          [profile.default]
+          src = "src"
+          test = "test"
+          solc_version = "0.8.18"
+          optimizer = true
+          optimizer_runs = 200
+          via_ir = true
+          TOML
+          forge build --root .extra-oracle-probe
+
+  historic-oracle-provenance:
+    if: github.event_name == 'workflow_dispatch'
+    needs: compile-historic-provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: extra-historical-rpc-provenance
+      cancel-in-progress: false
+    env:
+      OP_READONLY_RPC: https://mainnet.optimism.io
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.7
+      - name: Read real archived Optimism state in disposable fork
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cast chain-id --rpc-url "$OP_READONLY_RPC")" = "10"
+          mkdir -p .extra-oracle-probe/test evidence
+          cp tests/extra_historical_fork/AnchorExtraHistoricalOracleProvenance.t.sol .extra-oracle-probe/test/
+          cat > .extra-oracle-probe/foundry.toml <<'TOML'
+          [profile.default]
+          src = "src"
+          test = "test"
+          solc_version = "0.8.18"
+          optimizer = true
+          optimizer_runs = 200
+          via_ir = true
+          TOML
+          printf '{"chain_id":10,"block":120000000,"vault_id":3,"position_id":16,"broadcast":false,"storage_overrides":false,"oracle_eligibility":"UNKNOWN"}\n' > evidence/provenance.json
+          forge test --root .extra-oracle-probe \
+            --fork-url "$OP_READONLY_RPC" \
+            --fork-block-number 120000000 \
+            --match-contract AnchorExtraHistoricalOracleProvenanceTest -vv \
+            2>&1 | tee evidence/historical-oracle-provenance.log
+      - name: Preserve read-only forensic results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extra-historical-oracle-provenance
+          path: evidence/
+          retention-days: 14
+          if-no-files-found: warn
