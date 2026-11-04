@@ -121,6 +121,51 @@ contract AnchorExtraHistoricalOracleProvenanceTest {
         emit log_named_uint("POSITION_DEBT0_RAW", _word(positionRaw, 13));
         emit log_named_uint("POSITION_DEBT1_RAW", _word(positionRaw, 14));
 
+        // VaultTypes.VeloVaultState: 24=totalLp, 25=totalLpShares,
+        // 29=debtTotalShares0 and 33=debtTotalShares1.
+        require(vaultRaw.length >= 34 * 32, "incomplete historical vault struct");
+        emit log_named_uint("VAULT_TOTAL_LP_RAW", _word(vaultRaw, 24));
+        emit log_named_uint("VAULT_TOTAL_LP_SHARES_RAW", _word(vaultRaw, 25));
+        emit log_named_uint("VAULT_DEBT0_TOTAL_SHARES_RAW", _word(vaultRaw, 29));
+        emit log_named_uint("VAULT_DEBT1_TOTAL_SHARES_RAW", _word(vaultRaw, 33));
+        if (gauge.code.length > 0) {
+            emit log_named_bytes32("GAUGE_RUNTIME_CODEHASH", gauge.codehash);
+            _readUint(gauge,
+                abi.encodeWithSignature("balanceOf(address)", vault),
+                "GAUGE_STAKED_LP_BALANCE_RAW");
+        } else {
+            emit log_named_uint("GAUGE_UNAVAILABLE", 1);
+        }
+        (bool lpPositionOk, bytes memory lpPositionRaw) = vault.staticcall(
+            abi.encodeWithSignature("getPosition(uint256)", POSITION_ID));
+        if (lpPositionOk && lpPositionRaw.length == 15 * 32) {
+            emit log_named_uint("POSITION_LP_SHARES_RAW", _word(lpPositionRaw, 9));
+            emit log_named_uint("POSITION_DEBT0_SHARES_RAW", _word(lpPositionRaw, 10));
+            emit log_named_uint("POSITION_DEBT1_SHARES_RAW", _word(lpPositionRaw, 11));
+            emit log_named_bytes32("POSITION_INTERNAL_ABI_HASH", keccak256(lpPositionRaw));
+        } else {
+            emit log_named_uint("POSITION_INTERNAL_UNAVAILABLE", 1);
+        }
+
+        // AddressId.ADDRESS_ID_CHAINLINK_ORACLE = 107 in the pinned
+        // upstream registry definitions; this is still only a raw response.
+        address oracle = IAnchorHistoricRegistry(registry).getAddress(107);
+        emit log_named_address("REGISTERED_CHAINLINK_ORACLE", oracle);
+        if (oracle.code.length > 0) {
+            emit log_named_bytes32("CHAINLINK_ORACLE_RUNTIME_CODEHASH", oracle.codehash);
+            (bool priceOk, bytes memory priceRaw) = oracle.staticcall(
+                abi.encodeWithSignature("getPrice(address,address)", token0, token1));
+            if (priceOk && priceRaw.length == 64 && _word(priceRaw, 0) <= 1) {
+                emit log_named_uint("CHAINLINK_GETPRICE_AVAILABLE", _word(priceRaw, 0));
+                emit log_named_uint("CHAINLINK_GETPRICE_RAW", _word(priceRaw, 1));
+                emit log_named_bytes32("CHAINLINK_RESPONSE_ABI_HASH", keccak256(priceRaw));
+            } else {
+                emit log_named_uint("CHAINLINK_GETPRICE_UNAVAILABLE", 1);
+            }
+        } else {
+            emit log_named_uint("CHAINLINK_ORACLE_UNAVAILABLE", 1);
+        }
+
         // Permissionless liquidator configuration is an independent gate.
         _readUint(manager,
             abi.encodeWithSignature("permissionLessLiquidationEnabled()"),
