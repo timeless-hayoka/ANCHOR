@@ -66,6 +66,42 @@ contract AnchorExtraHistoricalPositionDiscoveryTest {
         return (true, true, debt0 > 0 || debt1 > 0, liquidity > 0);
     }
 
+    /// @notice Observes real deployed vault risk parameters at the same fork
+    /// block as the position scan. It deliberately does NOT compute USD
+    /// collateral valuation, oracle freshness, debt ratio or eligibility.
+    function _inspectVaultLiquidationConfig(address manager, uint256 vaultId) internal {
+        (bool ok, bytes memory raw) = manager.staticcall(
+            abi.encodeWithSignature("getVault(uint256)", vaultId)
+        );
+        // VeloVaultState starts with 13 statically encoded words. Fields
+        // 8, 11 and 12 are liquidateWithTWAP, maxPriceDiff and
+        // liquidateDebtRatio in the deployed manager's verified ABI.
+        if (!ok || raw.length < 13 * 32 || raw.length % 32 != 0) {
+            emit log_named_uint("VAULT_CONFIG_UNAVAILABLE", vaultId);
+            return;
+        }
+        uint256 usesTwap;
+        uint256 maxPriceDiff;
+        uint256 liquidationDebtRatio;
+        assembly {
+            usesTwap := mload(add(raw, 288))
+            maxPriceDiff := mload(add(raw, 384))
+            liquidationDebtRatio := mload(add(raw, 416))
+        }
+        if (usesTwap > 1 || liquidationDebtRatio == 0) {
+            emit log_named_uint("VAULT_CONFIG_UNAVAILABLE", vaultId);
+            return;
+        }
+        emit log_named_uint("VAULT_CONFIG_ID", vaultId);
+        emit log_named_uint("VAULT_LIQUIDATE_WITH_TWAP", usesTwap);
+        emit log_named_uint("VAULT_MAX_PRICE_DIFF_RAW", maxPriceDiff);
+        emit log_named_uint("VAULT_LIQUIDATE_DEBT_RATIO_RAW", liquidationDebtRatio);
+        emit log_named_bytes32("VAULT_CONFIG_ABI_HASH", keccak256(raw));
+        // Eligibility stays UNKNOWN until canonical oracle and source-matched
+        // position valuation are independently confirmed at this exact block.
+        emit log_named_uint("VAULT_LIQUIDATION_ELIGIBILITY_UNKNOWN", vaultId);
+    }
+
     function test_HistoricalActivePositionDiscovery() public {
         require(block.chainid == CHAIN_ID, "not Optimism");
         emit log_named_uint("historical_snapshot_block", block.number);
@@ -97,6 +133,7 @@ contract AnchorExtraHistoricalPositionDiscoveryTest {
             if (vault.code.length == 0) continue;
             ++foundVaults;
             emit log_named_uint("sampled_vault_id", vaultId);
+            _inspectVaultLiquidationConfig(manager, vaultId);
             for (uint256 j = 0; j < positionIds.length; ++j) {
                 uint256 positionId = positionIds[j];
                 (bool recorded, bool active, bool hasDebt, bool hasLiquidity) =
