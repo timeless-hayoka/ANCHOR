@@ -3,7 +3,7 @@
 
 Queries only public JSON-RPC read methods, fails closed on mismatches,
 and records hashes/lengths instead of reproducing raw bytecode or traces.
-No eth_sendRawTransaction, signing, state overrides or simulated outcomes.
+No transaction submission, signing, state overrides or simulated outcomes.
 """
 from __future__ import annotations
 
