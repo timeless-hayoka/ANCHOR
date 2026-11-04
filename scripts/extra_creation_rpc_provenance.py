@@ -84,6 +84,39 @@ def bytecode_fingerprint(code: str) -> dict:
     return result
 
 
+def opcode_inventory(code: str) -> dict:
+    """Extract bytecode syntactic clues, not verified runtime dispatch."""
+    raw = bytes.fromhex(code[2:])
+    i = 0
+    counts = {"DELEGATECALL": 0, "CREATE2": 0, "CALL": 0, "STATICCALL": 0, "CREATE": 0}
+    names = {0xF4: "DELEGATECALL", 0xF5: "CREATE2", 0xF1: "CALL",
+             0xFA: "STATICCALL", 0xF0: "CREATE"}
+    selectors = set()
+    push20 = set()
+    while i < len(raw):
+        op = raw[i]
+        if op in names:
+            counts[names[op]] += 1
+        if 0x60 <= op <= 0x7F:
+            size = op - 0x5F
+            immediate = raw[i+1:i+1+size]
+            if len(immediate) != size:
+                break
+            if size == 4:
+                selectors.add("0x" + immediate.hex())
+            elif size == 20 and any(immediate) and immediate != b"\\xff" * 20:
+                push20.add("0x" + immediate.hex())
+            i += size
+        i += 1
+    return {
+        "opcode_counts": counts,
+        "push4_literals": sorted(selectors),
+        "push20_literals": sorted(push20)[:50],
+        "push20_truncated": len(push20) > 50,
+        "note": "Static PUSH/opcode inventory only; literals do not prove callable selectors or call destinations.",
+    }
+
+
 def trace_summary(root: dict) -> dict:
     if not isinstance(root, dict):
         raise ProvenanceError("trace returned non-object")
@@ -138,10 +171,14 @@ def collect(url: str) -> dict:
 
     creation_tag = hex(CREATE_BLOCK)
     study_tag = hex(STUDY_BLOCK)
-    factory_then = bytecode_fingerprint(read("eth_getCode", [FACTORY, creation_tag]))
-    factory_now = bytecode_fingerprint(read("eth_getCode", [FACTORY, study_tag]))
-    vault_then = bytecode_fingerprint(read("eth_getCode", [VAULT, creation_tag]))
-    vault_now = bytecode_fingerprint(read("eth_getCode", [VAULT, study_tag]))
+    factory_create_raw = read("eth_getCode", [FACTORY, creation_tag])
+    factory_study_raw = read("eth_getCode", [FACTORY, study_tag])
+    vault_create_raw = read("eth_getCode", [VAULT, creation_tag])
+    vault_study_raw = read("eth_getCode", [VAULT, study_tag])
+    factory_then = bytecode_fingerprint(factory_create_raw)
+    factory_now = bytecode_fingerprint(factory_study_raw)
+    vault_then = bytecode_fingerprint(vault_create_raw)
+    vault_now = bytecode_fingerprint(vault_study_raw)
     if vault_now.get("keccak256_runtime") and vault_now["keccak256_runtime"] != EXPECTED_CODEHASH:
         raise ProvenanceError("historic study vault runtime codehash mismatch")
     evidence = {
@@ -152,9 +189,11 @@ def collect(url: str) -> dict:
         "transaction_input_bytes": (len(data) - 2) // 2,
         "transaction_input_sha256": hashlib.sha256(bytes.fromhex(data[2:])).hexdigest(),
         "factory_creation_code": factory_then,
+        "factory_static_opcode_inventory": opcode_inventory(factory_create_raw),
         "factory_study_code": factory_now,
         "factory_runtime_equal_across_blocks": factory_then["sha256"] == factory_now["sha256"],
         "vault_creation_code": vault_then,
+        "vault_static_opcode_inventory": opcode_inventory(vault_create_raw),
         "vault_study_code": vault_now,
         "vault_runtime_equal_across_blocks": vault_then["sha256"] == vault_now["sha256"],
         "trace": {"status": "NOT_PROBED"},
