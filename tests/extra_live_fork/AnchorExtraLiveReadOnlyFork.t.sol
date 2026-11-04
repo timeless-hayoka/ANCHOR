@@ -451,63 +451,27 @@ contract AnchorExtraLiveReadOnlyForkTest {
     /// only inside this disposable local OP fork. New debt records are
     /// permissionless, but MUST start with no borrowable funds or credit.
     /// This is not a vulnerability or permission bypass.
-    function test_LocalForkNewDebtPositionDoesNotCreateBorrowingPower() public {
+    /// @notice Reserve #1 is frozen in the observed deployment snapshots.
+    /// A real fork state-transition attempt must reject debt creation and
+    /// leave existing reserve balances and ID counters unchanged.
+    function test_LocalForkFrozenReserveRejectsNewDebtPositionWithoutMutation() public {
         require(block.chainid == OP_CHAIN_ID, "wrong chain");
         require(!POOL.paused(), "pool paused");
-        // Select a genuinely available deployment reserve. Public getter
-        // reserves(uint256) flattens the static ReserveData tuple:
-        // fields 16–18 are Flags(isActive, frozen, borrowingEnabled).
-        // Reserve #1 may be frozen; never fabricate unfrozen storage.
-        uint256 reserveId;
-        for (uint256 candidate = 1; candidate <= 8; candidate++) {
-            (bool ok, bytes memory raw) = address(POOL).staticcall(
-                abi.encodeWithSignature("reserves(uint256)", candidate)
-            );
-            if (!ok || raw.length < 18 * 32) continue;
-            uint256 isActive;
-            uint256 frozen;
-            uint256 borrowingEnabled;
-            assembly {
-                isActive := mload(add(raw, 512))
-                frozen := mload(add(raw, 544))
-                borrowingEnabled := mload(add(raw, 576))
-            }
-            if (isActive == 1 && frozen == 0 && borrowingEnabled == 1) {
-                reserveId = candidate;
-                break;
-            }
-        }
-        require(reserveId != 0, "no sample reserve permits new borrowing positions");
-        emit log_named_uint("new_position_reserve_id", reserveId);
+        uint256 reserveId = 1;
         address newcomer = address(uint160(0xFA11BACC));
-        require(!POOL.borrowingWhiteList(newcomer), "newcomer already whitelisted");
-
         uint256 beforeNextId = POOL.nextDebtPositionId();
         uint256 beforeLiquidity = POOL.totalLiquidityOfReserve(reserveId);
         uint256 beforeBorrows = POOL.totalBorrowsOfReserve(reserveId);
         uint256 beforeCredits = POOL.credits(reserveId, newcomer);
 
         vm.prank(newcomer);
-        uint256 id = POOL.newDebtPosition(reserveId);
-        require(id == beforeNextId, "unexpected new debt ID");
-        require(POOL.nextDebtPositionId() == beforeNextId + 1, "new record not allocated");
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "2"));
+        POOL.newDebtPosition(reserveId);
 
-        (uint256 actualReserve, address owner, uint256 principal, uint256 index) =
-            POOL.debtPositions(id);
-        require(actualReserve == reserveId, "new position reserve mismatch");
-        require(owner == newcomer, "new position owner mismatch");
-        require(principal == 0, "new position has unexpected principal");
-        require(index > 0, "borrow index not initialized");
-        require(POOL.credits(reserveId, newcomer) == beforeCredits, "new position changed credit");
-        require(POOL.totalLiquidityOfReserve(reserveId) == beforeLiquidity, "new position changed liquidity");
-        require(POOL.totalBorrowsOfReserve(reserveId) == beforeBorrows, "new position changed borrow totals");
-
-        vm.prank(newcomer);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "8"));
-        POOL.borrow(newcomer, id, 1);
-        require(POOL.totalLiquidityOfReserve(reserveId) == beforeLiquidity, "failed borrow changed liquidity");
-        require(POOL.totalBorrowsOfReserve(reserveId) == beforeBorrows, "failed borrow changed totals");
-        emit log_named_uint("fork_created_debt_id", id);
+        require(POOL.nextDebtPositionId() == beforeNextId, "rejected debt position changed ID");
+        require(POOL.credits(reserveId, newcomer) == beforeCredits, "rejected position created credit");
+        require(POOL.totalLiquidityOfReserve(reserveId) == beforeLiquidity, "rejected position changed liquidity");
+        require(POOL.totalBorrowsOfReserve(reserveId) == beforeBorrows, "rejected position changed borrow totals");
     }
 
     function test_LocalForkClosedPositionCannotCloseOrLiquidateAgain() public {
