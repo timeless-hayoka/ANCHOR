@@ -10,7 +10,7 @@
 - **At block 145000000:** the same bounded sampling reported **zero active positions**. This does not prove there were no active positions outside the scanned IDs/vaults.
 - The independently located Vault Position Manager was `0xf9cFB8a62f50e10AdDE5Aa888B44cF01C5957055` at block 120000000. The registry/factory addresses were read from the deployed LendingPool contract rather than assumed.
 - The selected candidate was **vault 3 / position 16**, whose recorded manager was `0x24e32bB964721dFAC9DEE9E9FF71Ac476652E8eF`. The actual `getVaultPosition(3,16)` return was 19 ABI words long, with `isActive=true`, nonzero liquidity and debt-1.
-- Original position ABI-return SHA-256 equivalent? **Not asserted**. The recorded value below is a **Keccak-256 hash** of the exact ABI-return bytes: `0xfdbf41f35b21cdd886cb461a53f4ed745332d99bb3f9deecc46585d1dac0df53`.
+- The position's exact ABI-return bytes were fingerprinted using **Keccak-256** (not SHA-256): `0xfdbf41f35b21cdd886cb461a53f4ed745332d99bb3f9deecc46585d1dac0df53`.
 
 ## Strict positive control: actual manager's 10% partial close (fork only)
 
