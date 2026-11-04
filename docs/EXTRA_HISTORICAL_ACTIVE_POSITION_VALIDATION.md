@@ -30,6 +30,25 @@ The test uses `vm.prank(recordedManager)` **inside a disposable Foundry fork**; 
 
 The passing assertions verify: existing manager unchanged, active flag remains true, principals did not increase, liquidity decreased, debt-0 did not increase and debt-1 **decreased**, actual position ABI bytes changed, and the entire vault-state ABI changed. Amounts are **raw contract units**; `debt1` here is the position getter's value, not an independently reconstructed USD valuation.
 
+## Independent ERC-20 cash and LendingPool debt reconciliation (2026-11-04)
+
+[Confirmed pinned historical close run 41791446538](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41791446538) **passed 1/1 Foundry tests** at Optimism block `120000000`, with new strict assertions tying the partial close to independently read underlying ERC-20 custody and actual reserve debt, in addition to the existing position/vault-state checks.
+
+The real vault's `token0` is `0x4200000000000000000000000000000000000042` (matched to reserve #4), and `token1` is `0x7F5c764cBc14f9669B88837ca1490cCa17c31607` (matched to reserve #2). The test independently calculates reserve cash as `IERC20(underlying).balanceOf(eToken)`, and asserts `totalLiquidity == cash + accruedDebt` both before **and** after the successful close. The deployed vault token balances were also measured before/after; token0 remained 0 and token1 remained 22,518 raw units in this scenario.
+
+| Independently measured raw amount | Before close | After close | Delta |
+|---|---:|---:|---:|
+| Position debt1 value | 40,894,860 | 36,805,375 | **−4,089,485** |
+| Reserve #2 accrued borrowing | 4,727,549,666,438 | 4,727,545,576,953 | **−4,089,485** |
+| Actual reserve #2 eToken custody cash | 991,534,170,233 | 991,538,259,718 | **+4,089,485** |
+| Reserve #2 total liquidity | 5,719,083,836,671 | 5,719,083,836,671 | **unchanged** |
+| Reserve #4 cash | 192,627,114,451,947,060,026,038 | 192,627,114,451,947,060,026,038 | unchanged |
+| Reserve #4 accrued borrowing | 119,915,476,017,678,300,196,063 | 119,915,476,017,678,300,196,063 | unchanged |
+
+The test now *fails* if position debt1 reduction differs by even one base unit from reserve #2's borrowing reduction, if reserve #2 cash increase differs from the repayment, if either reserve violates independent cash-plus-borrow accounting, or if the unused token0 reserve changes. The expected manager's 10% close must still succeed and position/vault state hashes must change.
+
+**Verdict:** This is an independently reconciled **expected, successful partial close**, not a violation. The selected owner was simulated via Foundry `vm.prank` only inside the local fork, and all contract state was taken from the recorded historical snapshot. It does not establish liquidation eligibility, collateral health, a malicious caller's profit, or a reportable bug. Future liquidation tests require a separately verified unhealthy position; do not modify oracles/storage to manufacture one.
+
 ## Limitations and disclosure status
 
 This provides **one real historical authorized partial-close state transition**. It is not an active liquidation-eligibility determination, liquidation test, generalized collateral-health proof, or evidence of an exploit. The deployed manager's dependency graph can include AMM state, oracle values, lending and token contracts beyond those separately asserted. Tests did not independently reconstruct every reserve token-flow delta or liquidation health ratio. No Trinity finding, CVE or bounty report is justified by this normal transition.
