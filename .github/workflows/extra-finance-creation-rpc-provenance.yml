@@ -4,6 +4,8 @@ on:
     paths:
       - 'scripts/extra_creation_rpc_provenance.py'
       - 'tests/test_extra_creation_rpc_provenance.py'
+      - 'scripts/extra_historical_evidence_gates.py'
+      - 'tests/test_extra_historical_evidence_gates.py'
       - '.github/workflows/extra-finance-creation-rpc-provenance.yml'
   workflow_dispatch:
 
@@ -22,7 +24,7 @@ jobs:
       - name: Offline RPC validation regression tests
         run: |
           python -m pip install pytest
-          python -m pytest -q tests/test_extra_creation_rpc_provenance.py
+          python -m pytest -q tests/test_extra_creation_rpc_provenance.py tests/test_extra_historical_evidence_gates.py
 
   archived-read:
     if: github.event_name == 'workflow_dispatch'
