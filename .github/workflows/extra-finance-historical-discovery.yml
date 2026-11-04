@@ -1,0 +1,64 @@
+name: Extra Finance historical active vault discovery
+on:
+  pull_request:
+    paths:
+      - 'tests/extra_historical_fork/**'
+      - '.github/workflows/extra-finance-historical-discovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archived-vault-discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        block: [120000000, 145000000]
+    env:
+      OP_READONLY_RPC: https://mainnet.optimism.io
+    steps:
+      - name: Checkout ANCHOR
+        uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.7
+      - name: Validate RPC and historical pinned block
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cast chain-id --rpc-url "$OP_READONLY_RPC")" = "10"
+          mkdir -p evidence
+          printf '{"chain_id":10,"historical_block":%s,"target":"0xbb505c54d71e9e599cb8435b4f0ceec05fc71cbd","method":"bounded_staticcalls_only","broadcast":false}\n' "${{ matrix.block }}" > evidence/position-discovery-provenance.json
+          cat evidence/position-discovery-provenance.json
+      - name: Query live archived state in a disposable read-only fork
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .extra-history/test
+          cp tests/extra_historical_fork/AnchorExtraHistoricalPositionDiscovery.t.sol .extra-history/test/
+          cat > .extra-history/foundry.toml <<'TOML'
+          [profile.default]
+          src = "src"
+          test = "test"
+          solc_version = "0.8.18"
+          optimizer = true
+          optimizer_runs = 200
+          via_ir = true
+          TOML
+          forge test --root .extra-history \
+            --fork-url "$OP_READONLY_RPC" \
+            --fork-block-number "${{ matrix.block }}" \
+            --match-contract AnchorExtraHistoricalPositionDiscoveryTest -vv \
+            2>&1 | tee evidence/position-discovery-test.log
+      - name: Preserve bounded historical discovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extra-historical-position-discovery-${{ matrix.block }}
+          path: evidence/
+          retention-days: 14
+          if-no-files-found: warn
