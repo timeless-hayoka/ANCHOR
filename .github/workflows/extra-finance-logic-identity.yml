@@ -37,7 +37,7 @@ jobs:
           forge build --root .extra-logic-identity
 
   archived-logic-readout:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.head_ref == 'research/extra-logic-identity-readout-20261104')
     needs: compile-logic-identity
     concurrency:
       group: extra-historical-logic-registry-rpc
