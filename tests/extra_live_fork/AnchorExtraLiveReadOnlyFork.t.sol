@@ -340,6 +340,66 @@ contract AnchorExtraLiveReadOnlyForkTest {
         }
     }
 
+    /// @notice Phase-one *real* vault position discovery. We deliberately
+    /// query the deployed position manager and real factory, not synthetic
+    /// vaults or fabricated collateral. A later test must separately prove
+    /// a selected position is active and healthy before simulating closure
+    /// or liquidation. These are purely STATICCALLs to OP state.
+    function test_LiveForkDiscoverRealVaultPositionManagersAndPositions() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        address registry = POOL.addressRegistry();
+        address factory = IAnchorAddressRegistry(registry).getAddress(10);
+        address positionManager = IAnchorAddressRegistry(registry).getAddress(7);
+        require(factory.code.length > 0, "deployed factory missing");
+        require(positionManager.code.length > 0, "deployed position manager missing");
+
+        emit log_named_address("position_manager", positionManager);
+        emit log_named_address("vault_factory", factory);
+
+        uint256 foundVaults;
+        uint256 foundPositions;
+        uint256 foundActive;
+        // Bounded read-only discovery of 8 vaults x 16 position IDs each.
+        for (uint256 vaultId = 1; vaultId <= 8; vaultId++) {
+            address vault = IAnchorVaultFactory(factory).vaults(vaultId);
+            if (vault == address(0) || vault.code.length == 0) continue;
+            foundVaults++;
+            emit log_named_uint("discovered_vault_id", vaultId);
+            emit log_named_address("discovered_vault", vault);
+            for (uint256 posId = 1; posId <= 16; posId++) {
+                // IVeloVaultPositionManager.getVaultPosition returns
+                // VaultTypes.VeloPositionValue; manager and isActive are its
+                // first two static ABI words.
+                (bool ok, bytes memory ret) = positionManager.staticcall(
+                    abi.encodeWithSignature(
+                        "getVaultPosition(uint256,uint256)", vaultId, posId
+                    )
+                );
+                if (!ok || ret.length < 64) continue;
+                address manager;
+                uint256 activeWord;
+                assembly {
+                    manager := mload(add(ret, 32))
+                    activeWord := mload(add(ret, 64))
+                }
+                if (manager == address(0) || activeWord > 1) continue;
+                foundPositions++;
+                if (activeWord == 1) {
+                    foundActive++;
+                    emit log_named_uint("active_vault_id", vaultId);
+                    emit log_named_uint("active_position_id", posId);
+                    emit log_named_address("active_position_manager", manager);
+                }
+            }
+        }
+        emit log_named_uint("scanned_deployed_vaults", foundVaults);
+        emit log_named_uint("sampled_positions_with_manager", foundPositions);
+        emit log_named_uint("sampled_active_positions", foundActive);
+        require(foundVaults > 0, "no live vaults were resolved");
+        // Existence is reported, not assumed; this stage does not claim a
+        // liquidation state-transition test or exploitation result.
+    }
+
     function test_LiveForkReadOnlyCallsAreDeterministic() public view {
         require(block.chainid == OP_CHAIN_ID, "wrong chain");
         uint256 reserveId = 1;
