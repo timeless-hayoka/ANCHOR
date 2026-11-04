@@ -38,7 +38,9 @@ jobs:
           forge build --root .extra-oracle-probe
 
   historic-oracle-provenance:
-    if: github.event_name == 'workflow_dispatch'
+    # One-time tightly scoped research PR: archive-only read, no broadcasting.
+    # Keep ongoing archival operations opt-in outside this exact head branch.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.head_ref == 'research/extra-historical-provenance-run-20261104')
     needs: compile-historic-provenance
     runs-on: ubuntu-latest
     timeout-minutes: 15
