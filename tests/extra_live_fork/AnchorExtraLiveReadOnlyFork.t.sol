@@ -74,6 +74,8 @@ interface IAnchorLiveLendingPool {
     function borrowingWhiteList(address vault) external view returns (bool);
     function credits(uint256 reserveId, address vault) external view returns (uint256);
     function debtPositions(uint256 debtId) external view returns (uint256 reserveId, address owner, uint256 borrowed, uint256 borrowedIndex);
+    function newDebtPosition(uint256 reserveId) external returns (uint256);
+
 
     function setCreditsOfVault(uint256 vaultId, uint256 reserveId, uint256 credit) external;
     function enableVaultToBorrow(uint256 vaultId) external;
@@ -445,6 +447,45 @@ contract AnchorExtraLiveReadOnlyForkTest {
     /// @notice Local-only closed-position transition guard. This DOES NOT
     /// establish healthy-position liquidation behavior or a bounty issue.
     /// The vault, position manager and first position are real fork storage.
+    /// @notice A genuinely state-changing protocol action is exercised
+    /// only inside this disposable local OP fork. New debt records are
+    /// permissionless, but MUST start with no borrowable funds or credit.
+    /// This is not a vulnerability or permission bypass.
+    function test_LocalForkNewDebtPositionDoesNotCreateBorrowingPower() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        require(!POOL.paused(), "pool paused");
+        uint256 reserveId = 1;
+        address newcomer = address(uint160(0xFA11BACC));
+        require(!POOL.borrowingWhiteList(newcomer), "newcomer already whitelisted");
+
+        uint256 beforeNextId = POOL.nextDebtPositionId();
+        uint256 beforeLiquidity = POOL.totalLiquidityOfReserve(reserveId);
+        uint256 beforeBorrows = POOL.totalBorrowsOfReserve(reserveId);
+        uint256 beforeCredits = POOL.credits(reserveId, newcomer);
+
+        vm.prank(newcomer);
+        uint256 id = POOL.newDebtPosition(reserveId);
+        require(id == beforeNextId, "unexpected new debt ID");
+        require(POOL.nextDebtPositionId() == beforeNextId + 1, "new record not allocated");
+
+        (uint256 actualReserve, address owner, uint256 principal, uint256 index) =
+            POOL.debtPositions(id);
+        require(actualReserve == reserveId, "new position reserve mismatch");
+        require(owner == newcomer, "new position owner mismatch");
+        require(principal == 0, "new position has unexpected principal");
+        require(index > 0, "borrow index not initialized");
+        require(POOL.credits(reserveId, newcomer) == beforeCredits, "new position changed credit");
+        require(POOL.totalLiquidityOfReserve(reserveId) == beforeLiquidity, "new position changed liquidity");
+        require(POOL.totalBorrowsOfReserve(reserveId) == beforeBorrows, "new position changed borrow totals");
+
+        vm.prank(newcomer);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "8"));
+        POOL.borrow(newcomer, id, 1);
+        require(POOL.totalLiquidityOfReserve(reserveId) == beforeLiquidity, "failed borrow changed liquidity");
+        require(POOL.totalBorrowsOfReserve(reserveId) == beforeBorrows, "failed borrow changed totals");
+        emit log_named_uint("fork_created_debt_id", id);
+    }
+
     function test_LocalForkClosedPositionCannotCloseOrLiquidateAgain() public {
         require(block.chainid == OP_CHAIN_ID, "wrong chain");
         require(!POOL.paused(), "cannot attribute a revert when pool is paused");
