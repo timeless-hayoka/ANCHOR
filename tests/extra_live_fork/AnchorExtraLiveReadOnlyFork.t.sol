@@ -359,14 +359,16 @@ contract AnchorExtraLiveReadOnlyForkTest {
         uint256 foundVaults;
         uint256 foundPositions;
         uint256 foundActive;
-        // Bounded read-only discovery of 2 vaults x 3 position IDs each (public RPC throttling).
+        // Sparse read-only discovery of 2 vaults x 7 later position IDs; bounded to avoid public RPC 429 throttling.
         for (uint256 vaultId = 1; vaultId <= 2; vaultId++) {
             address vault = IAnchorVaultFactory(factory).vaults(vaultId);
             if (vault == address(0) || vault.code.length == 0) continue;
             foundVaults++;
             emit log_named_uint("discovered_vault_id", vaultId);
             emit log_named_address("discovered_vault", vault);
-            for (uint256 posId = 1; posId <= 3; posId++) {
+            uint256[7] memory samples = [uint256(8), 16, 32, 64, 128, 256, 512];
+            for (uint256 sample = 0; sample < samples.length; sample++) {
+                uint256 posId = samples[sample];
                 // IVeloVaultPositionManager.getVaultPosition returns
                 // VaultTypes.VeloPositionValue; manager and isActive are its
                 // first two static ABI words.
