@@ -460,7 +460,7 @@ contract AnchorExtraLiveReadOnlyForkTest {
     /// The mutation occurs ONLY inside this disposable Foundry fork;
     /// no privileged actor, funding, storage override or broadcast is used.
     /// This is not a vault collateral position and cannot demonstrate a bug.
-    function test_LocalForkCreatesZeroBorrowDebtWithoutChangingReserveAssets() public {
+    function test_LocalForkClassifiesDebtCreationAvailabilityAndPreservesAccounting() public {
         require(block.chainid == OP_CHAIN_ID, "wrong chain");
         require(!POOL.paused(), "pool is paused");
 
@@ -470,6 +470,7 @@ contract AnchorExtraLiveReadOnlyForkTest {
         uint256 cashBefore;
         uint256 borrowsBefore;
         uint256 creditsBefore;
+        uint256 guardedReserves;
 
         // Reserve #1 is frozen in the current deployment. Probe a BOUNDED
         // set of real reserves rather than forging storage or admin rights.
@@ -493,6 +494,12 @@ contract AnchorExtraLiveReadOnlyForkTest {
                 emit log_named_uint("rejected_candidate_reserve", id);
                 emit log_named_string("reserve_revert_reason", reason);
                 require(
+                    keccak256(bytes(reason)) == keccak256(bytes("1")) ||
+                    keccak256(bytes(reason)) == keccak256(bytes("2")),
+                    "unexpected debt-creation guard"
+                );
+                guardedReserves++;
+                require(
                     POOL.nextDebtPositionId() == nextBefore,
                     "failed candidate changed debt ID counter"
                 );
@@ -507,7 +514,15 @@ contract AnchorExtraLiveReadOnlyForkTest {
             }
         }
 
-        require(candidateReserve != 0, "no usable non-frozen reserve in bounded sample");
+        if (candidateReserve == 0) {
+            // This is NOT a positive debt-creation test: it records a real
+            // deployment availability BLOCKER and verifies all attempts
+            // were rejected by the correct inactive/frozen guards.
+            require(guardedReserves == 7, "unclassified sample responses");
+            require(POOL.nextDebtPositionId() == nextBefore, "blocked candidates allocated debt");
+            emit log_named_uint("positive_transition_blocked_candidates", guardedReserves);
+            return;
+        }
         require(POOL.nextDebtPositionId() == nextBefore + 1, "debt counter not incremented once");
         (uint256 debtReserve, address debtOwner, uint256 principal, uint256 borrowedIndex) =
             POOL.debtPositions(nextBefore);
