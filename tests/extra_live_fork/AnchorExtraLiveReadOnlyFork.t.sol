@@ -98,6 +98,7 @@ contract AnchorExtraLiveReadOnlyForkTest {
     // -vv, providing inspectable onchain values from a single pinned block.
     event log_named_uint(string label, uint256 value);
     event log_named_address(string label, address value);
+    event log_named_string(string label, string value);
     address internal constant TARGET =
         0xBB505c54D71E9e599cB8435b4F0cEEc05fC71cbD;
     uint256 internal constant OP_CHAIN_ID = 10;
@@ -488,7 +489,9 @@ contract AnchorExtraLiveReadOnlyForkTest {
                 borrowsBefore = borrowedBefore;
                 creditsBefore = allowedBefore;
                 break;
-            } catch {
+            } catch Error(string memory reason) {
+                emit log_named_uint("rejected_candidate_reserve", id);
+                emit log_named_string("reserve_revert_reason", reason);
                 require(
                     POOL.nextDebtPositionId() == nextBefore,
                     "failed candidate changed debt ID counter"
