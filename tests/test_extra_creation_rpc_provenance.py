@@ -99,3 +99,14 @@ def test_trace_node_budget_and_full_input_redaction():
     assert len(result["nodes"]) == MODULE.MAX_TRACE_NODES
     assert "input" not in result["nodes"][0]
     assert "input_sha256" in result["nodes"][0]
+
+
+def test_static_opcode_inventory_skips_immediate_bytes_and_flags_unverified_selectors():
+    # PUSH4, then a real DELEGATECALL opcode; PUSH1 0xf4 data must be skipped.
+    raw = "0x63f18efb4560f4f4" + "73" + "11" * 20 + "f5"
+    inv = MODULE.opcode_inventory(raw)
+    assert "0xf18efb45" in inv["push4_literals"]
+    assert "0x" + "11" * 20 in inv["push20_literals"]
+    assert inv["opcode_counts"]["DELEGATECALL"] == 1
+    assert inv["opcode_counts"]["CREATE2"] == 1
+    assert "do not prove" in inv["note"]
