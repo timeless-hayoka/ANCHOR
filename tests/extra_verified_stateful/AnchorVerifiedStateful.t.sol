@@ -379,6 +379,179 @@ contract AnchorVerifiedStatefulTest {
         require(debtAfter > 0, "partial repayment unexpectedly erased debt");
     }
 
+    /// @notice Same vault, two independent debt positions and shared credit.
+    /// @dev No time warp: exact principal settlement isolates ownership and
+    ///      accounting behavior from known historical interest-rounding issues.
+    function test_VerifiedTwoDebtPositionsShareCreditButNotPrincipal() public {
+        uint256 firstId = _prepareDebt();
+        vm.prank(VAULT);
+        uint256 secondId = pool.newDebtPosition(reserveId);
+        require(firstId != secondId, "two debt IDs collide");
+
+        uint256 initialLiquidity = token.balanceOf(pool.getETokenAddress(reserveId));
+        vm.prank(VAULT);
+        pool.borrow(VAULT, firstId, 60_000);
+        vm.prank(VAULT);
+        pool.borrow(VAULT, secondId, 70_000);
+
+        (uint256 firstDebt,) = pool.getCurrentDebt(firstId);
+        (uint256 secondDebt,) = pool.getCurrentDebt(secondId);
+        require(firstDebt == 60_000, "first debt changed unexpectedly");
+        require(secondDebt == 70_000, "second debt changed unexpectedly");
+        require(pool.credits(reserveId, VAULT) == 70_000, "joint credit consumption");
+        require(
+            token.balanceOf(pool.getETokenAddress(reserveId)) == initialLiquidity - 130_000,
+            "joint borrow not removed from reserve"
+        );
+
+        vm.startPrank(VAULT);
+        token.approve(address(pool), 130_000);
+        uint256 settledFirst = pool.repay(VAULT, firstId, 60_000);
+        vm.stopPrank();
+        require(settledFirst == 60_000, "first repayment mismatch");
+        (firstDebt,) = pool.getCurrentDebt(firstId);
+        (secondDebt,) = pool.getCurrentDebt(secondId);
+        require(firstDebt == 0, "first debt not closed");
+        require(secondDebt == 70_000, "unrelated position altered");
+        require(pool.credits(reserveId, VAULT) == 130_000, "first credit recovery");
+
+        vm.prank(VAULT);
+        uint256 settledSecond = pool.repay(VAULT, secondId, 70_000);
+        require(settledSecond == 70_000, "second repayment mismatch");
+        (secondDebt,) = pool.getCurrentDebt(secondId);
+        require(secondDebt == 0, "second debt not closed");
+        require(pool.credits(reserveId, VAULT) == 200_000, "all credits not returned");
+        require(
+            token.balanceOf(pool.getETokenAddress(reserveId)) == initialLiquidity,
+            "reserve liquidity was not recovered"
+        );
+    }
+
+    function test_VerifiedSharedCreditExhaustionDoesNotModifyEitherDebt() public {
+        uint256 firstId = _prepareDebt();
+        vm.prank(VAULT);
+        uint256 secondId = pool.newDebtPosition(reserveId);
+        vm.prank(VAULT);
+        pool.borrow(VAULT, firstId, 160_000);
+        require(pool.credits(reserveId, VAULT) == 40_000, "initial available credit");
+
+        uint256 liquidityBefore = token.balanceOf(pool.getETokenAddress(reserveId));
+        (uint256 firstBefore,) = pool.getCurrentDebt(firstId);
+        (uint256 secondBefore,) = pool.getCurrentDebt(secondId);
+        vm.prank(VAULT);
+        vm.expectRevert();
+        pool.borrow(VAULT, secondId, 40_001);
+
+        (uint256 firstAfter,) = pool.getCurrentDebt(firstId);
+        (uint256 secondAfter,) = pool.getCurrentDebt(secondId);
+        require(firstAfter == firstBefore, "first position modified by revert");
+        require(secondAfter == secondBefore, "second position modified by revert");
+        require(pool.credits(reserveId, VAULT) == 40_000, "failed borrow spent credit");
+        require(
+            token.balanceOf(pool.getETokenAddress(reserveId)) == liquidityBefore,
+            "failed borrow changed reserve liquidity"
+        );
+    }
+
+    /// @notice Isolate two positions after an interest-bearing time step.
+    /// @dev Only monotonicity and independence are asserted; rounding/fee
+    ///      exactness requires separate adversarial controls and known-issue triage.
+    function test_VerifiedTwoPositionsAccrueInterestAndSettleIndependently() public {
+        uint256 firstId = _prepareDebt();
+        vm.prank(VAULT);
+        uint256 secondId = pool.newDebtPosition(reserveId);
+        vm.prank(VAULT);
+        pool.borrow(VAULT, firstId, 70_000);
+        vm.prank(VAULT);
+        pool.borrow(VAULT, secondId, 60_000);
+
+        vm.warp(block.timestamp + 7 days);
+        (uint256 firstDue,) = pool.getCurrentDebt(firstId);
+        (uint256 secondDue,) = pool.getCurrentDebt(secondId);
+        require(firstDue > 70_000, "first position failed to accrue");
+        require(secondDue > 60_000, "second position failed to accrue");
+
+        token.mint(VAULT, firstDue + secondDue - 130_000);
+        vm.startPrank(VAULT);
+        token.approve(address(pool), firstDue + secondDue);
+        uint256 firstPaid = pool.repay(VAULT, firstId, firstDue);
+        vm.stopPrank();
+        require(firstPaid == firstDue, "first accrued repayment differs");
+        (uint256 firstRemaining,) = pool.getCurrentDebt(firstId);
+        (uint256 secondRemaining,) = pool.getCurrentDebt(secondId);
+        require(firstRemaining == 0, "first accrued debt remains");
+        require(secondRemaining > 0, "unrelated accrued debt was erased");
+        require(
+            secondRemaining <= secondDue + 1,
+            "unrelated accrued debt increased unexpectedly"
+        );
+    }
+
+    /// @notice Two distinct vaults have independently authorized debt and
+    /// credit. Shared reserve liquidity must still account for both loans.
+    function test_VerifiedIndependentVaultCreditAndDebtOwnership() public {
+        _deposit(ALICE, 500_000);
+        address secondVault = address(0xC0FFEF);
+        factory.setVault(2, secondVault);
+        pool.enableVaultToBorrow(1);
+        pool.enableVaultToBorrow(2);
+        pool.setCreditsOfVault(1, reserveId, 100_000);
+        pool.setCreditsOfVault(2, reserveId, 120_000);
+
+        vm.prank(VAULT);
+        uint256 firstId = pool.newDebtPosition(reserveId);
+        vm.prank(secondVault);
+        uint256 secondId = pool.newDebtPosition(reserveId);
+        uint256 initialLiquidity = token.balanceOf(pool.getETokenAddress(reserveId));
+
+        vm.prank(VAULT);
+        pool.borrow(VAULT, firstId, 40_000);
+        vm.prank(secondVault);
+        pool.borrow(secondVault, secondId, 50_000);
+
+        require(pool.credits(reserveId, VAULT) == 60_000, "vault one credits");
+        require(pool.credits(reserveId, secondVault) == 70_000, "vault two credits");
+        (uint256 firstDebt,) = pool.getCurrentDebt(firstId);
+        (uint256 secondDebt,) = pool.getCurrentDebt(secondId);
+        require(firstDebt == 40_000 && secondDebt == 50_000, "separate debt amounts");
+        require(
+            token.balanceOf(pool.getETokenAddress(reserveId)) == initialLiquidity - 90_000,
+            "two-vault reserve liquidity"
+        );
+
+        vm.prank(secondVault);
+        vm.expectRevert();
+        pool.borrow(secondVault, firstId, 1);
+        vm.prank(VAULT);
+        vm.expectRevert();
+        pool.borrow(VAULT, secondId, 1);
+
+        (firstDebt,) = pool.getCurrentDebt(firstId);
+        (secondDebt,) = pool.getCurrentDebt(secondId);
+        require(firstDebt == 40_000 && secondDebt == 50_000, "cross-vault borrow changed debt");
+        require(pool.credits(reserveId, VAULT) == 60_000, "cross-vault credit one");
+        require(pool.credits(reserveId, secondVault) == 70_000, "cross-vault credit two");
+    }
+
+    /// @notice Increasing utilization should raise the curve's borrowing rate
+    /// under the verified implementation's default synthetic reserve config.
+    function test_VerifiedBorrowRateMovesWithUtilization() public {
+        uint256 id = _prepareDebt();
+        uint256 idleRate = pool.borrowingRateOfReserve(reserveId);
+        vm.prank(VAULT);
+        pool.borrow(VAULT, id, 50_000);
+        uint256 rateAfterFirst = pool.borrowingRateOfReserve(reserveId);
+        vm.prank(VAULT);
+        pool.borrow(VAULT, id, 100_000);
+        uint256 rateAfterSecond = pool.borrowingRateOfReserve(reserveId);
+
+        require(rateAfterFirst > idleRate, "first borrow did not increase rate");
+        require(rateAfterSecond > rateAfterFirst, "increased utilization did not raise rate");
+        require(pool.credits(reserveId, VAULT) == 50_000, "credit after rising utilization");
+        (uint256 debt,) = pool.getCurrentDebt(id);
+        require(debt == 150_000, "two borrows changed combined principal");
+    }
+
     function test_VerifiedBorrowingInterestAccruesOverSevenDays() public {
         uint256 id = _prepareDebt();
         vm.prank(VAULT);

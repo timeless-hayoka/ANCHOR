@@ -47,3 +47,15 @@ The full settlement test is **not** evidence that interest always settles correc
 These tests establish source-matched **lab behavior** only, not reportable findings.  The isolated contract was freshly deployed with synthetic registry, mock ERC-20 and vault factory, not loaded with the onchain contract's historical storage configuration. The seven-day interest settlement succeeds in the tested scenario and does not rule out already disclosed repayment rounding or credit problems. The borrow/repay control checks same-block repayment and does **not** assert safety under the already disclosed repayment/rounding issue families. The depositor test does **not** claim the first-share-lock mitigation present in the older GitHub revision exists in deployed source. The lab does not yet reconstruct mainnet reserve configuration, vault implementation callbacks, oracle state, liquidations, multi-reserve debt, or all security invariants.
 
 Next: negative-control mutations of accounting/authorization assertions; additional partial repayment and interest-sensitive settlement tests; reconstruct distinct scope-approved vault/market configurations; review known findings and active bounty eligibility before any PoC or disclosure. Trinity remains `signal` with no finding.
+
+## Multi-position and dynamic-utilization controls (PR #43)
+
+[Verified-source CI run 41694908840](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41694908840) ran **18 passing stateful tests** (0 failures) against the Sourcify 0.8.18 source package, including 3 fuzz properties with **256 executions apiece (768 total)**. The five additional fixed scenarios from this PR cover:
+
+- **Same-vault, two positions:** separate loan IDs, aggregate reserve debits, shared credit budget, repayment of one loan without changing the other, and complete credit restoration after both loans close.
+- **Shared-credit overrun:** a second position cannot borrow one unit more than remaining credit; both debts, liquidity and available credit remain unchanged after revert.
+- **Accrued-interest independence:** after seven simulated days, debt rises on two positions and repaying one does not erase the other's positive liability.
+- **Different vaults:** two distinct whitelisted vaults hold separate credits and debt positions; cross-vault borrow attempts revert with debts and credits unchanged.
+- **Rate vs utilization:** under the verified source's *synthetic default reserve settings*, successive borrowing increments increase the curve's borrowing rate and consume only the expected credit.
+
+**Evidence limits:** All contract code comes from verified source, but storage, vault factory, token and interest configuration are initialized synthetically. These checks do not certify production vault deployments, full collateral risk, oracle prices, liquidations, or reportable exploitability. No Trinity finding is promoted.
