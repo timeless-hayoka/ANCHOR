@@ -7,6 +7,15 @@ pragma solidity 0.8.18;
 interface VmAnchorFork {
     function prank(address who) external;
     function expectRevert() external;
+    function expectRevert(bytes calldata revertData) external;
+}
+
+interface IAnchorAddressRegistry {
+    function getAddress(uint256 id) external view returns (address);
+}
+
+interface IAnchorVaultFactory {
+    function vaults(uint256 id) external view returns (address);
 }
 
 interface IAnchorLiveLendingPool {
@@ -18,6 +27,15 @@ interface IAnchorLiveLendingPool {
     function borrow(address onBehalfOf, uint256 debtId, uint256 amount) external;
     function repay(address onBehalfOf, uint256 debtId, uint256 amount) external returns (uint256);
     function borrowingWhiteList(address vault) external view returns (bool);
+    function credits(uint256 reserveId, address vault) external view returns (uint256);
+    function debtPositions(uint256 debtId) external view returns (uint256 reserveId, address owner, uint256 borrowed, uint256 borrowedIndex);
+
+    function setCreditsOfVault(uint256 vaultId, uint256 reserveId, uint256 credit) external;
+    function enableVaultToBorrow(uint256 vaultId) external;
+    function disableVaultToBorrow(uint256 vaultId) external;
+    function freezeReserve(uint256 reserveId) external;
+    function unFreezeReserve(uint256 reserveId) external;
+
     function getUnderlyingTokenAddress(uint256 reserveId) external view returns (address);
     function getETokenAddress(uint256 reserveId) external view returns (address);
     function totalLiquidityOfReserve(uint256 reserveId) external view returns (uint256);
@@ -130,6 +148,138 @@ contract AnchorExtraLiveReadOnlyForkTest {
         require(POOL.nextDebtPositionId() == debtCounterBefore, "failed requests changed debt IDs");
         require(POOL.totalLiquidityOfReserve(reserveId) == liquidityBefore, "failed requests changed liquidity");
         require(POOL.totalBorrowsOfReserve(reserveId) == borrowsBefore, "failed requests changed borrow balance");
+    }
+
+    /// @notice Reject an ordinary account's attempt to increase the
+    /// existing onchain vault's borrowing budget. All attempted state
+    /// changes occur only in this disposable local Foundry fork.
+    /// @dev LendingPool.getVault() is INTERNAL in verified Solidity; resolve
+    /// registry key 10 (ADDRESS_ID_VAULT_FACTORY) through the actual external
+    /// registry and then its public vaults(id) mapping. No fabricated ABI.
+    function _realVault(uint256 vaultId) internal view returns (address vault) {
+        address registry = POOL.addressRegistry();
+        require(registry.code.length > 0, "registry missing");
+        address factory = IAnchorAddressRegistry(registry).getAddress(10);
+        require(factory != address(0) && factory.code.length > 0, "vault factory missing");
+        vault = IAnchorVaultFactory(factory).vaults(vaultId);
+        require(vault != address(0) && vault.code.length > 0, "vault ID not deployed");
+    }
+
+    function test_LocalForkNonOwnerCannotIncreaseExistingVaultCredits() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        uint256 reserveId = 1;
+        uint256 vaultId = 1;
+        address currentVault = _realVault(vaultId);
+        require(currentVault != address(0) && currentVault.code.length > 0, "real vault missing");
+
+        address outsider = address(uint160(0xD00D));
+        uint256 beforeCredits = POOL.credits(reserveId, currentVault);
+        uint256 beforeLiquidity = POOL.totalLiquidityOfReserve(reserveId);
+        uint256 beforeBorrow = POOL.totalBorrowsOfReserve(reserveId);
+        bool beforeWhitelist = POOL.borrowingWhiteList(currentVault);
+
+        vm.prank(outsider);
+        vm.expectRevert();
+        POOL.setCreditsOfVault(vaultId, reserveId, beforeCredits + 1);
+
+        require(POOL.credits(reserveId, currentVault) == beforeCredits, "unauthorized credits modified");
+        require(POOL.borrowingWhiteList(currentVault) == beforeWhitelist, "whitelist changed on credit failure");
+        require(POOL.totalLiquidityOfReserve(reserveId) == beforeLiquidity, "liquidity changed on credit failure");
+        require(POOL.totalBorrowsOfReserve(reserveId) == beforeBorrow, "borrow totals changed on credit failure");
+    }
+
+    /// @notice Neither the whitelist nor a live reserve's admin flags
+    /// can be modified by a newly selected non-admin account.
+    function test_LocalForkNonOwnerCannotToggleVaultBorrowingAuthorization() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        uint256 vaultId = 1;
+        address vault = _realVault(vaultId);
+        require(vault != address(0) && vault.code.length > 0, "real vault missing");
+        address outsider = address(uint160(0xD00D));
+        bool initiallyWhitelisted = POOL.borrowingWhiteList(vault);
+        uint256 beforeCredits = POOL.credits(1, vault);
+        uint256 beforeReserveCounter = POOL.nextReserveId();
+
+        vm.prank(outsider);
+        vm.expectRevert();
+        POOL.enableVaultToBorrow(vaultId);
+        vm.prank(outsider);
+        vm.expectRevert();
+        POOL.disableVaultToBorrow(vaultId);
+        vm.prank(outsider);
+        vm.expectRevert();
+        POOL.freezeReserve(1);
+        vm.prank(outsider);
+        vm.expectRevert();
+        POOL.unFreezeReserve(1);
+
+        require(POOL.borrowingWhiteList(vault) == initiallyWhitelisted, "vault authorization modified");
+        require(POOL.credits(1, vault) == beforeCredits, "vault credits modified");
+        require(POOL.nextReserveId() == beforeReserveCounter, "admin failure modified reserve IDs");
+    }
+
+    /// @notice Stronger role-boundary control: even a DIFFERENT whitelisted
+    /// real vault may not borrow or repay a debt position it does not own.
+    /// Both attempted calls run only on a pinned disposable local fork.
+    function test_LocalForkWhitelistedVaultCannotOperateAnotherVaultDebt() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        require(!POOL.paused(), "cannot assess vault permissions while paused");
+        address registry = POOL.addressRegistry();
+        address factory = IAnchorAddressRegistry(registry).getAddress(10);
+        require(factory.code.length > 0, "no deployed vault factory");
+
+        // Find a real debt owner with a recorded vault identity.
+        // Hard bound makes the test deterministic and prevents unbounded RPC.
+        uint256 next = POOL.nextDebtPositionId();
+        uint256 bound = next < 65 ? next : 65;
+        uint256 selectedDebt = 0;
+        uint256 selectedReserve = 0;
+        address selectedOwner = address(0);
+        for (uint256 id = 1; id < bound; id++) {
+            (uint256 reserveId, address owner,,) = POOL.debtPositions(id);
+            if (owner != address(0) && reserveId > 0 && POOL.borrowingWhiteList(owner)) {
+                selectedDebt = id;
+                selectedReserve = reserveId;
+                selectedOwner = owner;
+                break;
+            }
+        }
+        require(selectedDebt != 0, "no active whitelisted debt owner within sample");
+        address competingVault = address(0);
+        for (uint256 id = 1; id <= 32; id++) {
+            address candidate = IAnchorVaultFactory(factory).vaults(id);
+            if (candidate != address(0)
+                && candidate != selectedOwner
+                && POOL.borrowingWhiteList(candidate)) {
+                competingVault = candidate;
+                break;
+            }
+        }
+        require(competingVault != address(0), "no independent whitelisted vault in sample");
+        uint256 debtBefore;
+        uint256 reserveIdBefore;
+        uint256 ignored;
+        (reserveIdBefore,, debtBefore, ignored) = POOL.debtPositions(selectedDebt);
+        require(reserveIdBefore == selectedReserve, "debt reserve identity changed");
+        uint256 creditBefore = POOL.credits(selectedReserve, competingVault);
+        uint256 liquidityBefore = POOL.totalLiquidityOfReserve(selectedReserve);
+        uint256 borrowsBefore = POOL.totalBorrowsOfReserve(selectedReserve);
+
+        vm.prank(competingVault);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "7"));
+        POOL.borrow(competingVault, selectedDebt, 1);
+        vm.prank(competingVault);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "7"));
+        POOL.repay(competingVault, selectedDebt, 1);
+
+        (uint256 afterReserve, address afterOwner, uint256 afterDebt,) =
+            POOL.debtPositions(selectedDebt);
+        require(afterReserve == selectedReserve, "debt reserve changed");
+        require(afterOwner == selectedOwner, "debt ownership changed");
+        require(afterDebt == debtBefore, "another vault changed debt");
+        require(POOL.credits(selectedReserve, competingVault) == creditBefore, "vault credit modified");
+        require(POOL.totalLiquidityOfReserve(selectedReserve) == liquidityBefore, "reserve liquidity modified");
+        require(POOL.totalBorrowsOfReserve(selectedReserve) == borrowsBefore, "reserve debt aggregate modified");
     }
 
     function test_LiveForkReadOnlyCallsAreDeterministic() public view {

@@ -49,6 +49,30 @@ Current Extra Finance <https://immunefi.com/bug-bounty/extrafinance/information/
 
 **Bounty next gate:** choose a different externally reachable security invariant with a plausible accepted financial impact, demonstrate a FAIL on independent real-implementation controls in a local fork, then isolate the minimal reproduction and scope/duplicate checks before submission. The original Trinity lead remains a research signal.
 
+## Real vault credit and admin-control negative tests (2026-11-03)
+
+[GitHub Actions run 41718377837](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41718377837) passed **7/7 local-fork Foundry tests** against OP Mainnet block **159070543**.
+
+These two additional tests resolve the deployed vault via the actual public `AddressRegistry.getAddress(10)` (vault factory ID) and `VaultFactory.vaults(1)`. The LendingPool's `getVault()` helper is internal and **not** an external ABI method; this matters because the first implementation incorrectly assumed it was externally available. The final verified tests inspect a real factory/vault in fork storage.
+
+- Non-owner `setCreditsOfVault(1, 1, previousCredits + 1)`: **reverted**. The vault's credit, whitelist flag, reserve liquidity and total borrowing stayed unchanged.
+- Non-owner `enableVaultToBorrow(1)`, `disableVaultToBorrow(1)`, `freezeReserve(1)` and `unFreezeReserve(1)`: **all reverted**. The vault whitelist, credit and reserve ID counter remained unchanged.
+- The original 5 live-fork tests (deployment state, reserve/debt views, deterministic getters, unauthorized reserve initialization, and stranger borrow/repay rejection) also passed.
+
+**Hypothesis outcome: NEGATIVE / NO ADMIN OR VAULT-CREDIT BYPASS REPRODUCED.** Only one deployed vault and reserve pair was sampled; the run does not certify every permissioned vault or edge condition, and there is no demonstrated economic exploit. Calls were simulated inside the local fork; the Optimism RPC was used only for state reads.
+
+**Next distinct research directions:** complex vault callbacks and cross-reserve debt paths, real reserve configuration versus synthetic assumptions, and multiple real-vault interactions. Each needs independent scope/duplicate review, a failing invariant with concrete impact, and reproducible local-fork evidence before any Trinity finding or bounty report.
+
+## Real cross-vault debt ownership boundary (2026-11-03)
+
+[GitHub Actions run 41719162207](https://github.com/timeless-hayoka/ANCHOR/actions/runs/41719162207) passed **8/8 fork tests, zero failures** at OP Mainnet block **159070694**.
+
+The additional local-only test `test_LocalForkWhitelistedVaultCannotOperateAnotherVaultDebt` scans a bounded number of actual deployed debt IDs and factory vault IDs. It locates a debt position whose owner is a whitelisted onchain vault, and a **different**, also whitelisted onchain vault. It then simulates `borrow(otherVault, debtId, 1)` and `repay(otherVault, debtId, 1)` as that second vault inside the disposable fork.
+
+**Both cross-vault calls reverted with the exact Solidity `Error(string)` reason `"7"` (`VL_INVALID_DEBT_OWNER`).** A generic unrelated revert would fail this test. The recorded original position owner, debt principal, reserve ID, competing vault credit, total reserve liquidity, and aggregate borrowing remained unchanged. No live-chain transaction was broadcast. The test asserts that the pool is not paused to avoid counting the pause guard as an owner-check success.
+
+**Research status: NEGATIVE / NO CROSS-VAULT DEBT OWNERSHIP BYPASS REPRODUCED.** This establishes one verified deployment snapshot and bounded pair of real whitelisted vaults, not all vaults, historical blocks, debt configurations, or a new in-scope financial loss. This evidence must not be promoted to a bounty report.
+
 ## Conclusions and boundaries
 
 The deployed contract, actual registry and sampled live reserves are reachable; getters function consistently in a pinned-block fork. This provides real-state, source-independent confirmation beyond the synthetic reserve tests in PRs #42–#43.
