@@ -42,14 +42,14 @@ def test_probe_has_no_mainnet_write_method_or_storage_override():
     assert '"debug_traceTransaction"' in source
     assert 'eth_sendRawTransaction' not in source
     assert 'eth_sendTransaction' not in source
-    assert '"eth_call"' not in source
+    assert '"eth_call"' in source
     assert "stateOverrides" not in source
 
 
 def test_mocked_historical_trace_and_code_fingerprints_are_reproducible():
     with patch.object(MODULE, "rpc", side_effect=_fixture), patch.object(
         MODULE.shutil, "which", return_value=None
-    ):
+    ), patch.object(MODULE, "readonly_registry_observations", return_value={"status": "UNKNOWN"}):
         evidence = MODULE.collect("https://example.invalid")
     assert evidence["chain_id"] == 10
     assert evidence["factory_runtime_equal_across_blocks"] is True
