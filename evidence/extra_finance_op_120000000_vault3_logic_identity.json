@@ -1,0 +1,181 @@
+{
+  "schema_version": "1.0",
+  "provenance": {
+    "chain_id": 10,
+    "block_number": 120000000,
+    "workflow_run": 41837960479,
+    "job_id": 126601790065,
+    "archive_fork_only": true,
+    "no_broadcast": true,
+    "no_storage_override": true,
+    "vault_id": 3,
+    "vault_address": "0x5101081495D209a80F5DBb1C5ecd76Fe137A9eE9",
+    "vault_runtime_codehash": "0x957d5a09afddb11ea5ecba8566e74dd9c2e2566b878e1711069526e7ecafa480",
+    "vault_runtime_code_size": 13930,
+    "registry": "0x85603119C938750Dfb5904f8a501b64F3F3A01D2",
+    "registry_codehash": "0x902648a3885a1ad71cd6aa3a0b88d689e1703f1e6ed6601c77de5b858298c16d"
+  },
+  "registry_observations": [
+    {
+      "key": "101",
+      "base_id": 101,
+      "version": null,
+      "role": "selector",
+      "address": "0xdCf0f4A0FC44F33DE35D8c80Ad5D248DBF838943",
+      "codehash": "0xbf087bd283003f7e597ead7d15df7504e8601387c3eb3e9e260c60b0fb1f430d",
+      "code_size": 1560,
+      "source_equivalence": "NOT_PROVEN"
+    },
+    {
+      "key": "102",
+      "base_id": 102,
+      "version": null,
+      "role": "initializer",
+      "address": "0x7FD13C20EebA7A3776EbC422CEF7c8752D40766f",
+      "codehash": "0xc2c9c9174e39a33d3264cb16a0fdf30e20077300d7406c1b889ccb8bc0a89779",
+      "code_size": 4094,
+      "source_equivalence": "NOT_PROVEN"
+    },
+    {
+      "key": "103",
+      "base_id": 103,
+      "version": null,
+      "role": "position_logic",
+      "address": "0x5a583Ccb69402d60BC360D691EeDb8EfdA6Fb7E5",
+      "codehash": "0x97d81efd7badfe963d1dd10ea0423b006f360d5019c9ec773ed1740365298bed",
+      "code_size": 19816,
+      "source_equivalence": "NOT_PROVEN"
+    },
+    {
+      "key": "104",
+      "base_id": 104,
+      "version": null,
+      "role": "rewards_logic",
+      "address": "0xF9d40a60fD6bDc866daf0918264a30acCE1DC9Cc",
+      "codehash": "0xaf27f118962c4482227d2f6ff1e905a3c9b5bb453916be8e181cfaa5390a025c",
+      "code_size": 8467,
+      "source_equivalence": "NOT_PROVEN"
+    },
+    {
+      "key": "105",
+      "base_id": 105,
+      "version": null,
+      "role": "owner_actions",
+      "address": "0x4b677E52Be607C8f7b81e8dEC0d9711a5c7010C6",
+      "codehash": "0x450c31e871da6170e2265e434079f4b28bc604d277a73c1f1266182204c8e119",
+      "code_size": 4608,
+      "source_equivalence": "NOT_PROVEN"
+    },
+    {
+      "key": "106",
+      "base_id": 106,
+      "version": null,
+      "role": "swap_path_manager",
+      "address": "0x73C3C06A2e1e5eB3d24f2AE021a1aF8E0DD2B5bD",
+      "codehash": "0x58456f61547e1b3c8c3d8cc59589b36b817bd328139ebe511364f73010aed1de",
+      "code_size": 2444,
+      "source_equivalence": "NOT_PROVEN"
+    },
+    {
+      "key": "107",
+      "base_id": 107,
+      "version": null,
+      "role": "chainlink_adapter",
+      "address": "0xBEdfdA828475005Dc8E4a09Aaa34BD0b8CA807e4",
+      "codehash": "0xa7b7421f9098808699cc33a35add9b92ddda49d89016130ef8fb6131281c9007",
+      "code_size": 2489,
+      "source_equivalence": "NOT_PROVEN"
+    },
+    {
+      "key": "340282366920938463463374607431768212457",
+      "base_id": 1001,
+      "version": 1,
+      "role": "vault_deployer",
+      "address": "0xa4b43b3D33f4E583194d05485c5691C0b205a75B",
+      "codehash": "0x3c33e223582b598efbec758ca7ceb31d7fce9bb67dedbe481fbb332c7de28744",
+      "code_size": 15191,
+      "source_equivalence": "NOT_PROVEN"
+    },
+    {
+      "key": "340282366920938463463374607431768212458",
+      "base_id": 1002,
+      "version": 1,
+      "role": "vault_initializer",
+      "address": "0x400ce8b1C4f96257DdE88C66B4688C583A395057",
+      "codehash": "0x5cf09b43fabbb16af359f9a014aef96cb07882c5dcbbb61520be3295d763587c",
+      "code_size": 3607,
+      "source_equivalence": "NOT_PROVEN"
+    },
+    {
+      "key": "340282366920938463463374607431768212459",
+      "base_id": 1003,
+      "version": 1,
+      "role": "vault_position_logic",
+      "address": "0x512C21D420a5841a3C06636D5ee194a565a07D5C",
+      "codehash": "0xf62a4bd972dddebaa651d7a82ffcfb419e15904fc28fee8d994b84d2f252dd60",
+      "code_size": 23464,
+      "source_equivalence": "NOT_PROVEN"
+    },
+    {
+      "key": "340282366920938463463374607431768212460",
+      "base_id": 1004,
+      "version": 1,
+      "role": "vault_rewards_logic",
+      "address": "0x360b864a59240eEbDa0f1a9B2534Ea96ED591B53",
+      "codehash": "0xd07c85404c20c2189861177fe6029223853be3008e9d55329afcdc66296b3b5b",
+      "code_size": 8701,
+      "source_equivalence": "NOT_PROVEN"
+    },
+    {
+      "key": "340282366920938463463374607431768212461",
+      "base_id": 1005,
+      "version": 1,
+      "role": "vault_owner_actions",
+      "address": "0xE14a211117CDEaa167c5b0e90F04239Dc2262a43",
+      "codehash": "0xf56f3e836f65f52771116c40fb28b2b4d38d0c3acc09f0e2db0bb6308acabde3",
+      "code_size": 4679,
+      "source_equivalence": "NOT_PROVEN"
+    }
+  ],
+  "unset_registry_entries": {
+    "unversioned": [
+      1001,
+      1002,
+      1003,
+      1004,
+      1005
+    ],
+    "version2": [
+      1001,
+      1002,
+      1003,
+      1004,
+      1005
+    ],
+    "version3": [
+      1001,
+      1002,
+      1003,
+      1004,
+      1005
+    ]
+  },
+  "probe_result": {
+    "optional_implementation_getter": "UNAVAILABLE",
+    "exact_deployed_source": "UNVERIFIED",
+    "liquidation_eligibility": "UNKNOWN",
+    "liquidation_replay": "NOT_ATTEMPTED"
+  },
+  "source_lookup": {
+    "checked_2026_11_04": [
+      "0x5101081495D209a80F5DBb1C5ecd76Fe137A9eE9",
+      "0x512C21D420a5841a3C06636D5ee194a565a07D5C",
+      "0x5a583Ccb69402d60BC360D691EeDb8EfdA6Fb7E5",
+      "0xa4b43b3D33f4E583194d05485c5691C0b205a75B"
+    ],
+    "op_explorer": "UNVERIFIED_ON_CHECKED_ADDRESSES",
+    "sourcify_v2": "NO_MATCH_ON_CHECKED_ADDRESSES",
+    "equivalence_conclusion": "UNKNOWN"
+  },
+  "evidence_url": "https://github.com/timeless-hayoka/ANCHOR/actions/runs/41837960479"
+}
