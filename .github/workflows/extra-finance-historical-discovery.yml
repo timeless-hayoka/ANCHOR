@@ -1,0 +1,114 @@
+name: Extra Finance historical active vault discovery
+on:
+  pull_request:
+    paths:
+      - 'tests/extra_historical_fork/**'
+      - '.github/workflows/extra-finance-historical-discovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archived-vault-discovery:
+    # Broad archived scans are opt-in. Public OP RPC rate-limited the
+    # previously parallel 145m scan, independently of the successful close.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        block: [120000000, 145000000]
+    env:
+      OP_READONLY_RPC: https://mainnet.optimism.io
+    steps:
+      - name: Checkout ANCHOR
+        uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.7
+      - name: Validate RPC and historical pinned block
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cast chain-id --rpc-url "$OP_READONLY_RPC")" = "10"
+          mkdir -p evidence
+          printf '{"chain_id":10,"historical_block":%s,"target":"0xbb505c54d71e9e599cb8435b4f0ceec05fc71cbd","method":"bounded_staticcalls_only","broadcast":false}\n' "${{ matrix.block }}" > evidence/position-discovery-provenance.json
+          cat evidence/position-discovery-provenance.json
+      - name: Query live archived state in a disposable read-only fork
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .extra-history/test
+          cp tests/extra_historical_fork/AnchorExtraHistoricalPositionDiscovery.t.sol .extra-history/test/
+          cat > .extra-history/foundry.toml <<'TOML'
+          [profile.default]
+          src = "src"
+          test = "test"
+          solc_version = "0.8.18"
+          optimizer = true
+          optimizer_runs = 200
+          via_ir = true
+          TOML
+          forge test --root .extra-history \
+            --fork-url "$OP_READONLY_RPC" \
+            --fork-block-number "${{ matrix.block }}" \
+            --match-contract AnchorExtraHistoricalPositionDiscoveryTest -vv \
+            2>&1 | tee evidence/position-discovery-test.log
+      - name: Preserve bounded historical discovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extra-historical-position-discovery-${{ matrix.block }}
+          path: evidence/
+          retention-days: 14
+          if-no-files-found: warn
+
+  historical-active-position-close:
+    # One known active historical position is the PR acceptance control.
+    # Do not compete with optional large archive scans for public RPC quota.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      OP_READONLY_RPC: https://mainnet.optimism.io
+    steps:
+      - name: Checkout ANCHOR
+        uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.7
+      - name: Simulate real authorized partial close at historic block 120000000
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cast chain-id --rpc-url "$OP_READONLY_RPC")" = "10"
+          mkdir -p .extra-historical-close/test evidence
+          cp tests/extra_historical_fork/AnchorExtraHistoricalVaultClose.t.sol .extra-historical-close/test/
+          cat > .extra-historical-close/foundry.toml <<'TOML'
+          [profile.default]
+          src = "src"
+          test = "test"
+          solc_version = "0.8.18"
+          optimizer = true
+          optimizer_runs = 200
+          via_ir = true
+          TOML
+          printf '{"chain_id":10,"block":120000000,"vault_id":3,"position_id":16,"broadcast":false,"storage_overrides":false}\n' > evidence/historical-close-provenance.json
+          forge test --root .extra-historical-close \
+            --fork-url "$OP_READONLY_RPC" \
+            --fork-block-number 120000000 \
+            --match-contract AnchorExtraHistoricalVaultCloseTest -vv \
+            2>&1 | tee evidence/historical-close-test.log
+      - name: Preserve true positive-control outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extra-historical-partial-close-test
+          path: evidence/
+          retention-days: 14
+          if-no-files-found: warn
