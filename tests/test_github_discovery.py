@@ -169,7 +169,7 @@ class GitHubDiscoveryTests(TestCase):
         )
 
         self.assertGreaterEqual(candidate.priority_score, 80)
-        self.assertEqual(candidate.recommendation, "join")
+        self.assertEqual(candidate.recommendation, "watch")
         self.assertIn("security policy is visible", candidate.reasons)
         self.assertIn("test or fuzz workflow is present", candidate.reasons)
         self.assertIn("smart-contract surface is explicit", candidate.reasons)
