@@ -23,6 +23,46 @@ interface IAnchorERC20Read {
     function totalSupply() external view returns (uint256);
 }
 
+interface IAnchorVaultTokens {
+    function token0() external view returns (address);
+    function token1() external view returns (address);
+}
+
+interface IAnchorVaultPositionManagerTransitions {
+    struct CloseParams {
+        uint256 vaultId;
+        uint256 vaultPositionId;
+        uint16 percent;
+        address receiver;
+        bool receiveNativeETH;
+        uint8 receiveType;
+        uint256 minAmount0WhenRemoveLiquidity;
+        uint256 minAmount1WhenRemoveLiquidity;
+        uint256 deadline;
+        uint256 swapExecutorId;
+        bytes swapPath;
+    }
+
+    struct LiquidateParams {
+        uint256 vaultId;
+        uint256 vaultPositionId;
+        uint16 percent;
+        address receiver;
+        bool receiveNativeETH;
+        uint8 receiveType;
+        uint256 minAmount0WhenRemoveLiquidity;
+        uint256 minAmount1WhenRemoveLiquidity;
+        uint256 deadline;
+        uint256 maxRepay0;
+        uint256 maxRepay1;
+        uint256 swapExecutorId;
+        bytes swapPath;
+    }
+
+    function closeVaultPositionPartially(CloseParams calldata params) external;
+    function liquidateVaultPositionPartially(LiquidateParams calldata params) external payable;
+}
+
 interface IAnchorLiveLendingPool {
     function addressRegistry() external view returns (address);
     function nextReserveId() external view returns (uint256);
@@ -400,6 +440,112 @@ contract AnchorExtraLiveReadOnlyForkTest {
         require(foundVaults > 0, "no live vaults were resolved");
         // Existence is reported, not assumed; this stage does not claim a
         // liquidation state-transition test or exploitation result.
+    }
+
+    /// @notice Local-only closed-position transition guard. This DOES NOT
+    /// establish healthy-position liquidation behavior or a bounty issue.
+    /// The vault, position manager and first position are real fork storage.
+    function test_LocalForkClosedPositionCannotCloseOrLiquidateAgain() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        require(!POOL.paused(), "cannot attribute a revert when pool is paused");
+
+        uint256 vaultId = 1;
+        uint256 positionId = 1;
+        address vault = _realVault(vaultId);
+        address registry = POOL.addressRegistry();
+        address manager = IAnchorAddressRegistry(registry).getAddress(7);
+        require(manager.code.length > 0, "deployed position manager missing");
+
+        (bool readable, bytes memory positionBefore) = manager.staticcall(
+            abi.encodeWithSignature(
+                "getVaultPosition(uint256,uint256)", vaultId, positionId
+            )
+        );
+        require(readable && positionBefore.length >= 64, "position read unavailable");
+        address recordedManager;
+        uint256 activeWord;
+        assembly {
+            recordedManager := mload(add(positionBefore, 32))
+            activeWord := mload(add(positionBefore, 64))
+        }
+        require(recordedManager != address(0), "not an existing position");
+        require(activeWord == 0, "position must be recorded as inactive");
+
+        (bool vaultReadable, bytes memory vaultStateBefore) =
+            vault.staticcall(abi.encodeWithSignature("getVaultState()"));
+        require(vaultReadable && vaultStateBefore.length > 0, "vault state unavailable");
+
+        uint256 liquidityBefore = POOL.totalLiquidityOfReserve(1);
+        uint256 borrowsBefore = POOL.totalBorrowsOfReserve(1);
+        address token0 = IAnchorVaultTokens(vault).token0();
+        address token1 = IAnchorVaultTokens(vault).token1();
+        require(token0.code.length > 0 && token1.code.length > 0, "real vault tokens missing");
+        uint256 token0Before = IAnchorERC20Read(token0).balanceOf(vault);
+        uint256 token1Before = IAnchorERC20Read(token1).balanceOf(vault);
+
+        address caller = address(uint160(0xBEEF));
+        IAnchorVaultPositionManagerTransitions.CloseParams memory closeParams =
+            IAnchorVaultPositionManagerTransitions.CloseParams({
+                vaultId: vaultId,
+                vaultPositionId: positionId,
+                percent: 5000,
+                receiver: caller,
+                receiveNativeETH: false,
+                receiveType: 2,
+                minAmount0WhenRemoveLiquidity: 0,
+                minAmount1WhenRemoveLiquidity: 0,
+                deadline: block.timestamp + 1 days,
+                swapExecutorId: 0,
+                swapPath: new bytes(0)
+            });
+        vm.prank(caller);
+        vm.expectRevert();
+        IAnchorVaultPositionManagerTransitions(manager)
+            .closeVaultPositionPartially(closeParams);
+
+        IAnchorVaultPositionManagerTransitions.LiquidateParams memory liquidateParams =
+            IAnchorVaultPositionManagerTransitions.LiquidateParams({
+                vaultId: vaultId,
+                vaultPositionId: positionId,
+                percent: 5000,
+                receiver: caller,
+                receiveNativeETH: false,
+                receiveType: 2,
+                minAmount0WhenRemoveLiquidity: 0,
+                minAmount1WhenRemoveLiquidity: 0,
+                deadline: block.timestamp + 1 days,
+                maxRepay0: 0,
+                maxRepay1: 0,
+                swapExecutorId: 0,
+                swapPath: new bytes(0)
+            });
+        vm.prank(caller);
+        vm.expectRevert();
+        IAnchorVaultPositionManagerTransitions(manager)
+            .liquidateVaultPositionPartially(liquidateParams);
+
+        (bool positionAfterOk, bytes memory positionAfter) = manager.staticcall(
+            abi.encodeWithSignature(
+                "getVaultPosition(uint256,uint256)", vaultId, positionId
+            )
+        );
+        (bool vaultAfterOk, bytes memory vaultStateAfter) =
+            vault.staticcall(abi.encodeWithSignature("getVaultState()"));
+        require(positionAfterOk && vaultAfterOk, "post-operation read unavailable");
+        require(
+            keccak256(positionBefore) == keccak256(positionAfter),
+            "rejected transition changed position record"
+        );
+        require(
+            keccak256(vaultStateBefore) == keccak256(vaultStateAfter),
+            "rejected transition changed vault state"
+        );
+        require(POOL.totalLiquidityOfReserve(1) == liquidityBefore, "reserve cash/debt total changed");
+        require(POOL.totalBorrowsOfReserve(1) == borrowsBefore, "reserve outstanding borrowing changed");
+        require(IAnchorERC20Read(token0).balanceOf(vault) == token0Before, "vault token0 balance changed");
+        require(IAnchorERC20Read(token1).balanceOf(vault) == token1Before, "vault token1 balance changed");
+        emit log_named_address("closed_position_vault", vault);
+        emit log_named_uint("closed_position_id", positionId);
     }
 
     function test_LiveForkReadOnlyCallsAreDeterministic() public view {
