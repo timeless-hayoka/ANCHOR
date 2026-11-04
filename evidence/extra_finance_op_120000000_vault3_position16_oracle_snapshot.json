@@ -1,0 +1,76 @@
+{
+  "schema_version": "1.0",
+  "evidence_type": "historical_read_only_fork_observation",
+  "provenance": {
+    "chain_id": 10,
+    "block_number": 120000000,
+    "vault_id": 3,
+    "position_id": 16,
+    "workflow_runs": [
+      41828379609,
+      41828797230
+    ],
+    "fork_only": true,
+    "transactions_broadcast": false,
+    "storage_overrides": false
+  },
+  "deployments": {
+    "lending_pool": "0xbb505c54d71e9e599cb8435b4f0ceec05fc71cbd",
+    "manager": "0xf9cfb8a62f50e10adde5aa888b44cf01c5957055",
+    "manager_codehash": "0x977f4c2127a0140b4f9efb6b10e45c1bce7ac78791b0cad8a756c726b499f3d5",
+    "vault": "0x5101081495d209a80f5dbb1c5ecd76fe137a9ee9",
+    "vault_codehash": "0x957d5a09afddb11ea5ecba8566e74dd9c2e2566b878e1711069526e7ecafa480",
+    "gauge": "0x0299d40e99f2a5a1390261f5a71d13c3932e214c",
+    "gauge_codehash": "0x2dd2bfb8225bd42e240562c4ddb0cad633ecea49293098f0e5839ba06d6420ca",
+    "pair": "0x47029bc8f5cbe3b464004e87ef9c9419a48018cd",
+    "pair_codehash": "0xf24dd0702ca08842d944ddd172a945f870c12bf7d41f12700acd4f3f36eccf3e",
+    "token0": "0x4200000000000000000000000000000000000042",
+    "token1": "0x7f5c764cbc14f9669b88837ca1490cca17c31607",
+    "oracle": "0xbedfda828475005dc8e4a09aaa34bd0b8ca807e4",
+    "oracle_codehash": "0xa7b7421f9098808699cc33a35add9b92ddda49d89016130ef8fb6131281c9007"
+  },
+  "historical_state": {
+    "liquidation_with_twap": true,
+    "max_price_diff_raw": 2000,
+    "liquidation_debt_ratio_raw": 8334,
+    "permissionless_liquidation": false,
+    "reserves_raw": {
+      "token0": "15578519655038332201614",
+      "token1": "39077850250",
+      "reserve_timestamp": 1715598731
+    },
+    "pair_total_lp_supply_raw": "24649355991593486",
+    "vault_direct_lp_balance_raw": "0",
+    "vault_total_lp_raw": "85182429644961",
+    "gauge_vault_staked_lp_raw": "85182429644961",
+    "vault_total_lp_shares_raw": "81836825646430",
+    "vault_debt0_total_shares_raw": "0",
+    "vault_debt1_total_shares_raw": "75570722",
+    "token0_decimals": 18,
+    "token1_decimals": 6,
+    "position_lp_raw": "40055866659254",
+    "position_debt0_raw": "0",
+    "position_debt1_raw": "40894860",
+    "position_abi_hash": "0xfdbf41f35b21cdd886cb461a53f4ed745332d99bb3f9deecc46585d1dac0df53",
+    "vault_state_abi_hash": "0xead1699058a2b7572dfafc5e67e947a4d1d15c222f26bf37bda28c208b5c214d",
+    "chainlink_get_price_available": true,
+    "chainlink_get_price_raw": "398212029812978622000000000000",
+    "chainlink_response_abi_hash": "0x64c15e22496f32ea23acb1897782940b5c6799cb0127ff81a97eeab81d6d38ee",
+    "position_internal_getter_status": "UNAVAILABLE"
+  },
+  "verification": {
+    "vault_source_verified_at_explorer": false,
+    "vault_source_match_at_sourcify": false,
+    "chainlink_quote_direction_and_scale_verified": false,
+    "lp_position_value_equivalence_verified": false,
+    "source_matched_twap_valuation_verified": false,
+    "liquidation_predicate_verified": false,
+    "liquidation_eligible": "UNKNOWN",
+    "liquidation_replay_attempted": false,
+    "finding": "NONE"
+  },
+  "historical_docs": [
+    "https://github.com/timeless-hayoka/ANCHOR/actions/runs/41828379609",
+    "https://github.com/timeless-hayoka/ANCHOR/actions/runs/41828797230"
+  ]
+}
