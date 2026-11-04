@@ -454,6 +454,72 @@ contract AnchorExtraLiveReadOnlyForkTest {
     /// @notice Reserve #1 is frozen in the observed deployment snapshots.
     /// A real fork state-transition attempt must reject debt creation and
     /// leave existing reserve balances and ID counters unchanged.
+    /// @notice POSITIVE CONTROL: verify the actual deployed implementation
+    /// permits creation of a zero-borrow debt record in a non-frozen reserve.
+    /// The mutation occurs ONLY inside this disposable Foundry fork;
+    /// no privileged actor, funding, storage override or broadcast is used.
+    /// This is not a vault collateral position and cannot demonstrate a bug.
+    function test_LocalForkCreatesZeroBorrowDebtWithoutChangingReserveAssets() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        require(!POOL.paused(), "pool is paused");
+
+        address account = address(uint160(0xF0A7C));
+        uint256 nextBefore = POOL.nextDebtPositionId();
+        uint256 candidateReserve;
+        uint256 cashBefore;
+        uint256 borrowsBefore;
+        uint256 creditsBefore;
+
+        // Reserve #1 is frozen in the current deployment. Probe a BOUNDED
+        // set of real reserves rather than forging storage or admin rights.
+        for (uint256 id = 2; id <= 8; id++) {
+            address token = POOL.getUnderlyingTokenAddress(id);
+            address eToken = POOL.getETokenAddress(id);
+            if (token == address(0) || eToken == address(0)) continue;
+
+            uint256 totalBefore = POOL.totalLiquidityOfReserve(id);
+            uint256 borrowedBefore = POOL.totalBorrowsOfReserve(id);
+            uint256 allowedBefore = POOL.credits(id, account);
+            vm.prank(account);
+            try POOL.newDebtPosition(id) returns (uint256 newId) {
+                require(newId == nextBefore, "unexpected debt ID allocation");
+                candidateReserve = id;
+                cashBefore = totalBefore;
+                borrowsBefore = borrowedBefore;
+                creditsBefore = allowedBefore;
+                break;
+            } catch {
+                require(
+                    POOL.nextDebtPositionId() == nextBefore,
+                    "failed candidate changed debt ID counter"
+                );
+                require(
+                    POOL.totalLiquidityOfReserve(id) == totalBefore,
+                    "failed candidate changed reserve liquidity"
+                );
+                require(
+                    POOL.totalBorrowsOfReserve(id) == borrowedBefore,
+                    "failed candidate changed aggregate debt"
+                );
+            }
+        }
+
+        require(candidateReserve != 0, "no usable non-frozen reserve in bounded sample");
+        require(POOL.nextDebtPositionId() == nextBefore + 1, "debt counter not incremented once");
+        (uint256 debtReserve, address debtOwner, uint256 principal, uint256 borrowedIndex) =
+            POOL.debtPositions(nextBefore);
+        require(debtReserve == candidateReserve, "recorded reserve mismatch");
+        require(debtOwner == account, "new debt owner mismatch");
+        require(principal == 0, "empty position has a borrowed principal");
+        require(borrowedIndex > 0, "borrowing index was not initialized");
+        require(POOL.credits(candidateReserve, account) == creditsBefore, "permissionless record granted credit");
+        require(POOL.totalLiquidityOfReserve(candidateReserve) == cashBefore, "empty debt changed reserve total");
+        require(POOL.totalBorrowsOfReserve(candidateReserve) == borrowsBefore, "empty debt changed borrowed total");
+
+        emit log_named_uint("positive_control_reserve_id", candidateReserve);
+        emit log_named_uint("new_local_debt_position_id", nextBefore);
+    }
+
     function test_LocalForkFrozenReserveRejectsNewDebtPositionWithoutMutation() public {
         require(block.chainid == OP_CHAIN_ID, "wrong chain");
         require(!POOL.paused(), "pool paused");
