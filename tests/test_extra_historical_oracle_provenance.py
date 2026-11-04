@@ -18,6 +18,11 @@ def test_provenance_probe_is_pinned_to_real_state_without_mutations():
     assert "getReserves()" in text
     assert "PAIR_TOTAL_LP_SUPPLY_RAW" in text
     assert "POSITION_DEBT1_RAW" in text
+    assert "GAUGE_STAKED_LP_BALANCE_RAW" in text
+    assert "VAULT_TOTAL_LP_SHARES_RAW" in text
+    assert "POSITION_LP_SHARES_RAW" in text
+    assert "REGISTERED_CHAINLINK_ORACLE" in text
+    assert "CHAINLINK_GETPRICE_RAW" in text
     assert "ORACLE_PREDICATE_UNVERIFIED" in text
     assert "LIQUIDATION_ELIGIBILITY_UNKNOWN" in text
     for forbidden in (
