@@ -144,6 +144,10 @@ contract AnchorExtraHistoricalVaultCloseTest {
         address underlying1 = IHistoryVaultTokens(vault).token1();
         require(underlying0.code.length > 0 && underlying1.code.length > 0, "vault token code missing");
         uint256[2] memory matched = _matchedReserves(underlying0, underlying1);
+        require(matched[0] != 0 && matched[1] != 0 && matched[0] != matched[1],
+            "actual vault asset reserves missing from bounded sample");
+        ReserveSnapshot memory token0BeforeReserve = _reserveSnapshot(matched[0]);
+        ReserveSnapshot memory token1BeforeReserve = _reserveSnapshot(matched[1]);
         uint256 vaultToken0Before = IHistoryToken(underlying0).balanceOf(vault);
         uint256 vaultToken1Before = IHistoryToken(underlying1).balanceOf(vault);
         emit log_named_address("HISTORICAL_TOKEN0", underlying0);
@@ -213,5 +217,33 @@ contract AnchorExtraHistoricalVaultCloseTest {
         emit log_named_uint("AFTER_VAULT_TOKEN0", IHistoryToken(underlying0).balanceOf(vault));
         emit log_named_uint("AFTER_VAULT_TOKEN1", IHistoryToken(underlying1).balanceOf(vault));
         _assertMatchedReserveAccounting(matched, "AFTER");
+        ReserveSnapshot memory token0AfterReserve = _reserveSnapshot(matched[0]);
+        ReserveSnapshot memory token1AfterReserve = _reserveSnapshot(matched[1]);
+        uint256 repaidDebt1 = debt1Before - _word(afterPosition, 14);
+        require(repaidDebt1 > 0, "no positive debt1 repayment occurred");
+        require(
+            token1BeforeReserve.accruedDebt >= token1AfterReserve.accruedDebt &&
+            token1BeforeReserve.accruedDebt - token1AfterReserve.accruedDebt == repaidDebt1,
+            "position debt1 repayment differs from actual reserve borrow delta"
+        );
+        require(
+            token1AfterReserve.realCash >= token1BeforeReserve.realCash &&
+            token1AfterReserve.realCash - token1BeforeReserve.realCash == repaidDebt1,
+            "actual reserve token1 cash deposit differs from debt1 reduction"
+        );
+        require(
+            token1BeforeReserve.totalLiquidity == token1AfterReserve.totalLiquidity,
+            "repayment violated total reserve asset conservation"
+        );
+        require(
+            token0AfterReserve.accruedDebt == token0BeforeReserve.accruedDebt &&
+            token0AfterReserve.realCash == token0BeforeReserve.realCash &&
+            token0AfterReserve.totalLiquidity == token0BeforeReserve.totalLiquidity,
+            "unused token0 reserve was unexpectedly modified"
+        );
+        emit log_named_uint("VERIFIED_POSITION_DEBT1_REPAID", repaidDebt1);
+        emit log_named_uint("VERIFIED_RESERVE1_CASH_INCREASE",
+            token1AfterReserve.realCash - token1BeforeReserve.realCash);
+
     }
 }
