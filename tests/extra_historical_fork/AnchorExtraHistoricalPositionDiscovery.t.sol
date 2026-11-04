@@ -28,6 +28,44 @@ contract AnchorExtraHistoricalPositionDiscoveryTest {
     address constant LENDING_POOL = 0xBB505c54D71E9e599cB8435b4F0cEEc05fC71cbD;
     uint256 constant CHAIN_ID = 10;
 
+    function _inspectPosition(address manager, uint256 vaultId, uint256 positionId)
+        internal returns (bool recorded, bool active, bool hasDebt, bool hasLiquidity)
+    {
+        (bool ok, bytes memory raw) = manager.staticcall(
+            abi.encodeWithSignature("getVaultPosition(uint256,uint256)", vaultId, positionId)
+        );
+        // VeloPositionValue has exactly 19 statically encoded ABI words.
+        if (!ok || raw.length < 19 * 32) return (false, false, false, false);
+        address user;
+        uint256 activeWord;
+        uint256 principal0;
+        uint256 principal1;
+        uint256 liquidity;
+        uint256 debt0;
+        uint256 debt1;
+        assembly {
+            user := mload(add(raw, 32))
+            activeWord := mload(add(raw, 64))
+            principal0 := mload(add(raw, 192))
+            principal1 := mload(add(raw, 224))
+            liquidity := mload(add(raw, 416))
+            debt0 := mload(add(raw, 448))
+            debt1 := mload(add(raw, 480))
+        }
+        if (user == address(0) || activeWord > 1) return (false, false, false, false);
+        if (activeWord == 0) return (true, false, false, false);
+        emit log_named_uint("ACTIVE_VAULT_ID", vaultId);
+        emit log_named_uint("ACTIVE_POSITION_ID", positionId);
+        emit log_named_address("ACTIVE_MANAGER", user);
+        emit log_named_uint("ACTIVE_PRINCIPAL0", principal0);
+        emit log_named_uint("ACTIVE_PRINCIPAL1", principal1);
+        emit log_named_uint("ACTIVE_LIQUIDITY", liquidity);
+        emit log_named_uint("ACTIVE_DEBT0", debt0);
+        emit log_named_uint("ACTIVE_DEBT1", debt1);
+        emit log_named_bytes32("ACTIVE_POSITION_ABI_HASH", keccak256(raw));
+        return (true, true, debt0 > 0 || debt1 > 0, liquidity > 0);
+    }
+
     function test_HistoricalActivePositionDiscovery() public {
         require(block.chainid == CHAIN_ID, "not Optimism");
         emit log_named_uint("historical_snapshot_block", block.number);
@@ -61,49 +99,13 @@ contract AnchorExtraHistoricalPositionDiscoveryTest {
             emit log_named_uint("sampled_vault_id", vaultId);
             for (uint256 j = 0; j < positionIds.length; ++j) {
                 uint256 positionId = positionIds[j];
-                // Only calldata corresponding to the verified public getter.
-                (bool ok, bytes memory raw) = manager.staticcall(
-                    abi.encodeWithSignature(
-                        "getVaultPosition(uint256,uint256)", vaultId, positionId
-                    )
-                );
-                // VeloPositionValue contains 19 ABI words (all static types).
-                // 0:manager, 1:isActive, 2:enableRangeStop, 3:openedAt,
-                // 4:current, 5/6:invest principals, 7:LP principal,
-                // 8/9:left tokens, 10/11:in-liquidity, 12:liquidity,
-                // 13/14:debt0/debt1, rest borrowing indices/range limits.
-                if (!ok || raw.length < 19 * 32) continue;
-                address user;
-                uint256 activeWord;
-                uint256 principal0;
-                uint256 principal1;
-                uint256 liquidity;
-                uint256 debt0;
-                uint256 debt1;
-                assembly {
-                    user := mload(add(raw, 32))
-                    activeWord := mload(add(raw, 64))
-                    principal0 := mload(add(raw, 192))
-                    principal1 := mload(add(raw, 224))
-                    liquidity := mload(add(raw, 416))
-                    debt0 := mload(add(raw, 448))
-                    debt1 := mload(add(raw, 480))
-                }
-                if (user == address(0) || activeWord > 1) continue;
-                ++recordedPositions;
-                if (activeWord != 1) continue;
+                (bool recorded, bool active, bool hasDebt, bool hasLiquidity) =
+                    _inspectPosition(manager, vaultId, positionId);
+                if (recorded) ++recordedPositions;
+                if (!active) continue;
                 ++activePositions;
-                if (debt0 > 0 || debt1 > 0) ++positiveDebtPositions;
-                if (liquidity > 0) ++nonzeroLiquidityPositions;
-                emit log_named_uint("ACTIVE_VAULT_ID", vaultId);
-                emit log_named_uint("ACTIVE_POSITION_ID", positionId);
-                emit log_named_address("ACTIVE_MANAGER", user);
-                emit log_named_uint("ACTIVE_PRINCIPAL0", principal0);
-                emit log_named_uint("ACTIVE_PRINCIPAL1", principal1);
-                emit log_named_uint("ACTIVE_LIQUIDITY", liquidity);
-                emit log_named_uint("ACTIVE_DEBT0", debt0);
-                emit log_named_uint("ACTIVE_DEBT1", debt1);
-                emit log_named_bytes32("ACTIVE_POSITION_ABI_HASH", keccak256(raw));
+                if (hasDebt) ++positiveDebtPositions;
+                if (hasLiquidity) ++nonzeroLiquidityPositions;
             }
         }
         require(foundVaults > 0, "no actual vaults in this historical block");
