@@ -11,7 +11,7 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
-def _fixture(method, params, request_id):
+def _fixture(url, method, params, request_id):
     tx = {
         "blockNumber": hex(MODULE.CREATE_BLOCK),
         "from": MODULE.SENDER, "to": MODULE.FACTORY,
@@ -62,8 +62,8 @@ def test_mocked_historical_trace_and_code_fingerprints_are_reproducible():
 
 
 def test_wrong_chain_fails_closed():
-    def wrong_chain(method, params, request_id):
-        response = _fixture(method, params, request_id)
+    def wrong_chain(url, method, params, request_id):
+        response = _fixture(url, method, params, request_id)
         if method == "eth_chainId":
             response["result"] = "0x1"
         return response
@@ -77,8 +77,8 @@ def test_wrong_chain_fails_closed():
 
 
 def test_trace_unavailable_not_interpreted_as_no_delegation():
-    def missing_trace(method, params, request_id):
-        response = _fixture(method, params, request_id)
+    def missing_trace(url, method, params, request_id):
+        response = _fixture(url, method, params, request_id)
         if method == "debug_traceTransaction":
             return {"jsonrpc": "2.0", "id": request_id,
                     "error": {"code": -32601, "message": "method not found"}}
