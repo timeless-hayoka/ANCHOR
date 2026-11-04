@@ -380,12 +380,12 @@ contract AnchorExtraLiveReadOnlyForkTest {
         }
     }
 
-    /// @notice Phase-one *real* vault position discovery. We deliberately
+    /// @notice Exploratory only; manually audited in runs 41760768642 and 41760969085.\n    /// Not a routine CI test: public RPC throttled when combined with heavier transitions.\n    /// Phase-one *real* vault position discovery. We deliberately
     /// query the deployed position manager and real factory, not synthetic
     /// vaults or fabricated collateral. A later test must separately prove
     /// a selected position is active and healthy before simulating closure
     /// or liquidation. These are purely STATICCALLs to OP state.
-    function test_LiveForkDiscoverRealVaultPositionManagersAndPositions() public {
+    function audit_LiveForkDiscoverRealVaultPositionManagersAndPositions() public {
         require(block.chainid == OP_CHAIN_ID, "wrong chain");
         address registry = POOL.addressRegistry();
         address factory = IAnchorAddressRegistry(registry).getAddress(10);
