@@ -117,6 +117,60 @@ def opcode_inventory(code: str) -> dict:
     }
 
 
+def method_selector(signature: str) -> str:
+    """Get canonical Ethereum selector from the pinned Foundry CLI."""
+    cmd = subprocess.run(["cast", "sig", signature], text=True,
+                         capture_output=True, timeout=10, check=True)
+    value = cmd.stdout.strip().lower()
+    if len(value) != 10 or not value.startswith("0x"):
+        raise ProvenanceError("bad cast selector output")
+    return value
+
+
+def readonly_registry_observations(url: str, factory: str, block_number: int,
+                                   request_id_start: int) -> dict:
+    """Optional historical eth_call data; no state overrides or writes."""
+    block_tag = hex(block_number)
+    observation = {"status": "UNKNOWN", "block_number": block_number, "entries": {}}
+    try:
+        # This selector is read from the ABI signature, not inferred to exist.
+        address_selector = method_selector("addressRegistry()")
+        registry_response = rpc(url, "eth_call",
+                                [{"to": factory, "data": address_selector}, block_tag],
+                                request_id_start)
+        response = need_result(registry_response, "historical factory addressRegistry")
+        if not isinstance(response, str) or len(response) != 66:
+            raise ProvenanceError("historical factory registry getter not supported")
+        registry = "0x" + response[-40:]
+        if registry == "0x" + "0" * 40:
+            raise ProvenanceError("historical registry address zero")
+        observation["status"] = "REGISTRY_FOUND"
+        observation["registry"] = registry
+        selector = method_selector("getAddress(uint256)")
+        keys = [101, 103, 107, (1 << 128) | 1001, (1 << 128) | 1003]
+        for index, key in enumerate(keys):
+            try:
+                payload = selector + f"{key:064x}"
+                res = need_result(rpc(url, "eth_call",
+                         [{"to": registry, "data": payload}, block_tag],
+                         request_id_start + 1 + index), "historical getAddress")
+                if not isinstance(res, str) or len(res) != 66:
+                    raise ProvenanceError("unexpected registry return")
+                observed = "0x" + res[-40:]
+                observation["entries"][str(key)] = (
+                    {"status": "UNSET"} if int(observed, 16) == 0 else
+                    {"status": "OBSERVED", "address": observed})
+            except (ProvenanceError, urllib.error.URLError, TimeoutError,
+                    OSError, ValueError) as exc:
+                observation["entries"][str(key)] = {
+                    "status": "UNKNOWN", "reason": type(exc).__name__}
+    except (ProvenanceError, urllib.error.URLError, TimeoutError, OSError,
+            ValueError, subprocess.SubprocessError) as exc:
+        observation["status"] = "UNKNOWN"
+        observation["reason"] = type(exc).__name__
+    return observation
+
+
 def trace_summary(root: dict) -> dict:
     if not isinstance(root, dict):
         raise ProvenanceError("trace returned non-object")
@@ -188,6 +242,10 @@ def collect(url: str) -> dict:
         "transaction_selector": data[:10],
         "transaction_input_bytes": (len(data) - 2) // 2,
         "transaction_input_sha256": hashlib.sha256(bytes.fromhex(data[2:])).hexdigest(),
+        "factory_creation_registry": readonly_registry_observations(
+            url, FACTORY, CREATE_BLOCK, call_id + 10),
+        "factory_study_registry": readonly_registry_observations(
+            url, FACTORY, STUDY_BLOCK, call_id + 30),
         "factory_creation_code": factory_then,
         "factory_static_opcode_inventory": opcode_inventory(factory_create_raw),
         "factory_study_code": factory_now,
