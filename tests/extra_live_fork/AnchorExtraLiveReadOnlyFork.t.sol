@@ -18,6 +18,11 @@ interface IAnchorVaultFactory {
     function vaults(uint256 id) external view returns (address);
 }
 
+interface IAnchorERC20Read {
+    function balanceOf(address account) external view returns (uint256);
+    function totalSupply() external view returns (uint256);
+}
+
 interface IAnchorLiveLendingPool {
     function addressRegistry() external view returns (address);
     function nextReserveId() external view returns (uint256);
@@ -42,6 +47,8 @@ interface IAnchorLiveLendingPool {
     function totalBorrowsOfReserve(uint256 reserveId) external view returns (uint256);
     function borrowingRateOfReserve(uint256 reserveId) external view returns (uint256);
     function utilizationRateOfReserve(uint256 reserveId) external view returns (uint256);
+    function exchangeRateOfReserve(uint256 reserveId) external view returns (uint256);
+
 }
 
 contract AnchorExtraLiveReadOnlyForkTest {
@@ -280,6 +287,57 @@ contract AnchorExtraLiveReadOnlyForkTest {
         require(POOL.credits(selectedReserve, competingVault) == creditBefore, "vault credit modified");
         require(POOL.totalLiquidityOfReserve(selectedReserve) == liquidityBefore, "reserve liquidity modified");
         require(POOL.totalBorrowsOfReserve(selectedReserve) == borrowsBefore, "reserve debt aggregate modified");
+    }
+
+    /// @notice Independent, onchain accounting cross-check: token.balanceOf
+    /// at the real eToken address + pool-reported accrued borrow is exactly
+    /// the reserve's total liquidity, and utilization/exchange-rate views
+    /// reflect those same quantities with Solidity floor rounding.
+    ///
+    /// No transactions/impersonation occur, even inside the fork.
+    function test_LiveForkReserveAccountingMatchesActualERC20Balances() public {
+        require(block.chainid == OP_CHAIN_ID, "wrong chain");
+        uint256 max = POOL.nextReserveId() - 1;
+        if (max > MAX_RESERVES_TO_READ) max = MAX_RESERVES_TO_READ;
+        require(max > 0, "no reserves to inspect");
+
+        for (uint256 reserveId = 1; reserveId <= max; reserveId++) {
+            address underlying = POOL.getUnderlyingTokenAddress(reserveId);
+            address eToken = POOL.getETokenAddress(reserveId);
+            require(underlying.code.length > 0 && eToken.code.length > 0, "missing reserve contracts");
+
+            uint256 realCash = IAnchorERC20Read(underlying).balanceOf(eToken);
+            uint256 reportedBorrow = POOL.totalBorrowsOfReserve(reserveId);
+            uint256 reportedLiquidity = POOL.totalLiquidityOfReserve(reserveId);
+            require(
+                reportedLiquidity >= reportedBorrow
+                    && reportedLiquidity - reportedBorrow == realCash,
+                "independent reserve cash plus debt mismatch"
+            );
+            uint256 expectedUtilization = reportedLiquidity == 0
+                ? 0
+                : reportedBorrow * 1e18 / reportedLiquidity;
+            require(
+                POOL.utilizationRateOfReserve(reserveId) == expectedUtilization,
+                "borrow/total utilization invariant differs"
+            );
+
+            uint256 shares = IAnchorERC20Read(eToken).totalSupply();
+            uint256 expectedExchangeRate =
+                (shares == 0 || reportedLiquidity == 0)
+                    ? 1e18
+                    : reportedLiquidity * 1e18 / shares;
+            require(
+                POOL.exchangeRateOfReserve(reserveId) == expectedExchangeRate,
+                "eToken exchange rate disagrees with independent supply"
+            );
+
+            emit log_named_uint("accounting_reserve_id", reserveId);
+            emit log_named_uint("actual_cash", realCash);
+            emit log_named_uint("accrued_borrow", reportedBorrow);
+            emit log_named_uint("total_eToken_supply", shares);
+            emit log_named_uint("expected_exchange_rate_1e18", expectedExchangeRate);
+        }
     }
 
     function test_LiveForkReadOnlyCallsAreDeterministic() public view {
