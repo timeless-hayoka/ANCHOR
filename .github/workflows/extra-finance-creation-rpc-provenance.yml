@@ -1,0 +1,58 @@
+name: Extra Finance historical creation trace and code provenance
+on:
+  pull_request:
+    paths:
+      - 'scripts/extra_creation_rpc_provenance.py'
+      - 'tests/test_extra_creation_rpc_provenance.py'
+      - '.github/workflows/extra-finance-creation-rpc-provenance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Offline RPC validation regression tests
+        run: |
+          python -m pip install pytest
+          python -m pytest -q tests/test_extra_creation_rpc_provenance.py
+
+  archived-read:
+    if: github.event_name == 'workflow_dispatch'
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    concurrency:
+      group: extra-creation-historical-provenance-rpc
+      cancel-in-progress: false
+    env:
+      OP_READONLY_RPC: https://mainnet.optimism.io
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.7
+      - name: Pinned historical read-only transaction, factory/vault bytecode and optional call tracer
+        run: |
+          set -euo pipefail
+          python scripts/extra_creation_rpc_provenance.py \
+            --rpc-url "$OP_READONLY_RPC" \
+            --out evidence/extra_vault3_rpc_creation_readout.json
+      - name: Save actual RPC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extra-creation-rpc-evidence
+          path: evidence/extra_vault3_rpc_creation_readout.json
+          retention-days: 14
+          if-no-files-found: warn
