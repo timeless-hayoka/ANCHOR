@@ -1,0 +1,94 @@
+{
+  "schema_version": "1.0",
+  "provenance": {
+    "chain_id": 10,
+    "creation_block": 96268610,
+    "study_block": 120000000,
+    "tx": "0xbdd878d0e7cdf19d7a25013839ac5a9ff677b923a6a42c4c41eba2583b3d4459",
+    "run_id": 41843514683,
+    "artifact_id": 13329383778,
+    "reference_run_id": 41843060987,
+    "read_only": true,
+    "broadcast": false,
+    "storage_overrides": false
+  },
+  "factory": {
+    "address": "0x155620a2e6a9392c754b73296d9655061525729b",
+    "runtime_code_size_bytes": 2449,
+    "keccak256": "0x94e05c7a0558dfd917427e437cc1db5e8bd9e6e73b029e47552dc601837673a4",
+    "sha256": "cd24d04eabb10e59f3960de0c0da49fffc68e5e4c6d5edf13b14d1bbecf60417",
+    "creation_equals_study": true,
+    "opcode_counts": {
+      "DELEGATECALL": 1,
+      "CREATE2": 0,
+      "STATICCALL": 4
+    },
+    "push4_literals": [
+      "0x0dfe1681",
+      "0x1cd5b926",
+      "0x22be3de1",
+      "0x4e487b71",
+      "0x5c9fcd85",
+      "0x715018a6",
+      "0x8c64ea4a",
+      "0x8da5cb5b",
+      "0xb93f9b0a",
+      "0xd21220a7",
+      "0xf18efb45",
+      "0xf2fde38b",
+      "0xf3ad65f4",
+      "0xffffffff"
+    ],
+    "note": "No CREATE2 opcode in factory runtime; an internal delegatecalled library may execute CREATE2. This does not establish a specific target."
+  },
+  "vault": {
+    "address": "0x5101081495d209a80f5dbb1c5ecd76fe137a9ee9",
+    "runtime_code_size_bytes": 13930,
+    "keccak256": "0x957d5a09afddb11ea5ecba8566e74dd9c2e2566b878e1711069526e7ecafa480",
+    "sha256": "1668b88f8fe84437f9459e8ea6cb22444d029963a6a8368ce02b52fecb1842b4",
+    "creation_equals_study": true,
+    "opcode_counts": {
+      "DELEGATECALL": 7,
+      "CREATE2": 0,
+      "STATICCALL": 10
+    },
+    "note": "EVM opcode counts do not prove the number or targets of executed delegation calls."
+  },
+  "transaction": {
+    "selector": "0xf18efb45",
+    "input_bytes": 452,
+    "sha256": "b3d1147cca20149aa33674da28f14e7b84ca1dba0ee957fb02e6b2322404140e"
+  },
+  "registry": {
+    "address": "0x85603119c938750dfb5904f8a501b64f3f3a01d2",
+    "creation": {
+      "101": "0x2c58ece45ac754b80fd39f5e7e67a4b0e91a1525",
+      "103": "0x4f4940a87d63a290d43b6550911896ff7aee354c",
+      "107": null,
+      "340282366920938463463374607431768212457": null,
+      "340282366920938463463374607431768212459": null
+    },
+    "study": {
+      "101": "0xdcf0f4a0fc44f33de35d8c80ad5d248dbf838943",
+      "103": "0x5a583ccb69402d60bc360d691eedb8efda6fb7e5",
+      "107": "0xbedfda828475005dc8e4a09aaa34bd0b8ca807e4",
+      "340282366920938463463374607431768212457": "0xa4b43b3d33f4e583194d05485c5691c0b205a75b",
+      "340282366920938463463374607431768212459": "0x512c21d420a5841a3c06636d5ee194a565a07d5c"
+    },
+    "note": "Registry is verified via actual eth_call at each respective block. Later entries must not be projected backward to creation."
+  },
+  "source_verification": {
+    "original_selector_101": "UNVERIFIED_ON_EXPLORER",
+    "original_position_logic_103": "UNVERIFIED_ON_EXPLORER",
+    "source_equivalence": "UNKNOWN",
+    "historical_creation_delegatecall_target": "UNVERIFIED",
+    "historical_liquidation_dispatch": "UNVERIFIED"
+  },
+  "trace": {
+    "status": "UNAVAILABLE",
+    "reason": "Public RPC returned HTTP error to debug_traceTransaction; no execution call frame proven."
+  },
+  "eligibility": "UNKNOWN",
+  "liquidation_replay": "NOT_ATTEMPTED",
+  "finding": "NONE"
+}
