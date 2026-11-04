@@ -8,8 +8,6 @@ It produces a numeric *candidate*, never an executable-liquidation approval.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
-from typing import Mapping
 
 MAX_TOKEN_DECIMALS = 36
 MAX_AMOUNT = 2**256 - 1
@@ -44,6 +42,7 @@ def _valid_token(item: TokenObservation, block: int) -> bool:
         and isinstance(item.oracle_address, str)
         and item.oracle_address.startswith("0x")
         and len(item.oracle_address) == 42
+        and isinstance(item.oracle_method, str)
         and bool(item.oracle_method.strip())
         and type(item.amount) is int
         and 0 <= item.amount <= MAX_AMOUNT
@@ -86,7 +85,7 @@ def evaluate_candidate(
         return unknown("missing or invalid deployed liquidation threshold")
     if not collateral or not debt:
         return unknown("missing collateral or debt observations")
-    if not all(_valid_token(t, block) for t in (*collateral, *debt)):
+    if not all(isinstance(t, TokenObservation) and _valid_token(t, block) for t in (*collateral, *debt)):
         return unknown("missing, unverified, stale or invalid same-block oracle evidence")
 
     # Distinct token observations are required within each side. A duplicated
