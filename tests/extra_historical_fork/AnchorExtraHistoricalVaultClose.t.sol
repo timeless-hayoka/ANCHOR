@@ -68,7 +68,12 @@ contract AnchorExtraHistoricalVaultCloseTest {
         address factory = IHistoryRegistry(registry).getAddress(10);
         address positionManager = IHistoryRegistry(registry).getAddress(7);
         require(positionManager.code.length > 0, "manager contract unavailable");
-        require(IHistoryFactory(factory).vaults(VAULT_ID).code.length > 0, "deployed vault unavailable");
+        address vault = IHistoryFactory(factory).vaults(VAULT_ID);
+        require(vault.code.length > 0, "deployed vault unavailable");
+        (bool vaultBeforeOk, bytes memory vaultBefore) =
+            vault.staticcall(abi.encodeWithSignature("getVaultState()"));
+        require(vaultBeforeOk && vaultBefore.length > 0, "historical vault state unreadable");
+        emit log_named_bytes32("BEFORE_VAULT_STATE_HASH", keccak256(vaultBefore));
 
         bytes memory beforePosition = _readPosition(positionManager);
         address recordedManager = address(uint160(_word(beforePosition, 0)));
@@ -116,8 +121,17 @@ contract AnchorExtraHistoricalVaultCloseTest {
         emit log_named_uint("AFTER_DEBT0", _word(afterPosition, 13));
         emit log_named_uint("AFTER_DEBT1", _word(afterPosition, 14));
         require(keccak256(afterPosition) != keccak256(beforePosition), "successful close did not alter position");
+        require(address(uint160(_word(afterPosition, 0))) == recordedManager, "position manager changed");
+        require(_word(afterPosition, 1) == 1, "10 percent close unexpectedly deactivated position");
+        require(_word(afterPosition, 5) <= _word(beforePosition, 5), "principal0 increased after close");
+        require(_word(afterPosition, 6) <= _word(beforePosition, 6), "principal1 increased after close");
         require(_word(afterPosition, 12) < liquidityBefore, "partial close did not reduce liquidity");
         require(_word(afterPosition, 13) <= debt0Before, "debt0 unexpectedly increased");
-        require(_word(afterPosition, 14) <= debt1Before, "debt1 unexpectedly increased");
+        require(_word(afterPosition, 14) < debt1Before, "debt1 did not decrease");
+        (bool vaultAfterOk, bytes memory vaultAfter) =
+            vault.staticcall(abi.encodeWithSignature("getVaultState()"));
+        require(vaultAfterOk && vaultAfter.length > 0, "post-close vault state unavailable");
+        emit log_named_bytes32("AFTER_VAULT_STATE_HASH", keccak256(vaultAfter));
+        require(keccak256(vaultBefore) != keccak256(vaultAfter), "close did not change vault state");
     }
 }
