@@ -454,7 +454,31 @@ contract AnchorExtraLiveReadOnlyForkTest {
     function test_LocalForkNewDebtPositionDoesNotCreateBorrowingPower() public {
         require(block.chainid == OP_CHAIN_ID, "wrong chain");
         require(!POOL.paused(), "pool paused");
-        uint256 reserveId = 1;
+        // Select a genuinely available deployment reserve. Public getter
+        // reserves(uint256) flattens the static ReserveData tuple:
+        // fields 16–18 are Flags(isActive, frozen, borrowingEnabled).
+        // Reserve #1 may be frozen; never fabricate unfrozen storage.
+        uint256 reserveId;
+        for (uint256 candidate = 1; candidate <= 8; candidate++) {
+            (bool ok, bytes memory raw) = address(POOL).staticcall(
+                abi.encodeWithSignature("reserves(uint256)", candidate)
+            );
+            if (!ok || raw.length < 18 * 32) continue;
+            uint256 isActive;
+            uint256 frozen;
+            uint256 borrowingEnabled;
+            assembly {
+                isActive := mload(add(raw, 512))
+                frozen := mload(add(raw, 544))
+                borrowingEnabled := mload(add(raw, 576))
+            }
+            if (isActive == 1 && frozen == 0 && borrowingEnabled == 1) {
+                reserveId = candidate;
+                break;
+            }
+        }
+        require(reserveId != 0, "no sample reserve permits new borrowing positions");
+        emit log_named_uint("new_position_reserve_id", reserveId);
         address newcomer = address(uint160(0xFA11BACC));
         require(!POOL.borrowingWhiteList(newcomer), "newcomer already whitelisted");
 
