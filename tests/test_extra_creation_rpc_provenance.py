@@ -85,7 +85,7 @@ def test_trace_unavailable_not_interpreted_as_no_delegation():
         return response
     with patch.object(MODULE, "rpc", side_effect=missing_trace), patch.object(
         MODULE.shutil, "which", return_value=None
-    ):
+    ), patch.object(MODULE, "readonly_registry_observations", return_value={"status": "UNKNOWN"}):
         evidence = MODULE.collect("https://example.invalid")
     assert evidence["trace"]["status"] == "UNAVAILABLE"
     assert evidence["source_equivalence"] == "UNKNOWN"
@@ -110,3 +110,16 @@ def test_static_opcode_inventory_skips_immediate_bytes_and_flags_unverified_sele
     assert inv["opcode_counts"]["DELEGATECALL"] == 1
     assert inv["opcode_counts"]["CREATE2"] == 1
     assert "do not prove" in inv["note"]
+
+
+def test_archived_registry_snapshot_flags_absent_getters_unknown():
+    with patch.object(MODULE, "method_selector", return_value="0xb93f9b0a"), patch.object(
+        MODULE, "rpc", return_value={
+            "jsonrpc": "2.0", "id": 10, "error": {"code": -32601, "message": "unavailable"}
+        }
+    ):
+        result = MODULE.readonly_registry_observations(
+            "https://example.invalid", MODULE.FACTORY, MODULE.CREATE_BLOCK, 10
+        )
+    assert result["status"] == "UNKNOWN"
+    assert result["entries"] == {}
