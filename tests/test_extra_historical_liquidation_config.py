@@ -4,7 +4,6 @@ These tests protect the ABI field offsets and prevent a read-only scanner from
 silently asserting liquidation eligibility without source-matched oracle data.
 """
 from pathlib import Path
-import re
 
 SOURCE = (
     Path(__file__).resolve().parents[1]
@@ -35,6 +34,6 @@ def test_scanner_does_not_promote_unpriced_positions_to_eligible():
     assert "ELIGIBLE_FOR_LIQUIDATION" not in source
     # The discovery fixture must remain read-only; no production simulation
     # or direct storage changes belong in this scan.
-    assert re.search(r"manager\\.staticcall\\(", source)
+    assert "manager.staticcall(" in source
     for forbidden in ("vm.store(", "vm.prank(", "liquidateVaultPositionPartially("):
         assert forbidden not in source
