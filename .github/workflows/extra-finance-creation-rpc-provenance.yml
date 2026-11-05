@@ -6,6 +6,8 @@ on:
       - 'tests/test_extra_creation_rpc_provenance.py'
       - 'scripts/extra_historical_evidence_gates.py'
       - 'tests/test_extra_historical_evidence_gates.py'
+      - 'scripts/extra_registry_two_provider_auth.py'
+      - 'tests/test_extra_registry_two_provider_auth.py'
       - '.github/workflows/extra-finance-creation-rpc-provenance.yml'
   workflow_dispatch:
 
@@ -24,7 +26,7 @@ jobs:
       - name: Offline RPC validation regression tests
         run: |
           python -m pip install pytest
-          python -m pytest -q tests/test_extra_creation_rpc_provenance.py tests/test_extra_historical_evidence_gates.py
+          python -m pytest -q tests/test_extra_creation_rpc_provenance.py tests/test_extra_historical_evidence_gates.py tests/test_extra_registry_two_provider_auth.py
 
   archived-read:
     if: github.event_name == 'workflow_dispatch'
