@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import re
 
-HEX_HASH = re.compile(r"0x[0-9a-fA-F]{64}\\Z")
-HEX_ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}\\Z")
+HEX_HASH = re.compile(r"0x[0-9a-fA-F]{64}\Z")
+HEX_ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}\Z")
 
 
 class EvidenceGateError(ValueError):
