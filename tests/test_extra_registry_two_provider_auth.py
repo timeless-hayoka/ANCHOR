@@ -1,5 +1,6 @@
 """Offline controls for two-provider, block-bound historical registry authentication."""
 import importlib.util
+import copy
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -21,7 +22,7 @@ def observation(label, block):
             "runtime_sha256": {"factory": mod.EXPECTED_FACTORY_SHA256,
                                "vault": mod.EXPECTED_VAULT_SHA256,
                                "registry": "c" * 64},
-            "registry_entries": PINNED["registry"][label]}
+            "registry_entries": copy.deepcopy(PINNED["registry"][label])}
 
 
 def fake_observe(url, height):
