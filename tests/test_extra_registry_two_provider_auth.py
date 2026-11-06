@@ -112,3 +112,27 @@ def test_historical_state_queries_use_canonical_block_hash():
         with pytest.raises(mod.AuthenticationError, match="runtime differs"):
             mod.observe("https://a.invalid", block_number)
     assert observed_refs == [{"blockHash": block_hash, "requireCanonical": True}]
+
+
+def test_provider_rejecting_canonical_hash_read_fails_closed():
+    block_number = 96268610
+    block_hash = "0x" + "a" * 64
+    requests = []
+
+    def fixture(url, method, params, request_id):
+        requests.append((method, params))
+        if method == "eth_chainId":
+            return "0xa"
+        if method == "eth_getBlockByNumber":
+            return {"number": hex(block_number), "hash": block_hash}
+        if method == "eth_getCode":
+            assert params[1] == {"blockHash": block_hash, "requireCanonical": True}
+            raise mod.AuthenticationError("provider does not support EIP-1898")
+        raise AssertionError("unexpected fallback request")
+
+    with patch.object(mod, "rpc", side_effect=fixture):
+        with pytest.raises(mod.AuthenticationError, match="does not support"):
+            mod.observe("https://a.invalid", block_number)
+    assert [method for method, _ in requests] == [
+        "eth_chainId", "eth_getBlockByNumber", "eth_getCode"
+    ]
