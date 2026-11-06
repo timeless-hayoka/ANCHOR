@@ -9,6 +9,7 @@ on:
       - 'scripts/extra_registry_two_provider_auth.py'
       - 'tests/test_extra_registry_two_provider_auth.py'
       - '.github/workflows/extra-finance-creation-rpc-provenance.yml'
+      - '.github/workflows/extra-finance-independent-archive-auth.yml'
   workflow_dispatch:
 
 permissions:
