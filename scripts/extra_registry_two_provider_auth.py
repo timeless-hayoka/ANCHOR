@@ -61,7 +61,9 @@ def observe(url, block_number):
         raise AuthenticationError("incorrect historical block")
     block_hash = block.get("hash")
     require_hex(block_hash, 32)
-    # Bind every historical state read to the canonical hash (EIP-1898).\n    # Providers lacking support fail closed; never downgrade to block numbers.\n    block_ref = {"blockHash": block_hash, "requireCanonical": True}
+    # Bind every historical state read to the canonical hash (EIP-1898).
+    # Providers lacking support fail closed; never downgrade to block numbers.
+    block_ref = {"blockHash": block_hash, "requireCanonical": True}
     code_hashes = {}
     for address, label, expected in (
         (FACTORY, "factory", EXPECTED_FACTORY_SHA256),
