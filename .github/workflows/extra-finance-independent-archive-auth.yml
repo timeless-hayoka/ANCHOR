@@ -1,0 +1,60 @@
+name: Extra Finance independent archive registry authentication
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extra-finance-independent-archive-auth
+  cancel-in-progress: false
+
+jobs:
+  authenticate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OP_ARCHIVE_RPC_A: ${{ secrets.OP_ARCHIVE_RPC_A }}
+      OP_ARCHIVE_RPC_B: ${{ secrets.OP_ARCHIVE_RPC_B }}
+    steps:
+      - name: Checkout reviewed main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Require both private archive endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${OP_ARCHIVE_RPC_A}" || -z "${OP_ARCHIVE_RPC_B}" ]]; then
+            echo "::error::Configure both OP_ARCHIVE_RPC_A and OP_ARCHIVE_RPC_B repository secrets before running."
+            exit 1
+          fi
+          if [[ "${OP_ARCHIVE_RPC_A}" == "${OP_ARCHIVE_RPC_B}" ]]; then
+            echo "::error::Archive endpoints must be distinct."
+            exit 1
+          fi
+      - name: Run offline controls first
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install pytest
+          python -m pytest -q tests/test_extra_registry_two_provider_auth.py
+      - name: Authenticate historical snapshots (read only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/extra_registry_two_provider_auth.py \
+            --out evidence/extra_registry_two_provider_auth.json
+      - name: Upload authenticated evidence only on success
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extra-registry-independent-archive-auth
+          path: evidence/extra_registry_two_provider_auth.json
+          retention-days: 14
+          if-no-files-found: error

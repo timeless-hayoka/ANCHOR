@@ -91,3 +91,24 @@ def test_wrong_chain_and_reorg_and_code_mismatch_rejected():
     with patch.object(mod, "rpc", side_effect=fixture):
         with pytest.raises(mod.AuthenticationError, match="runtime differs"):
             mod.observe("https://a.invalid", block)
+
+
+def test_historical_state_queries_use_canonical_block_hash():
+    block_number = 96268610
+    block_hash = "0x" + "a" * 64
+    observed_refs = []
+    def fixture(url, method, params, request_id):
+        if method == "eth_chainId":
+            return "0xa"
+        if method == "eth_getBlockByNumber":
+            return {"number": hex(block_number), "hash": block_hash}
+        if method in ("eth_getCode", "eth_call"):
+            observed_refs.append(params[-1])
+            if method == "eth_getCode":
+                return "0x6000"
+            return "0x" + "00" * 32
+        raise AssertionError(method)
+    with patch.object(mod, "rpc", side_effect=fixture):
+        with pytest.raises(mod.AuthenticationError, match="runtime differs"):
+            mod.observe("https://a.invalid", block_number)
+    assert observed_refs == [{"blockHash": block_hash, "requireCanonical": True}]

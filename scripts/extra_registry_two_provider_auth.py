@@ -61,15 +61,16 @@ def observe(url, block_number):
         raise AuthenticationError("incorrect historical block")
     block_hash = block.get("hash")
     require_hex(block_hash, 32)
-    # EIP-1898 blockHash eth_call is not supported by every archival endpoint;
-    # use numeric tags and re-read block hash to detect chain changes.
+    # Bind every historical state read to the canonical hash (EIP-1898).
+    # Providers lacking support fail closed; never downgrade to block numbers.
+    block_ref = {"blockHash": block_hash, "requireCanonical": True}
     code_hashes = {}
     for address, label, expected in (
         (FACTORY, "factory", EXPECTED_FACTORY_SHA256),
         (VAULT, "vault", EXPECTED_VAULT_SHA256),
         (REGISTRY, "registry", None),
     ):
-        raw = read("eth_getCode", [address, hex(block_number)])
+        raw = read("eth_getCode", [address, block_ref])
         code = require_hex(raw, (len(raw) - 2) // 2)
         if not code:
             raise AuthenticationError("historical runtime missing")
@@ -80,7 +81,7 @@ def observe(url, block_number):
     entries = {}
     for key in KEYS:
         calldata = GET_ADDRESS_SELECTOR + f"{key:064x}"
-        value = read("eth_call", [{"to": REGISTRY, "data": calldata}, hex(block_number)])
+        value = read("eth_call", [{"to": REGISTRY, "data": calldata}, block_ref])
         raw = require_hex(value, 32)
         if any(raw[:12]):
             raise AuthenticationError("registry returned non-address word")
