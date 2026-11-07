@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from anchor_execution import run_bounded
 
 from bugbot.analysis import (
     AnalysisConfig,
@@ -54,12 +57,11 @@ def _tool_versions() -> dict[str, str | None]:
         if not binary:
             versions[name] = None
             continue
-        proc = subprocess.run(
-            [binary, *args],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            proc = run_bounded([binary, *args], timeout=15)
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            versions[name] = None
+            continue
         if proc.returncode != 0:
             versions[name] = None
             continue

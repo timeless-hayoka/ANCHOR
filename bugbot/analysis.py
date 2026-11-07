@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
-import os
 import shutil
 import subprocess
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
+
+from anchor_execution import execution_env, run_bounded
+from anchor_sandbox import sandbox_command
 
 from bugbot.scope import (
     IDENTITY_VERIFIED_REPO,
@@ -25,8 +27,6 @@ from knowledge.pipeline import ArchiveResult
 logger = logging.getLogger(__name__)
 
 ANALYSIS_STAGES = ("clone", "identity", "inspect", "test", "fuzz")
-_SECRET_ENV_MARKERS = ("AWS_", "GITHUB_", "GH_", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL")
-_ALLOWED_ENV_PREFIXES = ("PATH", "LANG", "LC_", "FOUNDRY", "RUST", "CARGO")
 
 
 @dataclass(frozen=True)
@@ -104,14 +104,12 @@ def _run_command(
     isolated_env: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     started = datetime.now(timezone.utc)
-    proc = subprocess.run(
-        args,
-        cwd=str(cwd) if cwd else None,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        proc = run_bounded(args, cwd=cwd, env=env)
+    except subprocess.TimeoutExpired:
+        proc = subprocess.CompletedProcess(args, 124, "", "Command deadline exceeded")
+    except (OSError, ValueError, RuntimeError) as exc:
+        proc = subprocess.CompletedProcess(args, 125, "", f"Command execution rejected: {exc}")
     finished = datetime.now(timezone.utc)
     if trace is not None and stage:
         trace.commands.append(
@@ -263,18 +261,10 @@ def _workspace_is_disposable(workspace: Path, anchor_root: Path) -> bool:
 
 
 def _isolated_execution_env(workspace: Path) -> dict[str, str]:
-    sandbox_home = workspace / ".sandbox-home"
-    sandbox_home.mkdir(parents=True, exist_ok=True)
-    env: dict[str, str] = {}
-    for key, value in os.environ.items():
-        if any(key == prefix or key.startswith(prefix) for prefix in _ALLOWED_ENV_PREFIXES):
-            env[key] = value
-    env["HOME"] = str(sandbox_home)
-    env["USER"] = "anchor-sandbox"
-    for key in list(env):
-        upper = key.upper()
-        if any(marker in upper for marker in _SECRET_ENV_MARKERS):
-            del env[key]
+    del workspace
+    env = execution_env()
+    env["HOME"] = "/home/anchor"
+    env["FOUNDRY_FFI"] = "false"
     return env
 
 
@@ -298,15 +288,13 @@ def _stage_test(
     if not (workspace / "foundry.toml").is_file():
         return AnalysisStageResult("test", True, "skipped: no foundry.toml", skipped=True)
 
-    isolated = grant.identity_status == IDENTITY_VERIFIED_REPO
-    env = _isolated_execution_env(workspace) if isolated else None
+    try:
+        command = sandbox_command(["forge", "test", "--offline", "-q"], workspace)
+    except RuntimeError as exc:
+        return AnalysisStageResult("test", False, f"blocked: {exc}")
     result = _run_command(
-        ["forge", "test", "--offline", "-q"],
-        cwd=workspace,
-        env=env,
-        trace=trace,
-        stage="test",
-        isolated_env=isolated,
+        command, cwd=workspace, env=_isolated_execution_env(workspace),
+        trace=trace, stage="test", isolated_env=True,
     )
     if result.returncode == 0:
         return AnalysisStageResult("test", True, "forge test passed", exit_code=0)
@@ -470,7 +458,8 @@ def run_target_analysis(config: AnalysisConfig) -> AnalysisRunResult:
         return _finalize_result(config, result)
 
     result = AnalysisRunResult(
-        success=True,
+        success=False,
+        error="Analysis incomplete: no fresh detector analysis or verified finding was produced",
         workspace=workspace,
         stages=stages,
         identity_status=identity.identity_status,

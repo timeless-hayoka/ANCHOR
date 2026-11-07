@@ -1282,8 +1282,9 @@ def test_cmd_bugbot_analyze_runs_stages_with_grant(tmp_path: Path, monkeypatch, 
         "workspace": str(workspace),
     }))
     out = capsys.readouterr()
-    assert rc == 0
-    assert "Analysis: PASS" in out.out
+    assert rc == 1
+    assert "Analysis incomplete" in out.out
+    assert "Analysis: PARTIAL" in out.out
     assert "INSPECT: PASS" in out.out
     assert "Archive:" in out.out
 

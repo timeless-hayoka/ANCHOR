@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Optional, Callable, Any
 
+from anchor_source import read_project_text
 from .parser import parse_sarif, Finding, is_sarif_payload
 from .normalizer import RuleNormalizer, NormalizedRule
 from .deduplicator import SARIFDeduplicator
@@ -350,10 +351,7 @@ Write a concise 2-4 sentence professional summary of the vulnerability pattern, 
         if not self.source_root:
             return ""
         try:
-            p = self.source_root / finding.file_path.lstrip("./")
-            if not p.exists():
-                return ""
-            lines = p.read_text(encoding="utf-8", errors="ignore").splitlines()
+            lines = read_project_text(self.source_root, finding.file_path).splitlines()
             start = max(0, finding.start_line - 1 - context_lines)
             end = min(len(lines), finding.start_line + context_lines)
             return "\n".join(lines[start:end])

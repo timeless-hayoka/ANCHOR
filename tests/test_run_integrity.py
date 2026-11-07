@@ -39,7 +39,7 @@ def test_poc_boolean_is_strict(server, value):
     run = server.create_run("hunt")
     server.RUNS[run.run_id] = run
     with TestClient(server.app) as client:
-        response = client.post(f"/runs/{run.run_id}/ingest", json={
+        response = client.post(f"/runs/{run.run_id}/ingest", headers={"X-Anchor-Ingest-Token": run.ingest_token}, json={
             "type": "poc.result", "payload": {"case_id": "claim", "exploit_verified": value},
         })
     assert response.status_code == 400
@@ -65,7 +65,7 @@ def test_terminal_run_is_immutable(server):
     asyncio.run(run.emit("run.completed", {}))
     before = list(run.events)
     with TestClient(server.app) as client:
-        response = client.post(f"/runs/{run.run_id}/ingest", json={
+        response = client.post(f"/runs/{run.run_id}/ingest", headers={"X-Anchor-Ingest-Token": run.ingest_token}, json={
             "type": "case.started", "payload": {"case_id": "late"},
         })
     assert response.status_code == 409

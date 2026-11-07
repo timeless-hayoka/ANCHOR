@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
+from anchor_execution import run_bounded
+
 from bugbot.scope import (
     IDENTITY_LOCAL_FIXTURE_UNPINNED,
     IDENTITY_VERIFIED_REPO,
@@ -40,12 +42,7 @@ def normalize_git_remote(url: str) -> str:
 
 
 def _run_git(workspace: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", "-C", str(workspace), *args],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    return run_bounded(["git", "-C", str(workspace), *args], timeout=30)
 
 
 def _git_head(workspace: Path) -> str | None:
@@ -145,6 +142,14 @@ def verify_target_identity(workspace: Path, grant: ScopeGrant) -> TargetIdentity
             summary=(
                 f"origin {origin} does not match approved repo {grant.target_repo_url}"
             ),
+            blocked_reason=_IDENTITY_BLOCKED_REASON,
+        )
+
+    status = _run_git(workspace, "status", "--porcelain", "--untracked-files=all", "--ignored", "--ignore-submodules=none")
+    if status.returncode != 0 or status.stdout.strip():
+        return TargetIdentityResult(
+            verified=False, identity_status=IDENTITY_VERIFIED_REPO,
+            summary="workspace differs from approved revision (modified, untracked, or ignored content)",
             blocked_reason=_IDENTITY_BLOCKED_REASON,
         )
 

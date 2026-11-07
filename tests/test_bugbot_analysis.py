@@ -92,7 +92,8 @@ def test_run_target_analysis_inspects_local_fixture_workspace(tmp_path: Path) ->
         )
     )
 
-    assert result.success is True
+    assert result.success is False
+    assert "Analysis incomplete" in result.error
     assert result.identity_status == IDENTITY_LOCAL_FIXTURE_UNPINNED
     assert result.archive is not None and result.archive.success is True
     stages = {stage.stage: stage for stage in result.stages}
@@ -168,7 +169,8 @@ def test_verified_repo_passes_with_matching_origin_and_head(tmp_path: Path) -> N
         )
     )
 
-    assert result.success is True
+    assert result.success is False
+    assert "Analysis incomplete" in result.error
     assert result.identity_status == IDENTITY_VERIFIED_REPO
     stages = {stage.stage: stage for stage in result.stages}
     assert stages["identity"].success is True
@@ -179,6 +181,9 @@ def test_verified_repo_blocks_test_outside_disposable_workspace(tmp_path: Path) 
     workspace.mkdir(parents=True)
     head = _init_git_repo(workspace)
     (workspace / "foundry.toml").write_text("[profile.default]\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(workspace), "add", "foundry.toml"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(workspace), "commit", "-m", "add config"], check=True, capture_output=True)
+    head = subprocess.run(["git", "-C", str(workspace), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
     subprocess.run(
         ["git", "-C", str(workspace), "remote", "add", "origin", "https://github.com/example/lab.git"],
         check=True,

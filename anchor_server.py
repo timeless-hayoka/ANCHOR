@@ -23,9 +23,12 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse, RedirectResponse
 
+from anchor_source import read_project_text
+from anchor_http_boundary import LocalRequestBoundary
+from anchor_execution import execution_env, limited_command, kill_process_group, MAX_OUTPUT_BYTES
 from anchor_run_claims import provisional_state, validate_telemetry
 from anchor_cli import load_outcome_entries
-from anchor_scripts import allowed_script_names, load_script_registry, registry_summary
+from anchor_scripts import allowed_script_names, load_script_registry, registry_summary, script_is_allowed
 from anchor_sarif import build_research_loop
 from anchor_sarif.parser import Finding
 from anchor_storage import build_storage_manifest, evidence_dir, storage_manifest_path, storage_summary, write_json
@@ -49,6 +52,11 @@ DEFAULT_SCRIPT = os.getenv("ANCHOR_DEFAULT_HUNT_SCRIPT", "trinity_hunt_v4_2_fixe
 ALLOW_HUNT_ARGS = os.getenv("ANCHOR_ALLOW_HUNT_ARGS", "0").strip().lower() in {"1", "true", "yes"}
 BENCHMARK = "3a8b8bf0"
 LADDER = {"DETECTED": 0, "CORRELATED": 1, "REPRODUCED_REAL": 2}
+CORS_ORIGINS = [origin.strip() for origin in os.getenv(
+    "ANCHOR_CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"
+).split(",") if origin.strip()]
+if "*" in CORS_ORIGINS:
+    raise ValueError("CORS origins must be explicit")
 TERMINAL_EVENTS = {"run.completed", "run.stopped", "run.failed"}
 
 SWC = {
@@ -115,9 +123,9 @@ def _resolve_project_path(raw: str | None, *, default: str | None = None, must_e
 def _normalize_args(value: Any) -> list[str]:
     if value is None:
         return []
-    if not isinstance(value, list):
-        raise ValueError("args must be a list")
-    return [str(v) for v in value]
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise ValueError("args must be a list of strings")
+    return value
 
 
 def _bootstrap_signing_key() -> tuple[Ed25519PrivateKey, str]:
@@ -260,6 +268,12 @@ def normalize_registry(data: Any) -> list[dict[str, Any]]:
 
 
 def case_from_registry(entry: dict[str, Any]) -> dict[str, Any]:
+    for key in ("case_id", "id", "challenge", "contract", "subject", "swc", "validation_state", "status"):
+        if entry.get(key) is not None and not isinstance(entry[key], str):
+            raise ValueError(f"Registry {key} must be a string")
+    for key in ("expected", "detected", "correlated", "reproduced_real"):
+        if key in entry and (not isinstance(entry[key], list) or not all(isinstance(x, str) for x in entry[key])):
+            raise ValueError(f"Registry {key} must be a list of strings")
     validation_state = str(entry.get("validation_state") or entry.get("status") or "UNKNOWN")
     if validation_state == "UNAVAILABLE":
         validation_state = "TOOL_UNAVAILABLE"
@@ -322,6 +336,7 @@ class Run:
     registry: dict[str, Any] | None = None
     task: asyncio.Task | None = None
     process: asyncio.subprocess.Process | None = None
+    ingest_token: str = field(default_factory=lambda: secrets.token_urlsafe(32), repr=False)
     ingested: bool = False
     cancelled: bool = False
 
@@ -407,6 +422,12 @@ class Run:
         async with self.lock:
             if self.done.is_set():
                 raise ValueError("Run is already terminal")
+            if len(self.events) >= 10000 and not terminal:
+                raise ValueError("Run event limit reached")
+            event.update({
+                "event_id": f"evt_{self.run_id}_{len(self.events) + 1:06d}",
+                "run_id": self.run_id, "timestamp": utc_stamp(),
+            })
             self.events.append(event)
             self._apply_event(event)
             subscribers = list(self.subscribers)
@@ -578,7 +599,7 @@ async def hunt_run(run: Run) -> None:
         args = _normalize_args(run.params.get("args"))
         if args and not ALLOW_HUNT_ARGS:
             raise ValueError("hunt args are disabled")
-        if script.name not in allowed_script_names():
+        if not script_is_allowed(script, PROJECT_ROOT):
             raise ValueError(f"hunt script {script.name} is not allowlisted")
         if registry_path.exists():
             raise ValueError("Registry output already exists; use a fresh per-run path")
@@ -587,15 +608,17 @@ async def hunt_run(run: Run) -> None:
         return
 
     await run.emit("run.started", {"mode": "hunt", "benchmark_id": run.benchmark, "total_cases": 0})
-    env = dict(os.environ)
+    env = execution_env()
     env.update({
         "ANCHOR_SERVER_URL": _self_url(), "ANCHOR_RUN_ID": run.run_id,
         "ANCHOR_REGISTRY_PATH": str(registry_path),
+        "ANCHOR_INGEST_TOKEN": run.ingest_token,
         "ANCHOR_TARGET": str(run.params.get("target") or ""), "PYTHONUNBUFFERED": "1",
     })
     try:
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, str(script), *args, cwd=str(PROJECT_ROOT), env=env,
+            *limited_command([sys.executable, str(script), *args]), cwd=str(PROJECT_ROOT), env=env,
+            start_new_session=True,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
         )
     except Exception as exc:
@@ -605,17 +628,32 @@ async def hunt_run(run: Run) -> None:
 
     async def pump_stdout() -> None:
         assert proc.stdout is not None
+        output_bytes = 0
         while True:
             line = await proc.stdout.readline()
             if not line:
                 return
+            output_bytes += len(line)
+            if output_bytes > MAX_OUTPUT_BYTES:
+                raise ValueError("Hunt output limit reached")
             text = line.decode(errors="replace").rstrip()
             if text:
                 await run.emit("log.line", {"message": text, "text": text})
 
     stdout_task = asyncio.create_task(pump_stdout())
-    returncode = await proc.wait()
-    await stdout_task
+    try:
+        await asyncio.wait_for(asyncio.gather(proc.wait(), stdout_task), timeout=120)
+    except (asyncio.TimeoutError, ValueError) as exc:
+        kill_process_group(proc.pid)
+        await proc.wait()
+        stdout_task.cancel()
+        await asyncio.gather(stdout_task, return_exceptions=True)
+        await fail_run(run, f"Hunt execution limit: {type(exc).__name__}")
+        return
+    finally:
+        kill_process_group(proc.pid)
+        await proc.wait()
+    returncode = proc.returncode
     if run.cancelled:
         return
     if returncode != 0:
@@ -623,7 +661,10 @@ async def hunt_run(run: Run) -> None:
         return
     try:
         if registry_path.exists():
-            data = json.loads(registry_path.read_text(encoding="utf-8"))
+            _ensure_under_project_root(registry_path, "registry path")
+            if registry_path.stat().st_size > MAX_OUTPUT_BYTES:
+                raise ValueError("Registry exceeds size limit")
+            data = json.loads(read_project_text(PROJECT_ROOT, str(registry_path)))
             if not isinstance(data, dict) or data.get("run_id") != run.run_id:
                 raise ValueError("Registry must bind to this run_id")
             if data.get("target") != run.params.get("target"):
@@ -674,6 +715,8 @@ async def run_driver(run: Run) -> None:
 def create_run(mode: str = "hunt", *, script: str | None = None, registry: str | None = None, args: Optional[list[str]] = None, benchmark: str | None = None, target: str | None = None) -> Run:
     if mode not in {"demo", "hunt"}:
         raise ValueError("mode must be demo or hunt")
+    if target is not None and (not isinstance(target, str) or not target.strip() or len(target) > 2048):
+        raise ValueError("target must be a nonempty identity string of at most 2048 characters")
     run_id = f"run_{secrets.token_hex(6)}"
     params: dict[str, Any] = {"target": target}
     if script is not None:
@@ -688,10 +731,11 @@ def create_run(mode: str = "hunt", *, script: str | None = None, registry: str |
 app = FastAPI(title="ANCHOR run server", version=APP_VERSION)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "X-Anchor-Ingest-Token"],
 )
+app.add_middleware(LocalRequestBoundary, origins=CORS_ORIGINS)
 
 
 @app.get("/")
@@ -961,6 +1005,8 @@ async def api_trinity_run_events(run_id: str, request: Request):
     if run_id in RUNS:
         return await run_events(run_id, request)
     run = create_run("demo")
+    if len(RUNS) >= 100:
+        raise HTTPException(status_code=503, detail="Run capacity reached; restart the local server")
     RUNS[run.run_id] = run
     run.task = asyncio.create_task(run_driver(run))
     return await run_events(run.run_id, request)
@@ -996,8 +1042,10 @@ async def create_run_route(req: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if run.mode == "hunt" and run.params.get("script") is not None:
         script_name = Path(run.params["script"]).name
-        if script_name not in allowed_script_names():
+        if not script_is_allowed(Path(run.params["script"]), PROJECT_ROOT):
             raise HTTPException(status_code=400, detail=f"hunt script {script_name} is not allowlisted")
+    if len(RUNS) >= 100:
+        raise HTTPException(status_code=503, detail="Run capacity reached; restart the local server")
     RUNS[run.run_id] = run
     run.task = asyncio.create_task(run_driver(run))
     return {"run_id": run.run_id, "mode": run.mode, "status": run.status}
@@ -1048,7 +1096,16 @@ async def ingest(run_id: str, req: Request) -> dict[str, Any]:
     run = RUNS.get(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
-    body = await req.json()
+    if run.done.is_set():
+        raise HTTPException(status_code=409, detail="Run is already terminal")
+    if run.mode == "demo":
+        raise HTTPException(status_code=400, detail="Demo runs do not accept producer telemetry")
+    if not secrets.compare_digest(req.headers.get("X-Anchor-Ingest-Token", "").encode(), run.ingest_token.encode()):
+        raise HTTPException(status_code=403, detail="Invalid producer token")
+    try:
+        body = await req.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON") from exc
     if not isinstance(body, dict):
         raise HTTPException(status_code=400, detail="Event payload must be an object")
     event_type = str(body.get("type") or body.get("event_type") or "").strip()
@@ -1058,6 +1115,8 @@ async def ingest(run_id: str, req: Request) -> dict[str, Any]:
     if not isinstance(payload, dict):
         payload = {k: v for k, v in body.items() if k not in {"schema_version", "event_id", "run_id", "type", "event_type", "timestamp", "payload"}}
     event = {
+        "provenance": "PRODUCER_TELEMETRY",
+        "mode": run.mode,
         "schema_version": str(body.get("schema_version") or "1.0"),
         "event_id": str(body.get("event_id") or f"evt_{secrets.token_hex(8)}"),
         "run_id": run_id,
@@ -1089,7 +1148,7 @@ async def cancel_run(run_id: str) -> dict[str, Any]:
     run.cancelled = True
     if run.process and run.process.returncode is None:
         try:
-            run.process.terminate()
+            kill_process_group(run.process.pid)
         except ProcessLookupError:
             pass
     await run.emit("run.stopped", {"reason": "cancelled_by_operator"})

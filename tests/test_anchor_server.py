@@ -157,6 +157,7 @@ def test_anchor_server_replays_after_cursor_and_ingests_events(monkeypatch: pyte
         server.RUNS[active.run_id] = active
         ingest = client.post(
             f"/runs/{active.run_id}/ingest",
+            headers={"X-Anchor-Ingest-Token": active.ingest_token},
             json={"type": "case.started", "payload": {"case_id": "case_live", "expected": ["SWC-107"]}},
         )
         assert ingest.status_code == 200

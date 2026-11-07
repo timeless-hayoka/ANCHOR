@@ -18,6 +18,9 @@ def provisional_state(state: str) -> str:
 def validate_telemetry(event_type: str, payload: dict[str, Any]) -> None:
     if event_type not in EVENT_TYPES:
         raise ValueError("Unsupported producer event type; the server owns run lifecycle")
+    for key in ("contract", "swc", "source", "stage", "test_path", "severity", "text", "message"):
+        if payload.get(key) is not None and not isinstance(payload[key], str):
+            raise ValueError(f"{key} must be a string")
     if event_type != "log.line":
         case_id = payload.get("case_id")
         if not isinstance(case_id, str) or not case_id.strip() or len(case_id) > 256:

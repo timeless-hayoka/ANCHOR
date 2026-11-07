@@ -61,3 +61,16 @@ def allowed_script_names(registry: dict[str, Any] | None = None) -> set[str]:
             if name:
                 names.add(Path(name).name)
     return names
+
+
+def script_is_allowed(path: Path, project_root: Path) -> bool:
+    """Match a canonical configured path, never a basename in another directory."""
+    candidate = path.resolve()
+    try:
+        candidate.relative_to(project_root.resolve())
+    except ValueError:
+        return False
+    configured = [project_root / name for name in DEFAULT_ALLOWLIST]
+    configured.extend(project_root / str(item["path"]) for item in registry_scripts()
+                      if item.get("allowed", True) and item.get("path"))
+    return candidate in {p.resolve() for p in configured}
