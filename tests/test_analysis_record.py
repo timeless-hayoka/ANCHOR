@@ -152,18 +152,19 @@ def test_run_target_analysis_archives_record(tmp_path: Path) -> None:
         )
     )
 
-    assert result.success is True
+    assert result.success is False
+    assert "Analysis incomplete" in result.error
     assert result.archive is not None
     assert result.archive.success is True
     assert result.archive.path is not None
     assert result.archive.path.parent == knowledge / "analysis"
     payload = json.loads(result.archive.path.read_text(encoding="utf-8"))
-    assert payload["final_status"] == FINAL_STATUS_PASS
+    assert payload["final_status"] == FINAL_STATUS_PARTIAL
     assert payload["target"]["target_id"] == "dvd-local-lab"
     assert payload["artifact_paths"]["archive_record"] == str(result.archive.path)
     assert is_canonical_evidence(payload)
     assert payload["kind"] == "hunt_analysis"
-    assert payload["status"] == "published"
+    assert payload["status"] == "unknown"
 
 
 def test_write_analysis_run_via_pipeline(tmp_path: Path) -> None:

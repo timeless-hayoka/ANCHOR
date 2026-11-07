@@ -4,10 +4,9 @@ Drop this file next to your pipeline, import it, and call one helper at each
 stage. The events show up live in the console's Live Run and Proof Gate views,
 and the ladder climbs in real time as your tools finish.
 
-When the ANCHOR server launches your pipeline (hunt mode), it sets
-ANCHOR_SERVER_URL and ANCHOR_RUN_ID in the environment, so you do not wire
-anything: just call the helpers. Running the pipeline standalone instead? Call
-start_run() once to create a run, or configure(url=..., run_id=...) by hand.
+When the server launches a trusted helper, it supplies ANCHOR_SERVER_URL,
+ANCHOR_RUN_ID and ANCHOR_INGEST_TOKEN. Standalone run creation is unsupported.
+Producer messages are unverified telemetry, not independent proof.
 
 Every call is best-effort. If the server is unreachable the call quietly no-ops
 and never raises, so adding these lines cannot break your pipeline. Only the
@@ -38,56 +37,48 @@ import urllib.request
 
 _URL = os.environ.get("ANCHOR_SERVER_URL", "http://127.0.0.1:8000").rstrip("/")
 _RUN = os.environ.get("ANCHOR_RUN_ID")
+_TOKEN = os.environ.get("ANCHOR_INGEST_TOKEN", "")
 _TIMEOUT = 3
 
 
-def configure(url=None, run_id=None):
+def configure(url=None, run_id=None, token=None):
     """Override the server URL and/or run id (otherwise taken from the environment)."""
-    global _URL, _RUN
+    global _URL, _RUN, _TOKEN
     if url:
         _URL = url.rstrip("/")
     if run_id:
         _RUN = run_id
+    if token is not None:
+        _TOKEN = token
     return _RUN
 
 
 def start_run(benchmark="3a8b8bf0", mode="hunt"):
-    """Create a run and remember its id. Needed only when running standalone,
-    not when the ANCHOR server launched the pipeline. Returns the run id or None."""
-    global _RUN
-    try:
-        data = json.dumps({"benchmark": benchmark, "mode": mode}).encode()
-        req = urllib.request.Request(
-            f"{_URL}/runs",
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-            _RUN = json.loads(resp.read()).get("run_id")
-    except Exception:
-        _RUN = None
-    return _RUN
+    """Deprecated unsupported standalone creation; returns None with a warning."""
+    import warnings
+    warnings.warn("Standalone run creation is unsupported; use a server-launched producer.", RuntimeWarning)
+    return None
 
 
 def _emit(event_type, payload):
-    if not _RUN:
+    if not _RUN or not _TOKEN:
         return False
     try:
         data = json.dumps({"type": event_type, "payload": payload}).encode()
         req = urllib.request.Request(
             f"{_URL}/runs/{_RUN}/ingest",
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "X-Anchor-Ingest-Token": _TOKEN},
             method="POST",
         )
-        urllib.request.urlopen(req, timeout=_TIMEOUT).read()
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as response:
+            response.read()
         return True
     except Exception:
         return False
 
 
-# --- run brackets (standalone only; the server does these in hunt mode) ----
+# --- legacy lifecycle helpers (server rejects producer lifecycle events) ---
 def run_started(benchmark="3a8b8bf0", total_cases=0):
     return _emit("run.started", {"benchmark_id": benchmark, "total_cases": total_cases})
 

@@ -2000,7 +2000,7 @@ def cmd_sarif_process(args: argparse.Namespace) -> int:
     sarif_map = {Path(path).stem: Path(path) for path in args.sarif_files}
     pipeline = SARIFProcessingPipeline(
         db_path=Path(args.db),
-        enable_semantic_clustering=True,
+        enable_semantic_clustering=False,
     )
     enriched = pipeline.process(sarif_map, enable_llm_summaries=args.llm)
     print(f"Processed {len(enriched)} unique findings")
@@ -2010,29 +2010,20 @@ def cmd_sarif_process(args: argparse.Namespace) -> int:
 
 def cmd_sarif_cluster(args: argparse.Namespace) -> int:
     del args
-    if not HAS_SARIF:
-        print("anchor_sarif not available", file=sys.stderr)
-        return 1
-    print("Semantic clustering on existing database is available via the Python API.")
-    print("Example: from anchor_sarif import SemanticClusterer")
-    return 0
+    print("Not implemented: clustering stored findings via CLI. Use the optional Python API.", file=sys.stderr)
+    return 2
 
 
 def cmd_sarif_tune(args: argparse.Namespace) -> int:
     del args
-    if not HAS_SARIF:
-        print("anchor_sarif not available", file=sys.stderr)
-        return 1
-    print("Hyperparameter tuning example ready. Use ClusterHyperparameterTuner in Python.")
-    return 0
+    print("Not implemented: CLI tuning. Use the optional Python API.", file=sys.stderr)
+    return 2
 
 
 def cmd_sarif_visualize(args: argparse.Namespace) -> int:
-    if not HAS_SARIF:
-        print("anchor_sarif not available", file=sys.stderr)
-        return 1
-    print(f"Visualization will be written to {args.output}")
-    return 0
+    del args
+    print("Not implemented: CLI visualization of stored findings. No file was written.", file=sys.stderr)
+    return 2
 
 
 def cmd_sarif_research(args: argparse.Namespace) -> int:
@@ -2043,7 +2034,7 @@ def cmd_sarif_research(args: argparse.Namespace) -> int:
     sarif_map = {Path(path).stem: Path(path) for path in args.sarif_files}
     pipeline = SARIFProcessingPipeline(
         db_path=Path(args.db),
-        enable_semantic_clustering=True,
+        enable_semantic_clustering=False,
         future_state_rewriter=lambda finding: rewrite_finding(finding, future_state=args.future_state),
         economic_validator=lambda finding: assess_economic_context(finding, future_state=args.future_state).to_dict(),
     )

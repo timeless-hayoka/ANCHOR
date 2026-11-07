@@ -150,11 +150,18 @@ def test_anchor_server_replays_after_cursor_and_ingests_events(monkeypatch: pyte
             f"/runs/{run_id}/ingest",
             json={"type": "case.started", "payload": {"case_id": "case_live", "contract": "Demo", "expected": ["SWC-107"]}},
         )
-        assert ingest.status_code == 200
+        assert ingest.status_code == 409  # Completed runs are immutable.
+        assert client.get("/cases/case_live").status_code == 404
 
-        case = client.get("/cases/case_live")
-        assert case.status_code == 200
-        assert case.json()["case_id"] == "case_live"
+        active = server.create_run("hunt")
+        server.RUNS[active.run_id] = active
+        ingest = client.post(
+            f"/runs/{active.run_id}/ingest",
+            headers={"X-Anchor-Ingest-Token": active.ingest_token},
+            json={"type": "case.started", "payload": {"case_id": "case_live", "expected": ["SWC-107"]}},
+        )
+        assert ingest.status_code == 200
+        assert client.get("/cases/case_live").json()["case_id"] == "case_live"
 
 
 def test_knowledge_api_list_show_and_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):

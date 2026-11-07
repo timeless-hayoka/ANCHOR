@@ -1,133 +1,119 @@
-# ANCHOR run server
+# ANCHOR local run server
 
-Local-first, single-tenant backend for the ANCHOR console. It runs on the
-hunter's own machine, points at their own project, and streams a hunt to the
-console's **Live Run** tab over Server-Sent Events. No auth, binds to localhost.
+This is a local, single-user orchestration and evidence-display service. It does
+not independently validate exploit impact and has no interactive model or login
+session. Keep it bound to loopback. The public website is a static demo.
 
-## Install and run
+## Install and start
 
 ```bash
-pip install -r requirements.txt
-uvicorn anchor_server:app --host 127.0.0.1 --port 8000
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m uvicorn anchor_server:app --host 127.0.0.1 --port 8000
+curl http://127.0.0.1:8000/api/health
 ```
 
-On first start it generates an ed25519 signing key at `anchor_signing_key.pem`
-and reuses it on later starts, so evidence signatures stay verifiable. The key
-is created with owner-only permissions.
+`/` redirects to the static demo. `/api/service` returns version and public-key
+metadata. A locally persisted Ed25519 key signs content; a signature attests to
+bytes, **not to the truth of a vulnerability claim**. Signed wrappers explicitly
+say `CONTENT_SIGNATURE_ONLY`.
 
-## Connect the console
+## Supported behavior
 
-In the console's **Live Run** tab, set the server URL to
-`http://127.0.0.1:8000` and click **Connect & run**. The DETECT / CORRELATE /
-REPRODUCE tiles climb, the event stream scrolls, and the findings list fills as
-events arrive. **Stop run** calls the cancel endpoint and actually terminates
-the run.
+| Capability | Current behavior |
+| --- | --- |
+| Explicit demo | POST `/runs` with `{"mode":"demo"}`. Fixtures/events carry `DEMO_FIXTURE` provenance; no engines execute. |
+| Hunt orchestration | Requires an existing, explicitly approved local Python helper and a fresh run-bound output or authenticated telemetry. No general default hunt driver is bundled. |
+| Registry import | Preserves unverified claims. Does not invent tool executions, successful assertions, or verified artifacts. |
+| Live proof label | Imported/producer `REPRODUCED_REAL`, `COUNCIL_ACCEPTED`, and `REPORT_READY` claims become `POC_EXECUTED_UNPROVEN`. Independent proof promotion is not wired to this server. |
+| Accuracy | Precision/recall/F1 are null for live runs without labeled ground truth. Demo scores remain illustrative. |
+| Trinity chat | Help-only response with `model_connected=false`. It does not invoke a model. |
+| Server state | In-memory runs, cases and event replay. Restart loses this state. |
+| Generic target analysis | Still incomplete. File inspection/skipped tests return partial analysis, not a clean scan. |
 
-Note on browsers: a console served over https talking to `http://localhost` is
-normally allowed (localhost is a mixed-content exception in Chrome and Firefox).
-If your browser blocks it, serve the console over http locally too.
+Missing/invalid modes and malformed inputs are rejected. Case lookup never
+creates a specimen result for a case that has not run.
 
-## Two run modes
+## Trusted helper execution
 
-`POST /runs` accepts a JSON body. Default mode is `demo`.
+Set `ANCHOR_PROJECT_ROOT` to the approved helper project. Script paths must
+resolve beneath it and match the canonical paths in `scripts/registry.json` or
+`ANCHOR_ALLOWED_HUNT_SCRIPTS`. The latter defaults to the two historical names
+`trinity_hunt_v4_2_fixed.py,anchor_hunt.py`, neither of which is bundled.
+A matching basename in another directory is not authorized. Explicit script
+arguments require `ANCHOR_ALLOW_HUNT_ARGS=1`; do not enable it for untrusted
+helpers. Configured helpers are trusted operator code, not arbitrary uploaded
+contract code.
 
-- **demo** (`{"mode":"demo"}` or no mode): streams a realistic run from built-in
-  fixtures, all five tools per specimen. No toolchain required, so the loop
-  works immediately.
-- **hunt** (`{"mode":"hunt"}`): wraps your real hunt script as a subprocess,
-  streams its stdout as `log.line` events, then emits structured case / finding
-  / poc events from the registry JSON it writes.
+Hunts have a 120-second wall/CPU limit, 2 GiB address-space limit, 1 MiB output
+and registry limits, and process-group termination on failure/cancellation.
+Only a small environment allowlist plus run-specific variables is inherited.
+These limits are **not** filesystem/network isolation for trusted helpers.
 
-  ```json
-  { "mode": "hunt", "script": "trinity_hunt_v4_2_fixed.py", "registry": "registry.json" }
-  ```
+For target Forge execution through BugBot, bubblewrap is required and applies
+separate filesystem/network namespaces with no host home directory and no
+network. Target files are mounted at `/work`; system libraries are read-only.
+FFI is disabled via the execution environment. Tools and compiler prerequisites
+must be available within that sandbox. Missing tools, namespace failures or
+compiler failures do not fall back to unsandboxed execution. Only Linux/POSIX
+bounded execution is currently supported.
 
-  This needs slither, mythril, echidna, medusa, and forge installed locally; the
-  server only orchestrates and streams. Script and registry paths must stay
-  inside the approved project root.
+## Producer and registry protocol
 
-## Live per-stage events from your pipeline
+The server launches a helper with:
 
-The hunt driver can emit structured events from the final registry, but for true
-per-stage live streaming (the ladder climbing as each tool finishes), have the
-pipeline stream events as it runs. Drop `anchor_emit.py` next to your pipeline
-and call one helper at each stage:
+- `ANCHOR_SERVER_URL`, `ANCHOR_RUN_ID`, `ANCHOR_TARGET`
+- `ANCHOR_REGISTRY_PATH`: fresh `.anchor/runs/<run_id>/registry.json` by default
+- `ANCHOR_INGEST_TOKEN`: per-run secret; never log or archive it
 
-```python
-import anchor_emit as ax
+Use `anchor_emit` from a server-launched helper. It sends
+`X-Anchor-Ingest-Token` automatically. Standalone `start_run()` is explicitly
+unsupported, and producers cannot complete/cancel a run through telemetry.
+The server owns lifecycle and waits for the subprocess result.
 
-ax.case_started(case_id, contract=name, expected=[swc])
-ax.stage(case_id, "slither")
-if slither_hit:
-    ax.detected(case_id, swc=swc, source="slither", severity=sev)
-ax.stage(case_id, "mythril")
-if tools_agree:
-    ax.correlated(case_id, swc=swc, evidence=["slither", "mythril"])
-ax.stage(case_id, "forge")
-ax.poc_result(case_id, swc=swc, exploit_verified=ok, test_path=path)
-ax.case_completed(case_id, "REPRODUCED_REAL" if ok else "CORRELATED")
-```
+A helper writing a registry must use an object with `run_id` equal to
+`ANCHOR_RUN_ID`, `target` equal to `ANCHOR_TARGET` (or null if unset), and
+`results` containing case objects with unique string IDs. Existing output paths,
+symlinks, malformed/unbound records, no output, or nonzero exit reject the run.
+Bindings prevent accidental replay; they do not authenticate contract source
+or prove impact. Raw claimed labels/artifacts remain explicitly unverified.
 
-In hunt mode the server launches your pipeline with `ANCHOR_SERVER_URL` and
-`ANCHOR_RUN_ID` already set, so the client wires itself with no configuration.
-Every call is best-effort and uses only the standard library, so adding these
-lines installs nothing and cannot break the pipeline. When the pipeline streams
-real ladder events this way, the server skips its registry replay so nothing is
-duplicated. Do not call `run_started` or `run_completed` under the server; it
-brackets the run for you. Running the pipeline standalone instead? Call
-`ax.start_run()` once to create a run, then connect the console to that run id.
+Producer event types: `case.started`, `stage.started`, `finding.detected`,
+`finding.correlated`, `poc.result`, `case.completed`, `log.line`.
+`poc.result.exploit_verified` must be a JSON boolean; even true is not proof.
+`run.completed`, `run.failed`, and `run.stopped` are terminal server events.
+Terminal runs reject further ingest with HTTP 409. Clients must handle all
+three terminal events. The service caps runs at 100 and nonterminal events per
+run at 10,000; restart the local service when run capacity is reached.
 
-## Event envelope
+## Browser boundary
 
-Every event uses the versioned envelope the console consumes:
+`ANCHOR_CORS_ORIGINS` is a comma-separated list of explicit trusted origins;
+defaults are `http://localhost:8000,http://127.0.0.1:8000`. Wildcard origins are
+rejected. Mutating requests with other browser origins are rejected before
+routing, including simple requests that do not trigger CORS preflight.
+Mutating request bodies are capped at 1 MiB, including chunked bodies.
+Non-browser local requests without an Origin header are allowed. Producer
+telemetry additionally requires its per-run token. This is not authentication
+for remote/multi-user deployment. No cookie/login protection is implemented.
 
-```json
-{
-  "schema_version": "1.0",
-  "event_id": "evt_run_xxx_000007",
-  "run_id": "run_xxx",
-  "type": "finding.correlated",
-  "timestamp": "2026-06-25T00:00:00+00:00",
-  "payload": { }
-}
-```
+## Routes
 
-Types: `run.started`, `case.started`, `stage.started`, `finding.detected`,
-`finding.correlated`, `poc.result`, `case.completed`, `run.completed`,
-`run.stopped`, `log.line`.
+| Route | Purpose |
+| --- | --- |
+| GET `/api/health`, `/api/service`, `/pubkey` | Health, version and public-key metadata |
+| POST `/runs` | Explicit demo or configured hunt |
+| GET `/runs/{id}/events?after={event_id}` | SSE replay and streaming |
+| POST `/runs/{id}/ingest` | Authenticated producer telemetry |
+| POST `/runs/{id}/cancel` | Cancel and kill helper process group |
+| GET `/runs/{id}/registry` | Current/final normalized registry |
+| GET `/cases/{id}` | Existing case; no fixture fallback |
+| POST `/evidence/sign` | Content signature, not proof attestation |
+| GET `/api/anchor/snapshot`, `/api/knowledge` | Repository evidence summaries and knowledge |
+| POST `/api/trinity/chat` | Explicit help-only endpoint |
 
-## Event replay
-
-The stream keeps an append-only event log per run. Clients can reconnect with
-`GET /runs/{id}/events?after={event_id}` to replay missed events and then follow
-new ones live. That makes a reconnecting browser tab trustworthy instead of
-racing a shared queue.
-
-## Endpoints
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET  | `/` | health, version, server public key |
-| GET  | `/pubkey` | ed25519 public key for verifying evidence |
-| POST | `/runs` | start a run, returns `{run_id}` |
-| GET  | `/runs/{id}/events` | SSE event stream |
-| POST | `/runs/{id}/ingest` | push a real event from the pipeline |
-| POST | `/runs/{id}/cancel` | cancel the run, emit `run.stopped` |
-| GET  | `/runs/{id}/registry` | final registry JSON |
-| GET  | `/cases/{id}` | case detail for the drawer |
-| POST | `/evidence/sign` | sign an evidence bundle with the server key |
-
-## Evidence signing
-
-The console's evidence bundle ships with a `PENDING_SERVER_SIGNATURE` placeholder
-and a real SHA-256 digest. POST that bundle to `/evidence/sign` and the server
-returns it with a real ed25519 signature plus its public key. Anyone can verify
-the signature against `/pubkey`, which makes a bundle tamper-evident and
-locally signed rather than just hashed.
-
-## Production notes
-
-This is built for a single hunter on localhost. Before exposing it anywhere:
-add auth, tighten CORS from `*` to your origin, keep run script and registry
-paths under an approved project root, and persist runs if you need restart
-resilience.
+Run `python -m pytest tests/ -q` for regressions. The bundled SARIF corpus checks
+processing; separate DVD CI checks existing lab proofs. Neither establishes
+fresh general-target detection through this server. Engine integration,
+production-matched reproduction, dependency locking, and full server extraction
+remain separate work.
