@@ -172,6 +172,7 @@ def sign_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "kind": "anchor.evidence_bundle",
+        "attestation": "CONTENT_SIGNATURE_ONLY",
         "signed_at": utc_stamp(),
         "signing_key_id": PUBLIC_KEY_ID,
         "public_key": PUBLIC_KEY_HEX,
@@ -205,6 +206,7 @@ def fixture_case(spec: dict[str, Any]) -> dict[str, Any]:
         })
     return {
         "case_id": spec["case_id"],
+        "provenance": "DEMO_FIXTURE",
         "contract": spec["contract"],
         "swc": swc,
         "expected": [swc] if swc else [],
@@ -232,6 +234,7 @@ def specimen_registry() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "kind": "anchor.registry",
+        "provenance": "DEMO_FIXTURE",
         "benchmark_id": BENCHMARK,
         "generated_at": utc_stamp(),
         "total": total,
@@ -328,6 +331,8 @@ class Run:
             "schema_version": "1.0",
             "event_id": f"evt_{self.run_id}_{seq:06d}",
             "run_id": self.run_id,
+            "mode": self.mode,
+            "provenance": "DEMO_FIXTURE" if self.mode == "demo" else "PRODUCER_TELEMETRY",
             "type": type_,
             "timestamp": utc_stamp(),
             "payload": payload or {},
@@ -342,6 +347,7 @@ class Run:
         elif event_type == "case.started":
             self.cases[case_id] = {
                 "case_id": case_id,
+                "provenance": "DEMO_FIXTURE" if self.mode == "demo" else "PRODUCER_TELEMETRY",
                 "contract": payload.get("contract") or None,
                 "swc": (payload.get("expected") or [None])[0],
                 "expected": payload.get("expected") or [],
@@ -665,7 +671,9 @@ async def run_driver(run: Run) -> None:
             run.done.set()
 
 
-def create_run(mode: str = "demo", *, script: str | None = None, registry: str | None = None, args: Optional[list[str]] = None, benchmark: str | None = None, target: str | None = None) -> Run:
+def create_run(mode: str = "hunt", *, script: str | None = None, registry: str | None = None, args: Optional[list[str]] = None, benchmark: str | None = None, target: str | None = None) -> Run:
+    if mode not in {"demo", "hunt"}:
+        raise ValueError("mode must be demo or hunt")
     run_id = f"run_{secrets.token_hex(6)}"
     params: dict[str, Any] = {"target": target}
     if script is not None:
@@ -846,7 +854,7 @@ async def api_health() -> dict[str, Any]:
 
 @app.get("/api/anchor/session")
 async def api_anchor_session() -> dict[str, Any]:
-    return {"authenticated": True, "release": f"ANCHOR {APP_VERSION}", "mode": "local"}
+    return {"authenticated": False, "authentication_enabled": False, "release": f"ANCHOR {APP_VERSION}", "mode": "local"}
 
 
 @app.get("/api/anchor/snapshot")
@@ -929,16 +937,15 @@ async def api_trinity_scripts() -> dict[str, Any]:
 
 @app.post("/api/trinity/chat")
 async def api_trinity_chat(req: Request) -> dict[str, Any]:
-    body = await req.json()
-    message = str((body or {}).get("message", "")).strip()
+    try:
+        body = await req.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON") from exc
+    if not isinstance(body, dict) or not isinstance(body.get("message", ""), str):
+        raise HTTPException(status_code=400, detail="message must be a string in an object")
     return {
-        "ok": True,
-        "reply": (
-            "Trinity is in local ANCHOR mode. Use the Live Run tab or run "
-            "`./anchor benchmark dvd phase1` to stream a real DVD benchmark."
-            + (f" You asked: {message[:240]}" if message else "")
-        ),
-        "mode": "local",
+        "ok": True, "mode": "help_only", "model_connected": False,
+        "reply": "No model is connected to this help endpoint. Run an explicitly configured hunt or consult the setup guide.",
     }
 
 
@@ -968,13 +975,11 @@ async def pubkey() -> dict[str, Any]:
 async def create_run_route(req: Request) -> dict[str, Any]:
     try:
         body = await req.json()
-    except Exception:
-        body = {}
-    if not isinstance(body, dict):
-        body = {}
-    mode = str(body.get("mode") or "demo").strip().lower()
-    if mode not in {"demo", "hunt"}:
-        mode = "demo"
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON") from exc
+    if not isinstance(body, dict) or body.get("mode") not in ("demo", "hunt"):
+        raise HTTPException(status_code=400, detail="Explicit mode demo or hunt is required")
+    mode = body["mode"]
     args = body.get("args")
     if args and not ALLOW_HUNT_ARGS:
         raise HTTPException(status_code=400, detail="hunt args are disabled; set ANCHOR_ALLOW_HUNT_ARGS=1 to allow explicit script arguments")
@@ -1126,12 +1131,6 @@ async def get_case(case_id: str) -> dict[str, Any]:
             if case.get("swc"):
                 case["swc_detail"] = SWC.get(case["swc"])
             return case
-    fixture = _fixture_for_case(case_id)
-    if fixture:
-        case = dict(fixture)
-        if case.get("swc"):
-            case["swc_detail"] = SWC.get(case["swc"])
-        return case
     raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
 
 

@@ -66,7 +66,7 @@ class SARIFProcessingPipeline:
     def __init__(
         self,
         db_path: Path = Path("anchor_sarif_findings.db"),
-        enable_semantic_clustering: bool = True,
+        enable_semantic_clustering: bool = False,
         embedding_model: str = "all-MiniLM-L6-v2",
         llm_summarizer: Optional[Callable[[str], str]] = None,
         source_root: Optional[Path] = None,

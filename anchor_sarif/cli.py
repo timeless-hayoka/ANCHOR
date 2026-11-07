@@ -72,11 +72,14 @@ def main(argv: list[str] | None = None) -> int:
     visualize_parser.add_argument("--output", default="sarif_clusters.html")
 
     args = parser.parse_args(argv)
+    if args.command == "visualize":
+        print("Not implemented: CLI visualization of stored findings. No file was written.", file=sys.stderr)
+        return 2
     pipeline = SARIFProcessingPipeline(
         db_path=Path(args.db),
         source_root=Path(args.source_root) if getattr(args, "source_root", None) else None,
-        filter_false_positives=args.filter_false_positives,
-        fp_discard_threshold=args.fp_threshold,
+        filter_false_positives=getattr(args, "filter_false_positives", True),
+        fp_discard_threshold=getattr(args, "fp_threshold", 0.7),
     )
 
     if args.command == "process":
@@ -140,62 +143,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(research.to_dict(), indent=2))
         return 0
 
-    if args.command == "visualize":
-        try:
-            from .visualizer import visualize_semantic_clusters
-            from .semantic_clusterer import SemanticClusterer, semantic_clustering_available
-        except ImportError:
-            print("Visualization dependencies not installed.", file=sys.stderr)
-            return 1
-
-        if not semantic_clustering_available():
-            print("Semantic clustering dependencies not installed.", file=sys.stderr)
-            return 1
-
-        import sqlite3
-
-        conn = sqlite3.connect(args.db)
-        rows = conn.execute(
-            "SELECT tool, rule_id, message, file_path, start_line, properties, cluster_id FROM findings"
-        ).fetchall()
-        conn.close()
-
-        if not rows:
-            print(f"No findings in {args.db}", file=sys.stderr)
-            return 1
-
-        from .parser import Finding
-
-        findings: list[Finding] = []
-        labels = []
-        for tool, rule_id, message, file_path, start_line, properties_json, cluster_id in rows:
-            props = json.loads(properties_json) if properties_json else {}
-            findings.append(
-                Finding(
-                    tool=tool,
-                    rule_id=rule_id,
-                    level="warning",
-                    message=message,
-                    file_path=file_path,
-                    start_line=int(start_line or 0),
-                    properties=props,
-                )
-            )
-            labels.append(int(cluster_id) if cluster_id is not None else -1)
-
-        import numpy as np
-        from .semantic_clusterer import ClusterResult
-
-        cluster_result = ClusterResult(
-            cluster_labels=np.array(labels),
-            n_clusters=len({label for label in labels if label != -1}),
-        )
-        fig = visualize_semantic_clusters(findings, cluster_result)
-        fig.write_html(args.output)
-        print(f"Visualization written to {args.output}")
-        return 0
-
-    parser.error(f"unknown command: {args.command}")
     return 2
 
 

@@ -56,11 +56,11 @@ If your browser blocks it, serve the console over http locally too.
 
 ## Two run modes
 
-`POST /runs` accepts a JSON body. Default mode is `demo`.
+`POST /runs` requires a JSON object with an explicit valid `mode`.
 
-- **demo** (`{"mode":"demo"}` or no mode): streams a realistic run from built-in
+- **demo** (`{"mode":"demo"}`): streams an illustrative run from built-in
   fixtures, all five tools per specimen. No toolchain required, so the loop
-  works immediately.
+  works immediately. Events, registry and case data are marked `DEMO_FIXTURE`.
 - **hunt** (`{"mode":"hunt"}`): wraps your real hunt script as a subprocess,
   streams its stdout as `log.line` events, then emits structured case / finding
   / poc events from the registry JSON it writes.
@@ -134,7 +134,9 @@ racing a shared queue.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET  | `/` | health, version, server public key |
+| GET  | `/` | redirect to static demo |
+| GET  | `/api/health` | service health |
+| GET  | `/api/service` | version and server public key |
 | GET  | `/pubkey` | ed25519 public key for verifying evidence |
 | POST | `/runs` | start a run, returns `{run_id}` |
 | GET  | `/runs/{id}/events` | SSE event stream |
