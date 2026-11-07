@@ -1,5 +1,32 @@
 # ANCHOR run server
 
+## Run integrity contract
+
+Live telemetry and imported registries are **unverified producer claims**. The
+server cannot independently verify contract impact and never promotes a live
+label or boolean to `REPRODUCED_REAL`. Such claims appear as
+`POC_EXECUTED_UNPROVEN`; original labels/artifacts are retained as claims.
+Accuracy metrics are `null` without independently labeled ground truth.
+
+The server owns run lifecycle. Completed, failed, and cancelled runs reject
+further telemetry with HTTP 409. Hunt failures emit `run.failed`, including the
+exit code when available. Clients must handle that terminal event.
+
+Hunt scripts must create a **fresh** registry at `ANCHOR_REGISTRY_PATH` (default:
+`.anchor/runs/<run_id>/registry.json`), using this envelope:
+
+```python
+{"run_id": os.environ["ANCHOR_RUN_ID"],
+ "target": os.environ["ANCHOR_TARGET"] or None,
+ "results": [...]}
+```
+
+`ANCHOR_TARGET` carries the requested target identity. The registry's `target`
+must match it. This binding prevents accidental cross-run reuse; it does not
+authenticate source equivalence or prove a vulnerability. Existing output paths,
+unbound/malformed registries, missing output, and nonzero script exits fail the
+run. Registry imports do not invent tool stages or successful execution artifacts.
+
 Local-first, single-tenant backend for the ANCHOR console. It runs on the
 hunter's own machine, points at their own project, and streams a hunt to the
 console's **Live Run** tab over Server-Sent Events. No auth, binds to localhost.

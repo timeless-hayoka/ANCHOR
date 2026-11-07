@@ -23,6 +23,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse, RedirectResponse
 
+from anchor_run_claims import provisional_state, validate_telemetry
 from anchor_cli import load_outcome_entries
 from anchor_scripts import allowed_script_names, load_script_registry, registry_summary
 from anchor_sarif import build_research_loop
@@ -48,7 +49,7 @@ DEFAULT_SCRIPT = os.getenv("ANCHOR_DEFAULT_HUNT_SCRIPT", "trinity_hunt_v4_2_fixe
 ALLOW_HUNT_ARGS = os.getenv("ANCHOR_ALLOW_HUNT_ARGS", "0").strip().lower() in {"1", "true", "yes"}
 BENCHMARK = "3a8b8bf0"
 LADDER = {"DETECTED": 0, "CORRELATED": 1, "REPRODUCED_REAL": 2}
-TERMINAL_EVENTS = {"run.completed", "run.stopped"}
+TERMINAL_EVENTS = {"run.completed", "run.stopped", "run.failed"}
 
 SWC = {
     "SWC-101": {"name": "Integer Overflow / Underflow", "sev": "high", "fix": "Use Solidity ^0.8 checked math or SafeMath.", "cvss": 7.5, "vector": "AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"},
@@ -262,17 +263,6 @@ def case_from_registry(entry: dict[str, Any]) -> dict[str, Any]:
     artifacts = entry.get("execution_artifacts") or []
     if not isinstance(artifacts, list):
         artifacts = []
-    if not artifacts and validation_state == "REPRODUCED_REAL":
-        artifacts = [{
-            "swc": entry.get("swc"),
-            "success": True,
-            "exploit_verified": True,
-            "assertion_count": entry.get("assertion_count", 1),
-            "unavailable": False,
-            "test_path": entry.get("test_path"),
-            "stderr": "",
-            "failure_reason": "",
-        }]
     return {
         "case_id": entry.get("case_id") or entry.get("id") or entry.get("challenge") or "unknown_case",
         "contract": entry.get("contract") or entry.get("subject") or None,
@@ -280,10 +270,13 @@ def case_from_registry(entry: dict[str, Any]) -> dict[str, Any]:
         "expected": entry.get("expected") or [],
         "detected": entry.get("detected") or [],
         "correlated": entry.get("correlated") or [],
-        "reproduced_real": entry.get("reproduced_real") or [],
-        "validation_state": validation_state,
-        "reproduction_status": entry.get("reproduction_status") or ("REPRODUCED_REAL" if validation_state == "REPRODUCED_REAL" else "FAILED"),
-        "execution_artifacts": artifacts,
+        "reproduced_real": [],
+        "claimed_validation_state": validation_state,
+        "validation_state": provisional_state(validation_state),
+        "reproduction_status": "UNVERIFIED",
+        "evidence_verification": "UNVERIFIED_IMPORT",
+        "execution_artifacts": [],
+        "claimed_execution_artifacts": artifacts,
         "timestamp": entry.get("timestamp") or utc_stamp(),
     }
 
@@ -292,17 +285,20 @@ def build_registry_from_cases(run: "Run") -> dict[str, Any]:
     results = list(run.cases.values())
     reproduced = sum(1 for item in results if item.get("validation_state") == "REPRODUCED_REAL")
     total = len(results)
-    precision = 1.0 if total else 0.0
     return {
         "schema_version": "1.0",
         "kind": "anchor.registry",
         "benchmark_id": run.benchmark,
+        "run_id": run.run_id,
+        "target": run.params.get("target"),
+        "mode": run.mode,
         "generated_at": utc_stamp(),
         "total": total,
         "reproduced": reproduced,
-        "precision": precision,
-        "recall": precision,
-        "f1": precision,
+        "precision": None,
+        "recall": None,
+        "f1": None,
+        "metrics_note": "Accuracy requires independently labeled ground truth.",
         "results": results,
     }
 
@@ -372,30 +368,30 @@ class Run:
                 case["correlated"] = [payload.get("swc")]
         elif event_type == "poc.result":
             case = self.cases.setdefault(case_id, {"case_id": case_id})
-            verified = bool(payload.get("exploit_verified"))
+            verified = payload.get("exploit_verified") is True
+            state = "REPRODUCED_REAL" if verified and self.mode == "demo" else (
+                "POC_EXECUTED_UNPROVEN" if verified else "FAILED"
+            )
             case.update({
                 "swc": payload.get("swc") or case.get("swc"),
-                "validation_state": "REPRODUCED_REAL" if verified else "FAILED",
-                "reproduction_status": "REPRODUCED_REAL" if verified else "FAILED",
+                "validation_state": state,
+                "reproduction_status": state if self.mode == "demo" else "UNVERIFIED",
+                "execution_artifacts": [],
+                "reproduced_real": [payload["swc"]] if self.mode == "demo" and verified and payload.get("swc") else [],
+                "claimed_poc_result": dict(payload),
+                "evidence_verification": "DEMO_FIXTURE" if self.mode == "demo" else "UNVERIFIED_TELEMETRY",
             })
-            if verified and payload.get("swc"):
-                case["reproduced_real"] = [payload.get("swc")]
-                case.setdefault("execution_artifacts", []).append({
-                    "swc": payload.get("swc"),
-                    "success": True,
-                    "exploit_verified": True,
-                    "assertion_count": payload.get("assertion_count", 1),
-                    "unavailable": False,
-                    "test_path": payload.get("test_path"),
-                    "stderr": "",
-                    "failure_reason": "",
-                })
         elif event_type == "case.completed":
             case = self.cases.setdefault(case_id, {"case_id": case_id})
-            case["validation_state"] = payload.get("validation_state") or case.get("validation_state", "UNKNOWN")
+            claimed = payload.get("validation_state") or case.get("validation_state", "UNKNOWN")
+            case["claimed_validation_state"] = claimed
+            case["validation_state"] = claimed if self.mode == "demo" else provisional_state(claimed)
             case["stage"] = "done"
         elif event_type == "run.completed":
             self.status = "done"
+            self.done.set()
+        elif event_type == "run.failed":
+            self.status = "failed"
             self.done.set()
         elif event_type == "run.stopped":
             self.status = "stopped"
@@ -403,13 +399,15 @@ class Run:
 
     async def publish(self, event: dict[str, Any], terminal: bool = False) -> None:
         async with self.lock:
+            if self.done.is_set():
+                raise ValueError("Run is already terminal")
             self.events.append(event)
             self._apply_event(event)
             subscribers = list(self.subscribers)
             if terminal:
                 self.done.set()
                 self.subscribers.clear()
-                self.status = "done" if event["type"] == "run.completed" else "stopped"
+                self.status = {"run.completed": "done", "run.failed": "failed", "run.stopped": "stopped"}[event["type"]]
         for queue in subscribers:
             queue.put_nowait(event)
         if terminal:
@@ -559,45 +557,43 @@ async def demo_run(run: Run) -> None:
     await run.emit("run.completed", {"reproduced": reproduced, "total": total, "precision": 1.0 if total else 0.0, "recall": 1.0 if total else 0.0, "f1": 1.0 if total else 0.0})
 
 
+async def fail_run(run: Run, reason: str, *, exit_code: int | None = None) -> None:
+    run.registry = build_registry_from_cases(run)
+    await run.emit("run.failed", {"reason": reason, "exit_code": exit_code})
+
+
 async def hunt_run(run: Run) -> None:
     try:
         script = _resolve_project_path(run.params.get("script"), default=DEFAULT_SCRIPT, must_exist=True, label="hunt script")
-        registry_path = _resolve_project_path(run.params.get("registry"), default="registry.json", must_exist=False, label="registry path")
+        registry_path = _resolve_project_path(
+            run.params.get("registry"), default=f".anchor/runs/{run.run_id}/registry.json",
+            must_exist=False, label="registry path",
+        )
         args = _normalize_args(run.params.get("args"))
+        if args and not ALLOW_HUNT_ARGS:
+            raise ValueError("hunt args are disabled")
+        if script.name not in allowed_script_names():
+            raise ValueError(f"hunt script {script.name} is not allowlisted")
+        if registry_path.exists():
+            raise ValueError("Registry output already exists; use a fresh per-run path")
     except ValueError as exc:
-        await run.emit("log.line", {"message": str(exc), "text": str(exc)})
-        run.registry = build_registry_from_cases(run)
-        await run.emit("run.completed", {"reproduced": 0, "total": 0, "precision": 0.0, "recall": 0.0, "f1": 0.0})
+        await fail_run(run, str(exc))
         return
-    if args and not ALLOW_HUNT_ARGS:
-        await run.emit("log.line", {"message": "hunt args rejected: set ANCHOR_ALLOW_HUNT_ARGS=1 to allow explicit script arguments.", "text": "hunt args rejected"})
-        run.registry = build_registry_from_cases(run)
-        await run.emit("run.completed", {"reproduced": 0, "total": 0, "precision": 0.0, "recall": 0.0, "f1": 0.0})
-        return
-    if script.name not in allowed_script_names():
-        await run.emit("log.line", {"message": f"hunt script rejected: {script.name} is not allowlisted.", "text": "hunt script rejected"})
-        run.registry = build_registry_from_cases(run)
-        await run.emit("run.completed", {"reproduced": 0, "total": 0, "precision": 0.0, "recall": 0.0, "f1": 0.0})
-        return
+
     await run.emit("run.started", {"mode": "hunt", "benchmark_id": run.benchmark, "total_cases": 0})
     env = dict(os.environ)
-    env["ANCHOR_SERVER_URL"] = _self_url()
-    env["ANCHOR_RUN_ID"] = run.run_id
-    env["PYTHONUNBUFFERED"] = "1"
+    env.update({
+        "ANCHOR_SERVER_URL": _self_url(), "ANCHOR_RUN_ID": run.run_id,
+        "ANCHOR_REGISTRY_PATH": str(registry_path),
+        "ANCHOR_TARGET": str(run.params.get("target") or ""), "PYTHONUNBUFFERED": "1",
+    })
     try:
         proc = await asyncio.create_subprocess_exec(
-            sys.executable,
-            str(script),
-            *args,
-            cwd=str(PROJECT_ROOT),
-            env=env,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
+            sys.executable, str(script), *args, cwd=str(PROJECT_ROOT), env=env,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
         )
     except Exception as exc:
-        await run.emit("log.line", {"message": f"failed to launch hunt: {exc}", "text": f"failed to launch hunt: {exc}"})
-        run.registry = build_registry_from_cases(run)
-        await run.emit("run.completed", {"reproduced": 0, "total": 0, "precision": 0.0, "recall": 0.0, "f1": 0.0})
+        await fail_run(run, f"failed to launch hunt: {exc}")
         return
     run.process = proc
 
@@ -616,49 +612,39 @@ async def hunt_run(run: Run) -> None:
     await stdout_task
     if run.cancelled:
         return
-
-    reproduced = 0
-    total = 0
-    if registry_path and registry_path.exists():
-        try:
-            registry_data = json.loads(registry_path.read_text(encoding="utf-8"))
-            run.registry = registry_data if isinstance(registry_data, dict) else {"results": registry_data}
-            results = normalize_registry(registry_data)
-            total = len(results)
-            reproduced = sum(1 for item in results if item.get("validation_state") == "REPRODUCED_REAL" or item.get("success"))
+    if returncode != 0:
+        await fail_run(run, "Hunt subprocess failed; registry output was not accepted", exit_code=returncode)
+        return
+    try:
+        if registry_path.exists():
+            data = json.loads(registry_path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict) or data.get("run_id") != run.run_id:
+                raise ValueError("Registry must bind to this run_id")
+            if data.get("target") != run.params.get("target"):
+                raise ValueError("Registry target does not match this run")
+            results = data.get("results")
+            if not isinstance(results, list) or not all(isinstance(row, dict) for row in results):
+                raise ValueError("Registry results must be a list of objects")
+            normalized = [case_from_registry(row) for row in results]
+            ids = [row["case_id"] for row in normalized]
+            if not all(isinstance(cid, str) and cid.strip() for cid in ids) or len(ids) != len(set(ids)):
+                raise ValueError("Registry case IDs must be nonempty and unique")
+            # Normalize the entire file before accepting any records. Do not replay
+            # imported claims as synthetic tool stages or successful PoC events.
             if not run.ingested:
-                for item in results:
-                    normalized = case_from_registry(item)
-                    cid = normalized["case_id"]
-                    run.cases[cid] = normalized
-                    CASE_INDEX[cid] = normalized
-                    await run.emit("case.started", {"case_id": cid, "contract": normalized.get("contract"), "expected": normalized.get("expected", [])})
-                    if ladder_index(normalized["validation_state"]) >= 0:
-                        await run.emit("finding.detected", {"case_id": cid, "swc": normalized.get("swc"), "source": "registry", "severity": (SWC.get(normalized.get("swc")) or {}).get("sev")})
-                    if ladder_index(normalized["validation_state"]) >= 1:
-                        await run.emit("finding.correlated", {"case_id": cid, "swc": normalized.get("swc"), "evidence": ["registry"]})
-                    if ladder_index(normalized["validation_state"]) >= 2:
-                        artifact = (normalized.get("execution_artifacts") or [{}])[0]
-                        await run.emit("poc.result", {"case_id": cid, "swc": normalized.get("swc"), "exploit_verified": True, "assertion_count": artifact.get("assertion_count", 1), "test_path": artifact.get("test_path")})
-                    await run.emit("case.completed", {"case_id": cid, "validation_state": normalized.get("validation_state")})
-        except Exception as exc:
-            await run.emit("log.line", {"message": f"registry parse failed: {exc}", "text": f"registry parse failed: {exc}"})
-
-    if run.registry is None:
-        run.registry = build_registry_from_cases(run)
-        total = len(run.registry.get("results", []))
-        reproduced = run.registry.get("reproduced", 0)
-    elif total == 0:
-        results = normalize_registry(run.registry)
-        total = len(results)
-        reproduced = sum(1 for item in results if item.get("validation_state") == "REPRODUCED_REAL" or item.get("success"))
-
+                for case in normalized:
+                    cid = case["case_id"]
+                    await run.emit("case.started", {"case_id": cid, "contract": case.get("contract"), "expected": case.get("expected", [])})
+                    run.cases[cid] = case
+                    await run.emit("case.completed", {"case_id": cid, "validation_state": case["claimed_validation_state"]})
+        elif not run.ingested:
+            raise ValueError("Hunt produced neither a run-bound registry nor telemetry")
+    except (OSError, ValueError, TypeError, AttributeError) as exc:
+        await fail_run(run, f"Registry rejected: {exc}")
+        return
+    run.registry = build_registry_from_cases(run)
     await run.emit("run.completed", {
-        "reproduced": reproduced,
-        "total": total,
-        "precision": float(run.registry.get("precision", 0.0)) if isinstance(run.registry, dict) else 0.0,
-        "recall": float(run.registry.get("recall", 0.0)) if isinstance(run.registry, dict) else 0.0,
-        "f1": float(run.registry.get("f1", 0.0)) if isinstance(run.registry, dict) else 0.0,
+        key: run.registry[key] for key in ("reproduced", "total", "precision", "recall", "f1")
     })
 
 
@@ -671,6 +657,9 @@ async def run_driver(run: Run) -> None:
     except asyncio.CancelledError:
         run.cancelled = True
         run.status = "stopped"
+    except Exception as exc:
+        if not run.done.is_set():
+            await fail_run(run, f"Run driver failed: {type(exc).__name__}")
     finally:
         if not run.done.is_set():
             run.done.set()
@@ -1071,9 +1060,17 @@ async def ingest(run_id: str, req: Request) -> dict[str, Any]:
         "timestamp": str(body.get("timestamp") or utc_stamp()),
         "payload": payload,
     }
+    if run.done.is_set():
+        raise HTTPException(status_code=409, detail="Run is already terminal")
+    if body.get("run_id", run_id) != run_id:
+        raise HTTPException(status_code=400, detail="Event run_id does not match route")
+    try:
+        validate_telemetry(event_type, payload)
+        await run.ingest_envelope(event)
+    except ValueError as exc:
+        raise HTTPException(status_code=409 if run.done.is_set() else 400, detail=str(exc)) from exc
     if event_type != "log.line":
         run.ingested = True
-    await run.ingest_envelope(event)
     return {"ok": True, "event": event}
 
 
@@ -1082,6 +1079,8 @@ async def cancel_run(run_id: str) -> dict[str, Any]:
     run = RUNS.get(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
+    if run.done.is_set():
+        return {"ok": True, "run_id": run_id, "status": run.status}
     run.cancelled = True
     if run.process and run.process.returncode is None:
         try:
