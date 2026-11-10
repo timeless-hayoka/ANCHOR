@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 DANGEROUS_HOOKS = ("preinstall", "install", "postinstall")
 NETWORK_TERMS = ("curl ", "wget ", "http://", "https://", "fetch(")
 EXEC_TERMS = ("node -e", "bash ", "sh ", "powershell", "child_process", "exec(")
+PIPE_TO_SHELL = re.compile(r"\\|\\s*(?:sh|bash|zsh)(?:\\s|$|[;&|])", re.IGNORECASE)
 
 
 def inspect_package(package: dict, *, approved_commit: str | None = None) -> list[dict]:
@@ -27,7 +29,7 @@ def inspect_package(package: dict, *, approved_commit: str | None = None) -> lis
         lowered = command.lower()
         if any(term in lowered for term in NETWORK_TERMS):
             findings.append({"rule": "INSTALL_NETWORK", "severity": "high", "evidence": hook})
-        if any(term in lowered for term in EXEC_TERMS):
+        if any(term in lowered for term in EXEC_TERMS) or PIPE_TO_SHELL.search(command):
             findings.append({"rule": "INSTALL_EXECUTION", "severity": "medium", "evidence": hook})
     provenance = package.get("provenance", {})
     if approved_commit is not None:
