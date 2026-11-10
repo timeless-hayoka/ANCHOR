@@ -9,7 +9,7 @@ from pathlib import Path
 DANGEROUS_HOOKS = ("preinstall", "install", "postinstall")
 NETWORK_TERMS = ("curl ", "wget ", "http://", "https://", "fetch(")
 EXEC_TERMS = ("node -e", "bash ", "sh ", "powershell", "child_process", "exec(")
-PIPE_TO_SHELL = re.compile(r"\\|\\s*(?:sh|bash|zsh)(?:\\s|$|[;&|])", re.IGNORECASE)
+PIPE_TO_SHELL = re.compile(r"\|\s*(?:sh|bash|zsh)(?:\s|$|[;&|])", re.IGNORECASE)
 
 
 def inspect_package(package: dict, *, approved_commit: str | None = None) -> list[dict]:
