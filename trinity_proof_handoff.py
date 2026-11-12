@@ -86,15 +86,15 @@ def review_case(finder: Mapping, foundry: Mapping, watcher: Mapping,
     proof_refs = _refs(foundry, "foundry")
     _require(watcher.get("verdict") == "validated", "Watcher did not validate")
     _require(watcher.get("reviewed_evidence_refs") == proof_refs, "Watcher did not review this proof")
-    _require(watcher.get("actor") != foundry.get("actor"), "Watcher not independent of prover")
-    _string(foundry, "actor", "foundry")
-    _string(watcher, "actor", "watcher")
+    prover_actor = _string(foundry, "actor", "foundry").strip().casefold()
+    watcher_actor = _string(watcher, "actor", "watcher").strip().casefold()
+    _require(watcher_actor != prover_actor, "Watcher not independent of prover")
     challenge = _string(watcher, "challenge", "watcher")
     watcher_refs = _refs(watcher, "watcher")
     _require(council.get("verdict") == "accepted", "Council did not accept")
-    _require(council.get("actor") not in (foundry.get("actor"), watcher.get("actor")),
+    council_actor = _string(council, "actor", "council").strip().casefold()
+    _require(council_actor not in (prover_actor, watcher_actor),
              "Council not independent")
-    _string(council, "actor", "council")
     impact = _string(council, "impact_boundary", "council")
     _require(council.get("reviewed_evidence_refs") == proof_refs,
              "Council did not review this proof")

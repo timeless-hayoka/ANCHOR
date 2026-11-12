@@ -82,3 +82,16 @@ def test_inputs_unchanged():
     snapshot = copy.deepcopy(original)
     review_case(*original)
     assert original == snapshot
+
+
+@pytest.mark.parametrize("role,alias", [
+    (2, "FOUNDRY"),
+    (2, " foundry "),
+    (3, "FOUNDRY"),
+    (3, " Watcher "),
+])
+def test_reviewer_identity_aliases_are_not_independent(role, alias):
+    pieces = list(fixtures())
+    pieces[role]["actor"] = alias
+    with pytest.raises(HandoffRejected, match="not independent"):
+        review_case(*pieces)
