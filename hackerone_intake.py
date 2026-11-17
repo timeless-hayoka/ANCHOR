@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import http.client
 import json
 import os
 import re
@@ -34,6 +35,31 @@ class HackerOneAPIError(RuntimeError):
 ResponseOpener = Callable[..., Any]
 
 
+class _RejectRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects before a credentialed follow-up request is created."""
+
+    def _reject(
+        self,
+        request: urllib.request.Request,
+        response: Any,
+        code: int,
+        message: str,
+        headers: Any,
+    ) -> None:
+        raise urllib.error.HTTPError(request.full_url, code, message, headers, response)
+
+    http_error_301 = _reject
+    http_error_302 = _reject
+    http_error_303 = _reject
+    http_error_307 = _reject
+    http_error_308 = _reject
+
+
+def _urlopen_without_redirects(request: urllib.request.Request, *, timeout: int) -> Any:
+    opener = urllib.request.build_opener(_RejectRedirectHandler())
+    return opener.open(request, timeout=timeout)
+
+
 def validate_program_handle(handle: str) -> str:
     """Return a validated HackerOne program handle."""
     if not PROGRAM_HANDLE_RE.fullmatch(handle):
@@ -51,7 +77,7 @@ class HackerOneClient:
         username: str,
         token: str,
         *,
-        opener: ResponseOpener = urllib.request.urlopen,
+        opener: ResponseOpener | None = None,
         timeout: int = 30,
     ) -> None:
         if not username or not token:
@@ -63,7 +89,7 @@ class HackerOneClient:
 
         credential = base64.b64encode(f"{username}:{token}".encode("utf-8")).decode("ascii")
         self._authorization = f"Basic {credential}"
-        self._opener = opener
+        self._opener = opener if opener is not None else _urlopen_without_redirects
         self._timeout = timeout
 
     @staticmethod
@@ -104,6 +130,8 @@ class HackerOneClient:
             raise HackerOneAPIError(message) from None
         except urllib.error.URLError as exc:
             raise HackerOneAPIError(f"HackerOne API connection failed: {exc.reason}") from None
+        except (http.client.HTTPException, OSError):
+            raise HackerOneAPIError("HackerOne API response could not be read") from None
         except (UnicodeDecodeError, json.JSONDecodeError):
             raise HackerOneAPIError("HackerOne API returned an invalid JSON response") from None
 

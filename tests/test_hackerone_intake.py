@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+from http.client import IncompleteRead
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request
@@ -13,6 +14,7 @@ import pytest
 from hackerone_intake import (
     HackerOneAPIError,
     HackerOneClient,
+    _RejectRedirectHandler,
     crawl_programs,
     select_crawl_candidates,
     validate_program_handle,
@@ -91,6 +93,26 @@ def test_rejects_off_origin_pagination_url() -> None:
         )
 
 
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+def test_default_redirect_handler_rejects_redirects(status: int) -> None:
+    request = Request(
+        "https://api.hackerone.com/v1/hackers/programs/acme",
+        headers={"Authorization": "Basic credential"},
+    )
+    handler = _RejectRedirectHandler()
+
+    with pytest.raises(HTTPError) as exc_info:
+        getattr(handler, f"http_error_{status}")(
+            request,
+            FakeResponse(),
+            status,
+            "Redirect",
+            {"Location": "http://attacker.example/collect"},
+        )
+
+    assert exc_info.value.code == status
+
+
 def test_http_errors_do_not_disclose_credentials() -> None:
     def opener(request: Request, *, timeout: int) -> FakeResponse:
         raise HTTPError(request.full_url, 401, "Unauthorized", {}, None)
@@ -101,6 +123,23 @@ def test_http_errors_do_not_disclose_credentials() -> None:
 
     assert "top-secret" not in str(exc_info.value)
     assert "researcher" not in str(exc_info.value)
+
+
+def test_incomplete_response_is_converted_to_safe_api_error() -> None:
+    class IncompleteResponse(FakeResponse):
+        def read(self, *_args, **_kwargs):
+            raise IncompleteRead(b'{"partial": "secret-fragment"')
+
+    def opener(_request: Request, *, timeout: int) -> FakeResponse:
+        return IncompleteResponse()
+
+    client = HackerOneClient("researcher", "top-secret", opener=opener)
+
+    with pytest.raises(HackerOneAPIError, match="response could not be read") as exc_info:
+        client._get("https://api.hackerone.com/v1/hackers/programs/acme")
+
+    assert "secret-fragment" not in str(exc_info.value)
+    assert "top-secret" not in str(exc_info.value)
 
 
 def test_writes_snapshot_to_handle_specific_file(tmp_path: Path) -> None:

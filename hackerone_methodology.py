@@ -298,6 +298,9 @@ def compile_hunt_plan(
         attributes = _attributes(scope_by_id[scope_id])
         if attributes.get("eligible_for_submission") is not True:
             raise MethodologyError(f"scope {scope_id} is not eligible for submission")
+        asset_identifier = _nonempty_string(
+            attributes.get("asset_identifier"), f"scope {scope_id} asset_identifier"
+        )
         kinds = _string_set(entry.get("system_kinds"), f"scope {scope_id} system_kinds")
         invalid_kinds = kinds - SYSTEM_KINDS
         if invalid_kinds:
@@ -310,7 +313,7 @@ def compile_hunt_plan(
         selected_scopes.append(
             {
                 "scope_id": scope_id,
-                "asset_identifier": attributes.get("asset_identifier"),
+                "asset_identifier": asset_identifier,
                 "asset_type": attributes.get("asset_type"),
                 "system_kinds": sorted(kinds),
                 "instructions": attributes.get("instruction") or attributes.get("instructions"),

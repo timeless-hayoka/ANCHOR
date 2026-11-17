@@ -11,6 +11,7 @@ from hackerone_methodology import (
     MethodologyError,
     build_review_template,
     compile_hunt_plan,
+    payload_sha256,
 )
 
 
@@ -132,6 +133,32 @@ def test_rejects_ineligible_scope_even_when_reviewer_marks_it_in_scope() -> None
 
     with pytest.raises(MethodologyError, match="not eligible for submission"):
         compile_hunt_plan(source, review, now=NOW)
+
+
+@pytest.mark.parametrize("asset_identifier", [None, "   "])
+def test_rejects_selected_scope_without_asset_identifier(asset_identifier: object) -> None:
+    source, review = approved_review()
+    attributes = source["structured_scopes"][0]["attributes"]
+    if asset_identifier is None:
+        attributes.pop("asset_identifier")
+    else:
+        attributes["asset_identifier"] = asset_identifier
+    review["snapshot_sha256"] = payload_sha256(source)
+
+    with pytest.raises(MethodologyError, match="scope web-1 asset_identifier"):
+        compile_hunt_plan(source, review, now=NOW)
+
+
+def test_normalizes_selected_scope_asset_identifier() -> None:
+    source, review = approved_review()
+    source["structured_scopes"][0]["attributes"]["asset_identifier"] = (
+        "  https://app.example.test  "
+    )
+    review["snapshot_sha256"] = payload_sha256(source)
+
+    plan = compile_hunt_plan(source, review, now=NOW)
+
+    assert plan["selected_scopes"][0]["asset_identifier"] == "https://app.example.test"
 
 
 def test_always_blocked_method_cannot_be_permitted() -> None:
