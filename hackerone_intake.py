@@ -171,6 +171,12 @@ class HackerOneClient:
         base_url = f"{API_ORIGIN}/v1/hackers/programs/{handle}"
         program_payload = self._get(base_url)
         program = program_payload.get("data")
+        if (
+            not isinstance(program, dict)
+            and program_payload.get("type") == "program"
+            and isinstance(program_payload.get("attributes"), dict)
+        ):
+            program = program_payload
         if not isinstance(program, dict):
             fields = ", ".join(sorted(str(key) for key in program_payload)) or "none"
             raise HackerOneAPIError(

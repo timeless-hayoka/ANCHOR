@@ -71,6 +71,32 @@ def test_fetches_program_scopes_and_exclusions_with_pagination() -> None:
     assert "secret-token" not in json.dumps(snapshot)
 
 
+def test_accepts_live_unwrapped_program_resource_shape() -> None:
+    def opener(request: Request, *, timeout: int) -> FakeResponse:
+        url = request.full_url
+        if url.endswith("/programs/acme"):
+            return response(
+                {
+                    "id": "7",
+                    "type": "program",
+                    "attributes": {"handle": "acme", "policy": "Rules"},
+                    "relationships": {"structured_scopes": {"data": []}},
+                }
+            )
+        if url.endswith("/structured_scopes") or url.endswith("/scope_exclusions"):
+            return response({"data": []})
+        raise AssertionError(f"unexpected URL: {url}")
+
+    snapshot = HackerOneClient("researcher", "token", opener=opener).get_program_snapshot(
+        "acme"
+    )
+
+    assert snapshot["program"]["type"] == "program"
+    assert snapshot["program"]["attributes"]["handle"] == "acme"
+    assert snapshot["structured_scopes"] == []
+    assert snapshot["scope_exclusions"] == []
+
+
 @pytest.mark.parametrize("handle", ["../other", "acme/other", "acme?x=1", "acme name", ""])
 def test_rejects_unsafe_program_handles(handle: str) -> None:
     with pytest.raises(ValueError):
