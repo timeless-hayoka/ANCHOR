@@ -1,0 +1,53 @@
+name: HackerOne scope crawler
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_programs:
+        description: Maximum number of open programs to snapshot (1-100)
+        required: true
+        default: "25"
+        type: string
+      include_vdp:
+        description: Include programs that accept disclosures but do not offer bounties
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hackerone-scope-crawler
+  cancel-in-progress: false
+
+jobs:
+  crawl-scopes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HACKERONE_USERNAME: ${{ secrets.HACKERONE_USERNAME }}
+      HACKERONE_API_TOKEN: ${{ secrets.HACKERONE_API_TOKEN }}
+      MAX_PROGRAMS: ${{ inputs.max_programs }}
+      INCLUDE_VDP: ${{ inputs.include_vdp }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Crawl open program scopes
+        shell: bash
+        run: |
+          args=(--crawl --limit "$MAX_PROGRAMS")
+          if [[ "$INCLUDE_VDP" == "true" ]]; then
+            args+=(--include-vdp)
+          fi
+          python hackerone_intake.py "${args[@]}"
+      - name: Upload scope evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hackerone-scope-crawl
+          path: discoveries/hackerone/
+          retention-days: 7
+          if-no-files-found: error
