@@ -1,0 +1,39 @@
+name: HackerOne scope intake
+
+on:
+  workflow_dispatch:
+    inputs:
+      program_handle:
+        description: HackerOne program handle (the value in hackerone.com/<handle>)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hackerone-scope-intake-${{ inputs.program_handle }}
+  cancel-in-progress: false
+
+jobs:
+  fetch-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HACKERONE_USERNAME: ${{ secrets.HACKERONE_USERNAME }}
+      HACKERONE_API_TOKEN: ${{ secrets.HACKERONE_API_TOKEN }}
+      PROGRAM_HANDLE: ${{ inputs.program_handle }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fetch read-only program scope
+        run: python hackerone_intake.py --program-handle "$PROGRAM_HANDLE"
+      - name: Upload scope evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hackerone-scope-${{ inputs.program_handle }}
+          path: discoveries/hackerone/
+          retention-days: 7
+          if-no-files-found: error
