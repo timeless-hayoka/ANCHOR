@@ -172,7 +172,11 @@ class HackerOneClient:
         program_payload = self._get(base_url)
         program = program_payload.get("data")
         if not isinstance(program, dict):
-            raise HackerOneAPIError("HackerOne program response is missing its data object")
+            fields = ", ".join(sorted(str(key) for key in program_payload)) or "none"
+            raise HackerOneAPIError(
+                "HackerOne program response is missing its data object "
+                f"(top-level fields: {fields})"
+            )
 
         return {
             "schema_version": "1.0",

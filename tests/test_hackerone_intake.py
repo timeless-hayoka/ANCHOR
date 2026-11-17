@@ -125,6 +125,26 @@ def test_http_errors_do_not_disclose_credentials() -> None:
     assert "researcher" not in str(exc_info.value)
 
 
+def test_missing_program_data_reports_only_top_level_field_names() -> None:
+    def opener(_request: Request, *, timeout: int) -> FakeResponse:
+        return response(
+            {
+                "meta": {"request_id": "sensitive-request-id"},
+                "errors": [{"detail": "sensitive API response detail"}],
+            }
+        )
+
+    client = HackerOneClient("researcher", "top-secret", opener=opener)
+    with pytest.raises(HackerOneAPIError) as exc_info:
+        client.get_program_snapshot("acme")
+
+    message = str(exc_info.value)
+    assert "top-level fields: errors, meta" in message
+    assert "sensitive-request-id" not in message
+    assert "sensitive API response detail" not in message
+    assert "top-secret" not in message
+
+
 def test_incomplete_response_is_converted_to_safe_api_error() -> None:
     class IncompleteResponse(FakeResponse):
         def read(self, *_args, **_kwargs):
