@@ -1,5 +1,10 @@
 # ANCHOR
 
+**PHI//DRIFT — Founding Mission & Guiding Principles**
+
+*Human Vision. Machine Intelligence. A Future We Build Together.*
+
+
 Proof-gated smart-contract hunting for authorized security research.
 
 AI says there may be a bug. ANCHOR asks for evidence.
